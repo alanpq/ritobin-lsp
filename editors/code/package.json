@@ -1,0 +1,23 @@
+{
+    "name": "lsp-ritobin",
+    "description": "VSCode plugin for Ritobin language support",
+    "author": "alanpq",
+    "license": "MIT",
+    "version": "0.0.1",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/alanpq/vscode-ritobin"
+    },
+    "engines": {
+        "vscode": "^1.100.0"
+    },
+    "dependencies": {
+        "anser": "^2.3.5",
+        "glob": "^11.0.0",
+        "vscode-languageclient": "^9.0.1"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.100.0",
+        "@vscode/test-electron": "^2.3.9"
+    }
+}
