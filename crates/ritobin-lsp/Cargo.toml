@@ -4,13 +4,25 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+paths = {workspace = true, features = ["serde1"] }
+
 anyhow = "1.0.100"
 clap = { version = "4.5.54", features = ["derive"] }
-env_logger = "0.11.8"
+crossbeam-channel = "0.5.15"
 log = "0.4.29"
 lsp-server = "0.7.9"
-lsp-types = "0.97.0"
+lsp-types = { version = "=0.95.0", features = ["proposed"] }
 ltk_ritobin = { version = "0.1.5", features = ["serde"] }
 rustc-hash = "2.1.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.148"
+semver = "1.0.27"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.22", default-features = false, features = [
+    "registry",
+    "fmt",
+    "local-time",
+    "std",
+    "time",
+    "tracing-log",
+] }

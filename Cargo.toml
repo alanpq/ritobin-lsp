@@ -7,3 +7,15 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 authors = ["alanpq"]
 repository = "https://github.com/alanpq/ritobin-lsp"
+
+[workspace.dependencies]
+paths = { path = "./crates/paths", version = "0.0.0" }
+
+# non-local
+camino = "1.1.10"
+
+
+[workspace.lints.rust]
+
+[workspace.lints.clippy]
+single_match = "allow"

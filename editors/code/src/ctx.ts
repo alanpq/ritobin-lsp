@@ -246,11 +246,11 @@ export class Ctx implements RustAnalyzerExtensionApi {
         this.config,
         this.unlinkedFiles,
       );
-      // this.pushClientCleanup(
-      //     this._client.onNotification(ra.serverStatus, (params) =>
-      //         this.setServerStatus(params),
-      //     ),
-      // );
+      this.pushClientCleanup(
+        this._client.onNotification(ra.serverStatus, (params) =>
+          this.setServerStatus(params),
+        ),
+      );
       // this.pushClientCleanup(
       //     this._client.onNotification(ra.openServerLogs, () => {
       //         this.outputChannel!.show();

@@ -48,7 +48,7 @@
         "<node_internals>/**/*.js"
       ],
       "env": {
-        "__RA_LSP_SERVER_DEBUG": "${workspaceFolder}/target/debug/ritobin-lsp"
+        "__RB_LSP_SERVER_DEBUG": "${workspaceFolder}/target/debug/ritobin-lsp"
       }
     },
     {
@@ -70,7 +70,7 @@
         "<node_internals>/**/*.js"
       ],
       "env": {
-        "__RA_LSP_SERVER_DEBUG": "${workspaceFolder}/target/release/ritobin-lsp"
+        "__RB_LSP_SERVER_DEBUG": "${workspaceFolder}/target/release/ritobin-lsp"
       }
     },
     {
@@ -93,7 +93,7 @@
         "<node_internals>/**/*.js"
       ],
       "env": {
-        "__RA_LSP_SERVER_DEBUG": "${workspaceFolder}/target/release/ritobin-lsp"
+        "__RB_LSP_SERVER_DEBUG": "${workspaceFolder}/target/release/ritobin-lsp"
       }
     },
     {

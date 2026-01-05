@@ -223,7 +223,7 @@
                             ]
                         },
                         "default": null,
-                        "markdownDescription": "Extra environment variables that will be passed to the ritobin-lsp executable. Useful for passing e.g. `RA_LOG` for debugging."
+                        "markdownDescription": "Extra environment variables that will be passed to the ritobin-lsp executable. Useful for passing e.g. `RB_LOG` for debugging."
                     }
                 }
             }
