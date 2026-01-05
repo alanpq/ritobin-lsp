@@ -1,5 +1,5 @@
 {
-    "name": "lsp-ritobin",
+    "name": "ritobin-lsp",
     "description": "VSCode plugin for Ritobin language support",
     "private": true,
     "author": "alanpq",

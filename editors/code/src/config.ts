@@ -93,11 +93,10 @@ export class Config {
     }
 
     private refreshLogging() {
-        log.info(vscode.extensions.getExtension(this.extensionId));
-        // log.info(
-        //     "Extension version:",
-        //     vscode.extensions.getExtension(this.extensionId)!.packageJSON.version,
-        // );
+        log.info(
+            "Extension version:",
+            vscode.extensions.getExtension(this.extensionId)!.packageJSON.version,
+        );
 
         const cfg = Object.entries(this.cfg).filter(([_, val]) => !(val instanceof Function));
         log.info("Using configuration", Object.fromEntries(cfg));
