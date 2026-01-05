@@ -14,8 +14,8 @@ export async function bootstrap(
     const path = await getServer(context, config, state);
     if (!path) {
         throw new Error(
-            "rust-analyzer Language Server is not available. " +
-                "Please, ensure its [proper installation](https://rust-analyzer.github.io/book/installation.html).",
+            "ritobin-lsp Language Server is not available. " +
+            "Please, ensure its [proper installation](https://ritobin-lsp.github.io/book/installation.html).",
         );
     }
 
@@ -24,10 +24,10 @@ export async function bootstrap(
     if (!isValidExecutable(path, config.serverExtraEnv)) {
         throw new Error(
             `Failed to execute ${path} --version.` +
-                (config.serverPath
-                    ? `\`config.server.path\` or \`config.serverPath\` has been set explicitly.\
+            (config.serverPath
+                ? `\`config.server.path\` or \`config.serverPath\` has been set explicitly.\
             Consider removing this config or making a valid server binary available at that path.`
-                    : ""),
+                : ""),
         );
     }
 
@@ -38,11 +38,12 @@ async function getServer(
     config: Config,
     state: PersistentState,
 ): Promise<string | undefined> {
+    console.log({ context });
     const packageJson: {
         version: string;
         releaseTag: string | null;
         enableProposedApi: boolean | undefined;
-    } = context.extension.packageJSON;
+    } = context.extension?.packageJSON ?? { version: "DAMN", releaseTag: null, enableProposedApi: false };
 
     // check if the server path is configured explicitly
     const explicitPath = process.env["__RA_LSP_SERVER_DEBUG"] ?? config.serverPath;
@@ -57,15 +58,15 @@ async function getServer(
     if (vscode.workspace.workspaceFolders) {
         for (const workspaceFolder of vscode.workspace.workspaceFolders) {
             // otherwise check if there is a toolchain override for the current vscode workspace
-            // and if the toolchain of this override has a rust-analyzer component
-            // if so, use the rust-analyzer component
+            // and if the toolchain of this override has a ritobin-lsp component
+            // if so, use the ritobin-lsp component
             // Check both rust-toolchain.toml and rust-toolchain files
             for (const toolchainFile of RUST_TOOLCHAIN_FILES) {
                 const toolchainUri = vscode.Uri.joinPath(workspaceFolder.uri, toolchainFile);
                 if (!(await hasToolchainFileWithRaDeclared(toolchainUri))) {
                     continue;
                 }
-                const res = await spawnAsync("rustup", ["which", "rust-analyzer"], {
+                const res = await spawnAsync("rustup", ["which", "ritobin-lsp"], {
                     env: { ...process.env },
                     cwd: workspaceFolder.uri.fsPath,
                 });
@@ -84,11 +85,11 @@ async function getServer(
         return toolchainServerPath;
     }
 
-    if (packageJson.releaseTag === null) return "rust-analyzer";
+    if (packageJson.releaseTag === null) return "ritobin-lsp";
 
     // finally, use the bundled one
     const ext = process.platform === "win32" ? ".exe" : "";
-    const bundled = vscode.Uri.joinPath(context.extensionUri, "server", `rust-analyzer${ext}`);
+    const bundled = vscode.Uri.joinPath(context.extensionUri, "server", `ritobin-lsp${ext}`);
     const bundledExists = await fileExists(bundled);
     if (bundledExists) {
         let server = bundled;
@@ -108,16 +109,16 @@ async function getServer(
 
     await vscode.window.showErrorMessage(
         "Unfortunately we don't ship binaries for your platform yet. " +
-            "You need to manually clone the rust-analyzer repository and " +
-            "run `cargo xtask install --server` to build the language server from sources. " +
-            "If you feel that your platform should be supported, please create an issue " +
-            "about that [here](https://github.com/rust-lang/rust-analyzer/issues) and we " +
-            "will consider it.",
+        "You need to manually clone the ritobin-lsp repository and " +
+        "run `cargo xtask install --server` to build the language server from sources. " +
+        "If you feel that your platform should be supported, please create an issue " +
+        "about that [here](https://github.com/alanpq/ritobin-lsp/issues) and we " +
+        "will consider it.",
     );
     return undefined;
 }
 
-// Given a path to a rust-analyzer executable, resolve its version and return it.
+// Given a path to a ritobin-lsp executable, resolve its version and return it.
 async function raVersionResolver(path: string): Promise<string | undefined> {
     const res = await spawnAsync(path, ["--version"]);
     if (!res.error && res.status === 0) {
@@ -127,7 +128,7 @@ async function raVersionResolver(path: string): Promise<string | undefined> {
     }
 }
 
-// Given a path to two rust-analyzer executables, return the earliest one by date.
+// Given a path to two ritobin-lsp executables, return the earliest one by date.
 async function earliestToolchainPath(
     path0: string | undefined,
     path1: string,
@@ -152,15 +153,15 @@ async function earliestToolchainPath(
 //  Medium  - versioned
 //  Lowest  - stable
 // Example paths:
-//  nightly   - /Users/myuser/.rustup/toolchains/nightly-2022-11-22-aarch64-apple-darwin/bin/rust-analyzer
-//  versioned - /Users/myuser/.rustup/toolchains/1.72.1-aarch64-apple-darwin/bin/rust-analyzer
-//  stable    - /Users/myuser/.rustup/toolchains/stable-aarch64-apple-darwin/bin/rust-analyzer
+//  nightly   - /Users/myuser/.rustup/toolchains/nightly-2022-11-22-aarch64-apple-darwin/bin/ritobin-lsp
+//  versioned - /Users/myuser/.rustup/toolchains/1.72.1-aarch64-apple-darwin/bin/ritobin-lsp
+//  stable    - /Users/myuser/.rustup/toolchains/stable-aarch64-apple-darwin/bin/ritobin-lsp
 async function orderFromPath(
     path: string,
     raVersionResolver: (path: string) => Promise<string | undefined>,
 ): Promise<string> {
     const raVersion = await raVersionResolver(path);
-    const raDate = raVersion?.match(/^rust-analyzer .*\(.* (\d{4}-\d{2}-\d{2})\)$/);
+    const raDate = raVersion?.match(/^ritobin-lsp .*\(.* (\d{4}-\d{2}-\d{2})\)$/);
     if (raDate?.length === 2) {
         const precedence = path.includes("nightly-") ? "0" : "1";
         return "0-" + raDate[1] + "/" + precedence;
@@ -182,7 +183,7 @@ async function hasToolchainFileWithRaDeclared(uri: vscode.Uri): Promise<boolean>
             await vscode.workspace.fs.readFile(uri),
         );
         return (
-            toolchainFileContents.match(/components\s*=\s*\[.*"rust-analyzer".*\]/g)?.length === 1
+            toolchainFileContents.match(/components\s*=\s*\[.*"ritobin-lsp".*\]/g)?.length === 1
         );
     } catch (_) {
         return false;
@@ -221,7 +222,7 @@ async function getNixOsServer(
     server: vscode.Uri,
 ) {
     await vscode.workspace.fs.createDirectory(globalStorageUri).then();
-    const dest = vscode.Uri.joinPath(globalStorageUri, `rust-analyzer${ext}`);
+    const dest = vscode.Uri.joinPath(globalStorageUri, `ritobin-lsp${ext}`);
     let exists = await vscode.workspace.fs.stat(dest).then(
         () => true,
         () => false,
@@ -254,13 +255,13 @@ async function patchelf(dest: vscode.Uri): Promise<void> {
     await vscode.window.withProgress(
         {
             location: vscode.ProgressLocation.Notification,
-            title: "Patching rust-analyzer for NixOS",
+            title: "Patching ritobin-lsp for NixOS",
         },
         async (progress, _) => {
             const expression = `
             {srcStr, pkgs ? import <nixpkgs> {}}:
                 pkgs.stdenv.mkDerivation {
-                    name = "rust-analyzer";
+                    name = "ritobin-lsp";
                     src = /. + srcStr;
                     phases = [ "installPhase" "fixupPhase" ];
                     installPhase = "cp $src $out";

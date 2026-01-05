@@ -1,23 +1,409 @@
 {
     "name": "lsp-ritobin",
     "description": "VSCode plugin for Ritobin language support",
+    "private": true,
     "author": "alanpq",
+    "publisher": "alanpq",
     "license": "MIT",
     "version": "0.0.1",
+    "type": "commonjs",
     "repository": {
         "type": "git",
         "url": "https://github.com/alanpq/vscode-ritobin"
     },
+    "keywords": [
+        "ritobin",
+        "League of Legends"
+    ],
+    "categories": [
+        "Formatters",
+        "Programming Languages"
+    ],
+    "capabilities": {
+        "untritobinedWorkspaces": {
+            "supported": false,
+            "description": "ritobin-lsp invokes binaries set up by its configuration as well as the Ritobin toolchain's binaries. A malicious actor could exploit this to run arbitrary code on your machine."
+        }
+    },
     "engines": {
         "vscode": "^1.100.0"
+    },
+    "enabledApiProposals": [],
+    "scripts": {
+        "vscode:prepublish": "npm run build-base -- --minify",
+        "package": "vsce package -o ritobin-lsp.vsix",
+        "build-base": "esbuild ./src/main.ts --bundle --outfile=out/main.js --external:vscode --format=cjs --platform=node --target=node20",
+        "build": "npm run build-base -- --sourcemap",
+        "watch": "npm run build-base -- --sourcemap --watch",
+        "format": "node --experimental-strip-types node_modules/prettier/bin/prettier.cjs . --write",
+        "format:check": "node --experimental-strip-types node_modules/prettier/bin/prettier.cjs . --check",
+        "lint": "eslint .",
+        "lint:fix": "npm run lint -- --fix",
+        "typecheck": "tsc"
     },
     "dependencies": {
         "anser": "^2.3.5",
         "glob": "^11.0.0",
+        "lodash": "^4.17.21",
         "vscode-languageclient": "^9.0.1"
     },
     "devDependencies": {
+        "@tsconfig/strictest": "^2.0.5",
+        "@types/lodash": "^4.17.21",
+        "@types/node": "~22.13.4",
         "@types/vscode": "^1.100.0",
-        "@vscode/test-electron": "^2.3.9"
+        "@typescript-eslint/eslint-plugin": "^8.25.0",
+        "@typescript-eslint/parser": "^8.25.0",
+        "@vscode/test-electron": "^2.3.9",
+        "@vscode/vsce": "^3.6.0",
+        "esbuild": "^0.25.0",
+        "prettier": "^3.5.2",
+        "typescript": "^5.7.3",
+        "typescript-eslint": "^8.25.0"
+    },
+    "main": "./out/main",
+    "contributes": {
+        "commands": [
+            {
+                "command": "ritobin-lsp.onEnter",
+                "title": "Enhanced enter key",
+                "category": "ritobin-lsp"
+            },
+            {
+                "command": "ritobin-lsp.matchingBrace",
+                "title": "Find matching brace",
+                "category": "ritobin-lsp"
+            },
+            {
+                "command": "ritobin-lsp.lspStatus",
+                "title": "Status",
+                "category": "ritobin-lsp"
+            },
+            {
+                "command": "ritobin-lsp.restartServer",
+                "title": "Restart server",
+                "category": "ritobin-lsp"
+            },
+            {
+                "command": "ritobin-lsp.startServer",
+                "title": "Start server",
+                "category": "ritobin-lsp"
+            },
+            {
+                "command": "ritobin-lsp.stopServer",
+                "title": "Stop server",
+                "category": "ritobin-lsp"
+            },
+            {
+                "command": "ritobin-lsp.moveItemUp",
+                "title": "Move Item Up",
+                "category": "ritobin-lsp"
+            },
+            {
+                "command": "ritobin-lsp.moveItemDown",
+                "title": "Move Item Down",
+                "category": "ritobin-lsp"
+            },
+            {
+                "command": "ritobin-lsp.toggleLSPLogs",
+                "title": "Toggle LSP Logs",
+                "category": "ritobin-lsp"
+            }
+        ],
+        "keybindings": [],
+        "configuration": [
+            {
+                "title": "ritobin-lsp",
+                "properties": {
+                    "ritobin-lsp.restartServerOnConfigChange": {
+                        "description": "Restart the server automatically when settings that require a restart are changed.",
+                        "default": false,
+                        "type": "boolean"
+                    },
+                    "ritobin-lsp.showRequestFailedErrorNotification": {
+                        "description": "Show error notifications when requests fail.",
+                        "default": true,
+                        "type": "boolean"
+                    },
+                    "ritobin-lsp.initializeStopped": {
+                        "markdownDescription": "Do not start ritobin-lsp server when the extension is activated.",
+                        "default": false,
+                        "type": "boolean"
+                    }
+                }
+            },
+            {
+                "title": "Status Bar",
+                "properties": {
+                    "ritobin-lsp.statusBar.clickAction": {
+                        "type": "string",
+                        "enum": [
+                            "stopServer",
+                            "openLogs"
+                        ],
+                        "enumDescriptions": [
+                            "Stop Server",
+                            "Open Logs"
+                        ],
+                        "default": "openLogs",
+                        "markdownDescription": "Action to run when clicking the extension status bar item."
+                    },
+                    "ritobin-lsp.statusBar.showStatusBar": {
+                        "markdownDescription": "When to show the extension status bar.\n\n`\"always\"` Always show the status bar.\n\n`\"never\"` Never show the status bar.\n\n`{ documentSelector: <DocumentSelector>[] }` Show the status bar if the open file matches any of the given document selectors.\n\nSee [VS Code -- DocumentSelector](https://code.visualstudio.com/api/references/document-selector) for more information.",
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "enum": [
+                                    "always",
+                                    "never"
+                                ]
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "documentSelector": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "language": {
+                                                    "type": "string"
+                                                },
+                                                "notebookType": {
+                                                    "type": "string"
+                                                },
+                                                "scheme": {
+                                                    "type": "string"
+                                                },
+                                                "pattern": {
+                                                    "type": "string"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ],
+                        "default": {
+                            "documentSelector": [
+                                {
+                                    "language": "ritobin"
+                                },
+                                {
+                                    "scheme": "output",
+                                    "pattern": "extension-output-ritobin-lang.ritobin-lsp*"
+                                }
+                            ]
+                        }
+                    }
+                }
+            },
+            {
+                "title": "Server",
+                "properties": {
+                    "ritobin-lsp.server.path": {
+                        "type": [
+                            "null",
+                            "string"
+                        ],
+                        "scope": "machine-overridable",
+                        "default": null,
+                        "markdownDescription": "Path to ritobin-lsp executable (points to bundled binary by default)."
+                    },
+                    "ritobin-lsp.server.extraEnv": {
+                        "type": [
+                            "null",
+                            "object"
+                        ],
+                        "additionalProperties": {
+                            "type": [
+                                "string",
+                                "number",
+                                "null"
+                            ]
+                        },
+                        "default": null,
+                        "markdownDescription": "Extra environment variables that will be passed to the ritobin-lsp executable. Useful for passing e.g. `RA_LOG` for debugging."
+                    }
+                }
+            }
+        ],
+        "problemPatterns": [
+            {
+                "name": "ritobin-panic",
+                "patterns": [
+                    {
+                        "regexp": "^thread '.*' panicked at (.*):(\\d*):(\\d*):$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3
+                    },
+                    {
+                        "regexp": "(.*)",
+                        "message": 1
+                    }
+                ]
+            }
+        ],
+        "languages": [
+            {
+                "id": "ritobin",
+                "extensions": [
+                    ".rito"
+                ],
+                "aliases": [
+                    "Ritobin",
+                    "rito"
+                ],
+                "configuration": "language-configuration.json"
+            }
+        ],
+        "problemMatchers": [
+            {
+                "name": "ritobin-panic",
+                "owner": "ritobin-panic",
+                "source": "panic",
+                "fileLocation": [
+                    "autoDetect",
+                    "${workspaceRoot}"
+                ],
+                "pattern": "$ritobin-panic"
+            }
+        ],
+        "semanticTokenTypes": [
+            {
+                "id": "boolean",
+                "description": "Style for boolean literals",
+                "superType": "keyword"
+            },
+            {
+                "id": "brace",
+                "description": "Style for { or }",
+                "superType": "punctuation"
+            },
+            {
+                "id": "bracket",
+                "description": "Style for [ or ]",
+                "superType": "punctuation"
+            },
+            {
+                "id": "builtinType",
+                "description": "Style for builtin types",
+                "superType": "type"
+            },
+            {
+                "id": "colon",
+                "description": "Style for :",
+                "superType": "punctuation"
+            },
+            {
+                "id": "escapeSequence",
+                "description": "Style for char or byte escapes in strings"
+            },
+            {
+                "id": "invalidEscapeSequence",
+                "description": "Style for invalid char or byte escapes in strings"
+            },
+            {
+                "id": "punctuation",
+                "description": "Style for generic punctuation"
+            },
+            {
+                "id": "unresolvedReference",
+                "description": "Style for names which can not be resolved due to compilation errors"
+            }
+        ],
+        "semanticTokenModifiers": [],
+        "semanticTokenScopes": [
+            {
+                "language": "ritobin",
+                "scopes": {
+                    "attribute": [
+                        "meta.attribute.ritobin"
+                    ],
+                    "boolean": [
+                        "constant.language.boolean.ritobin"
+                    ],
+                    "builtinType": [
+                        "support.type.primitive.ritobin"
+                    ],
+                    "constParameter": [
+                        "constant.other.caps.ritobin"
+                    ],
+                    "enum": [
+                        "entity.name.type.enum.ritobin"
+                    ],
+                    "formatSpecifier": [
+                        "punctuation.section.embedded.ritobin"
+                    ],
+                    "function": [
+                        "entity.name.function.ritobin"
+                    ],
+                    "interface": [
+                        "entity.name.type.trait.ritobin"
+                    ],
+                    "keyword": [
+                        "keyword.other.ritobin"
+                    ],
+                    "keyword.controlFlow": [
+                        "keyword.control.ritobin"
+                    ],
+                    "lifetime": [
+                        "storage.modifier.lifetime.ritobin"
+                    ],
+                    "macroBang": [
+                        "entity.name.function.macro.ritobin"
+                    ],
+                    "method": [
+                        "entity.name.function.ritobin"
+                    ],
+                    "struct": [
+                        "entity.name.type.struct.ritobin"
+                    ],
+                    "typeAlias": [
+                        "entity.name.type.declaration.ritobin"
+                    ],
+                    "union": [
+                        "entity.name.type.union.ritobin"
+                    ],
+                    "variable": [
+                        "variable.other.ritobin"
+                    ],
+                    "variable.constant": [
+                        "variable.other.constant.ritobin"
+                    ],
+                    "*.mutable": [
+                        "markup.underline"
+                    ]
+                }
+            }
+        ],
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "ritobin-lsp.matchingBrace",
+                    "when": "inRitobinProject"
+                },
+                {
+                    "command": "ritobin-lsp.restartServer",
+                    "when": "inRitobinProject"
+                },
+                {
+                    "command": "ritobin-lsp.onEnter",
+                    "when": "inRitobinProject"
+                },
+                {
+                    "command": "ritobin-lsp.toggleLSPLogs",
+                    "when": "inRitobinProject"
+                }
+            ],
+            "editor/context": [],
+            "view/title": [],
+            "view/item/context": []
+        },
+        "views": {},
+        "viewsContainers": {},
+        "jsonValidation": [],
+        "walkthroughs": []
     }
 }

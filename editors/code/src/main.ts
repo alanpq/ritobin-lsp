@@ -4,9 +4,9 @@ import * as lc from "vscode-languageclient/node";
 import * as commands from "./commands";
 import { type CommandFactory, Ctx, fetchWorkspace } from "./ctx";
 import * as diagnostics from "./diagnostics";
-import { activateTaskProvider } from "./tasks";
-import { setContextValue } from "./util";
-import { initializeDebugSessionTrackingAndRebuild } from "./debug";
+// import { activateTaskProvider } from "./tasks";
+import { log, setContextValue } from "./util";
+// import { initializeDebugSessionTrackingAndRebuild } from "./debug";
 
 const RUST_PROJECT_CONTEXT_NAME = "inRustProject";
 
@@ -16,9 +16,12 @@ export interface RustAnalyzerExtensionApi {
 
     // Allows adding a configuration override from another extension.
     // `extensionId` is used to only merge configuration override from present
-    // extensions. `configuration` is map of rust-analyzer-specific setting
+    // extensions. `configuration` is map of ritobin-lsp-specific setting
     // overrides, e.g., `{"cargo.cfgs": ["foo", "bar"]}`.
-    addConfiguration(extensionId: string, configuration: Record<string, unknown>): Promise<void>;
+    addConfiguration(
+        extensionId: string,
+        configuration: Record<string, unknown>,
+    ): Promise<void>;
 }
 
 export async function deactivate() {
@@ -28,14 +31,16 @@ export async function deactivate() {
 export async function activate(
     context: vscode.ExtensionContext,
 ): Promise<RustAnalyzerExtensionApi> {
-    checkConflictingExtensions();
 
     const ctx = new Ctx(context, createCommands(), fetchWorkspace());
+
+    log.info("ASDASDSD");
+
     // VS Code doesn't show a notification when an extension fails to activate
     // so we do it ourselves.
     const api = await activateServer(ctx).catch((err) => {
         void vscode.window.showErrorMessage(
-            `Cannot activate rust-analyzer extension: ${err.message}`,
+            `Cannot activate ritobin-lsp extension: ${err.message}`,
         );
         throw err;
     });
@@ -45,7 +50,7 @@ export async function activate(
 
 async function activateServer(ctx: Ctx): Promise<RustAnalyzerExtensionApi> {
     if (ctx.workspace.kind === "Workspace Folder") {
-        ctx.pushExtCleanup(activateTaskProvider(ctx.config));
+        //     ctx.pushExtCleanup(activateTaskProvider(ctx.config));
     }
 
     const diagnosticProvider = new diagnostics.TextDocumentProvider(ctx);
@@ -72,7 +77,11 @@ async function activateServer(ctx: Ctx): Promise<RustAnalyzerExtensionApi> {
         null,
         ctx.subscriptions,
     );
-    vscode.workspace.onDidOpenTextDocument(decorateVisibleEditors, null, ctx.subscriptions);
+    vscode.workspace.onDidOpenTextDocument(
+        decorateVisibleEditors,
+        null,
+        ctx.subscriptions,
+    );
     vscode.window.onDidChangeActiveTextEditor(
         async (editor) => {
             if (editor) {
@@ -101,16 +110,19 @@ async function activateServer(ctx: Ctx): Promise<RustAnalyzerExtensionApi> {
     );
     vscode.workspace.onDidChangeConfiguration(
         async (_) => {
-            await ctx.client?.sendNotification(lc.DidChangeConfigurationNotification.type, {
-                settings: "",
-            });
+            await ctx.client?.sendNotification(
+                lc.DidChangeConfigurationNotification.type,
+                {
+                    settings: "",
+                },
+            );
         },
         null,
         ctx.subscriptions,
     );
 
     if (ctx.config.debug.buildBeforeRestart) {
-        initializeDebugSessionTrackingAndRebuild(ctx);
+        // initializeDebugSessionTrackingAndRebuild(ctx);
     }
 
     if (ctx.config.initializeStopped) {
@@ -128,7 +140,8 @@ function createCommands(): Record<string, CommandFactory> {
     return {
         onEnter: {
             enabled: commands.onEnter,
-            disabled: (_) => () => vscode.commands.executeCommand("default:type", { text: "\n" }),
+            disabled: (_) => () =>
+                vscode.commands.executeCommand("default:type", { text: "\n" }),
         },
         restartServer: {
             enabled: (ctx) => async () => {
@@ -154,81 +167,27 @@ function createCommands(): Record<string, CommandFactory> {
                     health: "stopped",
                 });
             },
-            disabled: (_) => async () => {},
+            disabled: (_) => async () => { },
         },
-
-        analyzerStatus: { enabled: commands.analyzerStatus },
-        memoryUsage: { enabled: commands.memoryUsage },
-        reloadWorkspace: { enabled: commands.reloadWorkspace },
-        rebuildProcMacros: { enabled: commands.rebuildProcMacros },
-        matchingBrace: { enabled: commands.matchingBrace },
-        joinLines: { enabled: commands.joinLines },
-        parentModule: { enabled: commands.parentModule },
-        childModules: { enabled: commands.childModules },
-        viewHir: { enabled: commands.viewHir },
-        viewMir: { enabled: commands.viewMir },
-        interpretFunction: { enabled: commands.interpretFunction },
-        viewFileText: { enabled: commands.viewFileText },
-        viewItemTree: { enabled: commands.viewItemTree },
-        viewCrateGraph: { enabled: commands.viewCrateGraph },
-        viewFullCrateGraph: { enabled: commands.viewFullCrateGraph },
-        expandMacro: { enabled: commands.expandMacro },
-        run: { enabled: (ctx) => (mode?: "cursor") => commands.run(ctx, mode)() },
-        copyRunCommandLine: { enabled: commands.copyRunCommandLine },
-        debug: { enabled: commands.debug },
-        newDebugConfig: { enabled: commands.newDebugConfig },
-        openDocs: { enabled: commands.openDocs },
-        openExternalDocs: { enabled: commands.openExternalDocs },
-        openCargoToml: { enabled: commands.openCargoToml },
-        peekTests: { enabled: commands.peekTests },
-        moveItemUp: { enabled: commands.moveItemUp },
-        moveItemDown: { enabled: commands.moveItemDown },
-        cancelFlycheck: { enabled: commands.cancelFlycheck },
-        clearFlycheck: { enabled: commands.clearFlycheck },
-        runFlycheck: { enabled: commands.runFlycheck },
-        ssr: { enabled: commands.ssr },
-        serverVersion: { enabled: commands.serverVersion },
-        viewMemoryLayout: { enabled: commands.viewMemoryLayout },
-        toggleCheckOnSave: { enabled: commands.toggleCheckOnSave },
-        toggleLSPLogs: { enabled: commands.toggleLSPLogs },
-        openWalkthrough: { enabled: commands.openWalkthrough },
-        // Internal commands which are invoked by the server.
-        applyActionGroup: { enabled: commands.applyActionGroup },
-        applySnippetWorkspaceEdit: {
-            enabled: commands.applySnippetWorkspaceEditCommand,
+        lspStatus: {
+            enabled: (_) => async () => { },
+            disabled: (_) => async () => { },
         },
-        debugSingle: { enabled: commands.debugSingle },
-        gotoLocation: { enabled: commands.gotoLocation },
-        hoverRefCommandProxy: { enabled: commands.hoverRefCommandProxy },
-        resolveCodeAction: { enabled: commands.resolveCodeAction },
-        runSingle: { enabled: commands.runSingle },
-        showReferences: { enabled: commands.showReferences },
-        triggerParameterHints: { enabled: commands.triggerParameterHints },
-        rename: { enabled: commands.rename },
-        openLogs: { enabled: commands.openLogs },
-        revealDependency: { enabled: commands.revealDependency },
-        syntaxTreeReveal: { enabled: commands.syntaxTreeReveal },
-        syntaxTreeCopy: { enabled: commands.syntaxTreeCopy },
-        syntaxTreeHideWhitespace: {
-            enabled: commands.syntaxTreeHideWhitespace,
+        matchingBrace: {
+            enabled: (_) => async () => { },
+            disabled: (_) => async () => { },
         },
-        syntaxTreeShowWhitespace: {
-            enabled: commands.syntaxTreeShowWhitespace,
+        moveItemUp: {
+            enabled: (_) => async () => { },
+            disabled: (_) => async () => { },
         },
-        getFailedObligations: { enabled: commands.getFailedObligations },
+        moveItemDown: {
+            enabled: (_) => async () => { },
+            disabled: (_) => async () => { },
+        },
+        toggleLSPLogs: {
+            enabled: (_) => async () => { },
+            disabled: (_) => async () => { },
+        },
     };
-}
-
-function checkConflictingExtensions() {
-    if (vscode.extensions.getExtension("rust-lang.rust")) {
-        vscode.window
-            .showWarningMessage(
-                `You have both the rust-analyzer (rust-lang.rust-analyzer) and Rust (rust-lang.rust) ` +
-                    "plugins enabled. These are known to conflict and cause various functions of " +
-                    "both plugins to not work correctly. You should disable one of them.",
-                "Got it",
-            )
-            // eslint-disable-next-line no-console
-            .then(() => {}, console.error);
-    }
 }

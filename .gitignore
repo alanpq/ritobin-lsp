@@ -7,3 +7,4 @@ target/
 *.iml
 .vscode/settings.json
 .DS_Store
+.direnv

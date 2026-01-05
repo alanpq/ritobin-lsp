@@ -33,18 +33,18 @@ export async function createClient(
                 _token: vscode.CancellationToken,
                 _next: lc.ConfigurationRequest.HandlerSignature,
             ) {
-                // The rust-analyzer LSP only ever asks for the "rust-analyzer"
+                // The ritobin-lsp LSP only ever asks for the "ritobin-lsp"
                 // section, so we only need to support that. Instead of letting
                 // the vscode-languageclient handle it, use the `cfg` property
                 // in the config.
                 if (
                     params.items.length !== 1 ||
-                    params.items[0]?.section !== "rust-analyzer" ||
+                    params.items[0]?.section !== "ritobin-lsp" ||
                     params.items[0]?.scopeUri !== undefined
                 ) {
                     return new lc.ResponseError(
                         lc.ErrorCodes.InvalidParams,
-                        'Only the "rust-analyzer" config section is supported.',
+                        'Only the "ritobin-lsp" config section is supported.',
                     );
                 }
                 return [prepareVSCodeConfig(config.cfg)];
@@ -71,7 +71,7 @@ export async function createClient(
                     (diag.message === "file not included in crate hierarchy" ||
                         diag.message.startsWith("This file is not included in any crates"))
                 ) {
-                    const config = vscode.workspace.getConfiguration("rust-analyzer");
+                    const config = vscode.workspace.getConfiguration("ritobin-lsp");
                     if (config.get("showUnlinkedFileNotification")) {
                         unlinkedFiles.push(uri);
                         const folder = vscode.workspace.getWorkspaceFolder(uri)?.uri.fsPath;
@@ -224,7 +224,7 @@ export async function createClient(
                     const mkAction = () => {
                         const action = new vscode.CodeAction(item.title, kind);
                         action.command = {
-                            command: "rust-analyzer.resolveCodeAction",
+                            command: "ritobin-lsp.resolveCodeAction",
                             title: item.title,
                             arguments: [item],
                         };
@@ -260,7 +260,7 @@ export async function createClient(
                         ];
                         primary.title = group;
                         primary.command = {
-                            command: "rust-analyzer.applyActionGroup",
+                            command: "ritobin-lsp.applyActionGroup",
                             title: "",
                             arguments: [args],
                         };
@@ -287,7 +287,7 @@ export async function createClient(
     };
 
     const client = new RaLanguageClient(
-        "rust-analyzer",
+        "ritobin-lsp",
         "Rust Analyzer Language Server",
         serverOptions,
         clientOptions,
@@ -323,12 +323,12 @@ class ExperimentalFeatures implements lc.StaticFeature {
             testExplorer: this.testExplorer,
             commands: {
                 commands: [
-                    "rust-analyzer.runSingle",
-                    "rust-analyzer.debugSingle",
-                    "rust-analyzer.showReferences",
-                    "rust-analyzer.gotoLocation",
-                    "rust-analyzer.triggerParameterHints",
-                    "rust-analyzer.rename",
+                    "ritobin-lsp.runSingle",
+                    "ritobin-lsp.debugSingle",
+                    "ritobin-lsp.showReferences",
+                    "ritobin-lsp.gotoLocation",
+                    "ritobin-lsp.triggerParameterHints",
+                    "ritobin-lsp.rename",
                 ],
             },
             ...capabilities.experimental,
@@ -400,7 +400,7 @@ export let HOVER_REFERENCE_COMMAND: ra.CommandLink[] = [];
 
 function renderCommand(cmd: ra.CommandLink): string {
     HOVER_REFERENCE_COMMAND.push(cmd);
-    return `[${cmd.title}](command:rust-analyzer.hoverRefCommandProxy?${HOVER_REFERENCE_COMMAND.length - 1
+    return `[${cmd.title}](command:ritobin-lsp.hoverRefCommandProxy?${HOVER_REFERENCE_COMMAND.length - 1
         } '${cmd.tooltip}')`;
 }
 
