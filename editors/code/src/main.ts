@@ -8,7 +8,7 @@ import * as diagnostics from "./diagnostics";
 import { log, setContextValue } from "./util";
 // import { initializeDebugSessionTrackingAndRebuild } from "./debug";
 
-const RUST_PROJECT_CONTEXT_NAME = "inRitobinProject";
+const RITOBIN_PROJECT_CONTEXT_NAME = "inRitobinProject";
 
 export interface RustAnalyzerExtensionApi {
   // FIXME: this should be non-optional
@@ -25,15 +25,14 @@ export interface RustAnalyzerExtensionApi {
 }
 
 export async function deactivate() {
-  await setContextValue(RUST_PROJECT_CONTEXT_NAME, undefined);
+  await setContextValue(RITOBIN_PROJECT_CONTEXT_NAME, undefined);
 }
 
 export async function activate(
   context: vscode.ExtensionContext,
 ): Promise<RustAnalyzerExtensionApi> {
   const ctx = new Ctx(context, createCommands(), fetchWorkspace());
-
-  log.info("ASDASDSD");
+  log.info("Activating...");
 
   // VS Code doesn't show a notification when an extension fails to activate
   // so we do it ourselves.
@@ -43,7 +42,7 @@ export async function activate(
     );
     throw err;
   });
-  await setContextValue(RUST_PROJECT_CONTEXT_NAME, true);
+  await setContextValue(RITOBIN_PROJECT_CONTEXT_NAME, true);
   return api;
 }
 
@@ -168,10 +167,7 @@ function createCommands(): Record<string, CommandFactory> {
       },
       disabled: (_) => async () => {},
     },
-    lspStatus: {
-      enabled: (_) => async () => {},
-      disabled: (_) => async () => {},
-    },
+    lspStatus: { enabled: commands.lspStatus },
     matchingBrace: {
       enabled: (_) => async () => {},
       disabled: (_) => async () => {},
@@ -190,4 +186,3 @@ function createCommands(): Record<string, CommandFactory> {
     },
   };
 }
-

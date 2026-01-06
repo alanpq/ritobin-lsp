@@ -105,7 +105,7 @@ use lsp_types::{WorkDoneProgressOptions, notification::Notification as _}; // fo
 use clap::{Parser, Subcommand};
 
 use crate::{
-    config::Config,
+    config::{Config, ConfigChange, ConfigErrors},
     lsp::{
         capabilities::server_capabilities,
         ext::{ServerStatusNotification, ServerStatusParams},
@@ -114,6 +114,7 @@ use crate::{
 
 pub mod config;
 pub mod lsp;
+pub mod main_loop;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -308,32 +309,7 @@ fn main() -> std::result::Result<(), Box<dyn Error + Sync + Send>> {
         .filter(|workspaces| !workspaces.is_empty())
         .unwrap_or_else(|| vec![root_path.clone()]);
 
-    let mut config = Config::new(root_path, capabilities, workspace_roots, client_info);
-    // if let Some(json) = initialization_options {
-    //     let mut change = ConfigChange::default();
-    //     change.change_client_config(json);
-    //
-    //     let error_sink: ConfigErrors;
-    //     (config, error_sink, _) = config.apply_change(change);
-    //
-    //     if !error_sink.is_empty() {
-    //         use lsp_types::{
-    //             MessageType, ShowMessageParams,
-    //             notification::{Notification, ShowMessage},
-    //         };
-    //         let not = lsp_server::Notification::new(
-    //             ShowMessage::METHOD.to_owned(),
-    //             ShowMessageParams {
-    //                 typ: MessageType::WARNING,
-    //                 message: error_sink.to_string(),
-    //             },
-    //         );
-    //         connection
-    //             .sender
-    //             .send(lsp_server::Message::Notification(not))
-    //             .unwrap();
-    //     }
-    // }
+    let config = Config::new(root_path, capabilities, workspace_roots, client_info);
 
     // advertised capabilities
     let server_caps = server_capabilities(&config);
@@ -409,6 +385,7 @@ fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
         .send(lsp_server::Message::Notification(not))?;
 
     for msg in &connection.receiver {
+        tracing::info!("MSG");
         match msg {
             Message::Request(req) => {
                 if connection.handle_shutdown(&req)? {
@@ -434,6 +411,7 @@ fn handle_notification(
     note: &lsp_server::Notification,
     docs: &mut FxHashMap<Url, String>,
 ) -> Result<()> {
+    tracing::debug!(?note, "handle_notification");
     match note.method.as_str() {
         DidOpenTextDocument::METHOD => {
             let p: DidOpenTextDocumentParams = serde_json::from_value(note.params.clone())?;
@@ -459,6 +437,7 @@ fn handle_request(
     req: &ServerRequest,
     docs: &mut FxHashMap<Url, String>,
 ) -> Result<()> {
+    tracing::debug!(?req, "handle_request");
     match req.method.as_str() {
         GotoDefinition::METHOD => {
             send_ok(

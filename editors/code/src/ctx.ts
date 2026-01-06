@@ -5,14 +5,12 @@ import * as ra from "./lsp_ext";
 import { Config, prepareVSCodeConfig } from "./config";
 import { createClient } from "./client";
 import {
-  findRustToolchainFiles,
-  isCargoTomlEditor,
   isDocumentInWorkspace,
-  isRustDocument,
-  isRustEditor,
+  isRitobinDocument,
+  isRitobinEditor,
   LazyOutputChannel,
   log,
-  type RustEditor,
+  type RitobinEditor,
 } from "./util";
 import type { ServerStatusParams } from "./lsp_ext";
 // import {
@@ -44,7 +42,7 @@ export function fetchWorkspace(): Workspace {
     (folder) => folder.uri.scheme === "file",
   );
   const rustDocuments = vscode.workspace.textDocuments.filter((document) =>
-    isRustDocument(document),
+    isRitobinDocument(document),
   );
 
   return folders.length === 0
@@ -251,11 +249,11 @@ export class Ctx implements RustAnalyzerExtensionApi {
           this.setServerStatus(params),
         ),
       );
-      // this.pushClientCleanup(
-      //     this._client.onNotification(ra.openServerLogs, () => {
-      //         this.outputChannel!.show();
-      //     }),
-      // );
+      this.pushClientCleanup(
+        this._client.onNotification(ra.openServerLogs, () => {
+          this.outputChannel!.show();
+        }),
+      );
     }
     return this._client;
   }
@@ -318,14 +316,9 @@ export class Ctx implements RustAnalyzerExtensionApi {
     this._client = undefined;
   }
 
-  get activeRustEditor(): RustEditor | undefined {
+  get activeRitobinEditor(): RitobinEditor | undefined {
     const editor = vscode.window.activeTextEditor;
-    return editor && isRustEditor(editor) ? editor : undefined;
-  }
-
-  get activeCargoTomlEditor(): RustEditor | undefined {
-    const editor = vscode.window.activeTextEditor;
-    return editor && isCargoTomlEditor(editor) ? editor : undefined;
+    return editor && isRitobinEditor(editor) ? editor : undefined;
   }
 
   get extensionPath(): string {
@@ -360,6 +353,7 @@ export class Ctx implements RustAnalyzerExtensionApi {
           );
       }
 
+      log.info("registering command ", fullName);
       this.commandDisposables.push(
         vscode.commands.registerCommand(fullName, callback),
       );

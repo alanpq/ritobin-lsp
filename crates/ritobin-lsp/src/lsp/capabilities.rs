@@ -21,160 +21,166 @@ use crate::{
 
 pub fn server_capabilities(config: &Config) -> ServerCapabilities {
     ServerCapabilities {
-        text_document_sync: Some(TextDocumentSyncCapability::Options(
-            TextDocumentSyncOptions {
-                open_close: Some(true),
-                change: Some(TextDocumentSyncKind::INCREMENTAL),
-                will_save: None,
-                will_save_wait_until: None,
-                save: if config.caps().did_save_text_document_dynamic_registration() {
-                    None
-                } else {
-                    Some(SaveOptions::default().into())
-                },
-            },
-        )),
-        hover_provider: Some(HoverProviderCapability::Simple(true)),
-        completion_provider: Some(CompletionOptions {
-            resolve_provider: if config.client_is_neovim() {
-                // config
-                //     .has_completion_item_resolve_additionalTextEdits()
-                //     .then_some(true)
-                Some(true)
-            } else {
-                Some(true)
-                // Some(config.caps().completions_resolve_provider())
-            },
-            trigger_characters: Some(vec![
-                ":".to_owned(),
-                ".".to_owned(),
-                "'".to_owned(),
-                "(".to_owned(),
-            ]),
-            all_commit_characters: None,
-            completion_item: config.caps().completion_item(),
-            work_done_progress_options: WorkDoneProgressOptions {
-                work_done_progress: None,
-            },
-        }),
-        signature_help_provider: Some(SignatureHelpOptions {
-            trigger_characters: Some(vec!["(".to_owned(), ",".to_owned(), "<".to_owned()]),
-            retrigger_characters: None,
-            work_done_progress_options: WorkDoneProgressOptions {
-                work_done_progress: None,
-            },
-        }),
-        declaration_provider: Some(DeclarationCapability::Simple(true)),
-        definition_provider: Some(OneOf::Left(true)),
-        type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
-        implementation_provider: Some(ImplementationProviderCapability::Simple(true)),
-        references_provider: Some(OneOf::Left(true)),
-        document_highlight_provider: Some(OneOf::Left(true)),
-        document_symbol_provider: Some(OneOf::Left(true)),
-        workspace_symbol_provider: Some(OneOf::Left(true)),
-        code_action_provider: Some(config.caps().code_action_capabilities()),
-        code_lens_provider: Some(CodeLensOptions {
-            resolve_provider: Some(true),
-        }),
-        document_formatting_provider: Some(OneOf::Left(false)),
-        // document_range_formatting_provider: match config.rustfmt(None) {
-        //     RustfmtConfig::Rustfmt {
-        //         enable_range_formatting: true,
-        //         ..
-        //     } => Some(OneOf::Left(true)),
-        //     _ => Some(OneOf::Left(false)),
-        // },
-        // document_on_type_formatting_provider: Some({
-        //     let mut chars = ide::Analysis::SUPPORTED_TRIGGER_CHARS.iter();
-        //     DocumentOnTypeFormattingOptions {
-        //         first_trigger_character: chars.next().unwrap().to_string(),
-        //         more_trigger_character: Some(chars.map(|c| c.to_string()).collect()),
-        //     }
-        // }),
-        selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
-        folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
-        rename_provider: Some(OneOf::Right(RenameOptions {
-            prepare_provider: Some(true),
-            work_done_progress_options: WorkDoneProgressOptions {
-                work_done_progress: None,
-            },
-        })),
-        linked_editing_range_provider: None,
-        document_link_provider: None,
-        color_provider: None,
-        execute_command_provider: None,
-        workspace: Some(WorkspaceServerCapabilities {
-            workspace_folders: Some(WorkspaceFoldersServerCapabilities {
-                supported: Some(true),
-                change_notifications: Some(OneOf::Left(true)),
-            }),
-            file_operations: Some(WorkspaceFileOperationsServerCapabilities {
-                did_create: None,
-                will_create: None,
-                did_rename: None,
-                will_rename: Some(FileOperationRegistrationOptions {
-                    filters: vec![
-                        FileOperationFilter {
-                            scheme: Some(String::from("file")),
-                            pattern: FileOperationPattern {
-                                glob: String::from("**/*.rito"),
-                                matches: Some(FileOperationPatternKind::File),
-                                options: None,
-                            },
-                        },
-                        FileOperationFilter {
-                            scheme: Some(String::from("file")),
-                            pattern: FileOperationPattern {
-                                glob: String::from("**"),
-                                matches: Some(FileOperationPatternKind::Folder),
-                                options: None,
-                            },
-                        },
-                    ],
-                }),
-                did_delete: None,
-                will_delete: None,
-            }),
-        }),
-        call_hierarchy_provider: Some(CallHierarchyServerCapability::Simple(true)),
-        semantic_tokens_provider: Some(
-            SemanticTokensOptions {
-                legend: SemanticTokensLegend {
-                    token_types: semantic_tokens::SUPPORTED_TYPES.to_vec(),
-                    token_modifiers: semantic_tokens::SUPPORTED_MODIFIERS.to_vec(),
-                },
-
-                full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
-                range: Some(true),
-                work_done_progress_options: Default::default(),
-            }
-            .into(),
-        ),
-        moniker_provider: None,
-        // inlay_hint_provider: Some(OneOf::Right(InlayHintServerCapabilities::Options(
-        //     InlayHintOptions {
-        //         work_done_progress_options: Default::default(),
-        //         resolve_provider: Some(config.caps().inlay_hints_resolve_provider()),
+        // text_document_sync: Some(TextDocumentSyncCapability::Options(
+        //     TextDocumentSyncOptions {
+        //         open_close: Some(true),
+        //         change: Some(TextDocumentSyncKind::INCREMENTAL),
+        //         will_save: None,
+        //         will_save_wait_until: None,
+        //         save: if config.caps().did_save_text_document_dynamic_registration() {
+        //             None
+        //         } else {
+        //             Some(SaveOptions::default().into())
+        //         },
         //     },
-        // ))),
-        inline_value_provider: None,
-        experimental: Some(json!({
-            "matchingBrace": true,
-            "moveItem": true,
-            "onEnter": true,
-        })),
-        diagnostic_provider: Some(lsp_types::DiagnosticServerCapabilities::Options(
-            lsp_types::DiagnosticOptions {
-                identifier: Some("ritobin-lsp".to_owned()),
-                inter_file_dependencies: true,
-                // FIXME
-                workspace_diagnostics: false,
-                work_done_progress_options: WorkDoneProgressOptions {
-                    work_done_progress: None,
-                },
-            },
-        )),
-        inline_completion_provider: None,
+        // )),
+        // hover_provider: Some(HoverProviderCapability::Simple(true)),
+        // completion_provider: Some(CompletionOptions {
+        //     resolve_provider: if config.client_is_neovim() {
+        //         // config
+        //         //     .has_completion_item_resolve_additionalTextEdits()
+        //         //     .then_some(true)
+        //         Some(true)
+        //     } else {
+        //         Some(true)
+        //         // Some(config.caps().completions_resolve_provider())
+        //     },
+        //     trigger_characters: Some(vec![
+        //         ":".to_owned(),
+        //         "'".to_owned(),
+        //         "\"".to_owned(),
+        //         "[".to_owned(),
+        //         "{".to_owned(),
+        //     ]),
+        //     all_commit_characters: None,
+        //     completion_item: config.caps().completion_item(),
+        //     work_done_progress_options: WorkDoneProgressOptions {
+        //         work_done_progress: None,
+        //     },
+        // }),
+        // signature_help_provider: Some(SignatureHelpOptions {
+        //     trigger_characters: Some(vec!["{".to_owned(), "[".to_owned()]),
+        //     retrigger_characters: None,
+        //     work_done_progress_options: WorkDoneProgressOptions {
+        //         work_done_progress: None,
+        //     },
+        // }),
+        // declaration_provider: Some(DeclarationCapability::Simple(true)),
+        // definition_provider: Some(OneOf::Left(true)),
+        // type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
+        // implementation_provider: Some(ImplementationProviderCapability::Simple(true)),
+        // references_provider: Some(OneOf::Left(true)),
+        // document_highlight_provider: Some(OneOf::Left(true)),
+        // document_symbol_provider: Some(OneOf::Left(true)),
+        // workspace_symbol_provider: Some(OneOf::Left(true)),
+        // code_action_provider: Some(config.caps().code_action_capabilities()),
+        // code_lens_provider: Some(CodeLensOptions {
+        //     resolve_provider: Some(true),
+        // }),
+        // document_formatting_provider: Some(OneOf::Left(false)),
+        // // document_range_formatting_provider: match config.rustfmt(None) {
+        // //     RustfmtConfig::Rustfmt {
+        // //         enable_range_formatting: true,
+        // //         ..
+        // //     } => Some(OneOf::Left(true)),
+        // //     _ => Some(OneOf::Left(false)),
+        // // },
+        // // document_on_type_formatting_provider: Some({
+        // //     let mut chars = ide::Analysis::SUPPORTED_TRIGGER_CHARS.iter();
+        // //     DocumentOnTypeFormattingOptions {
+        // //         first_trigger_character: chars.next().unwrap().to_string(),
+        // //         more_trigger_character: Some(chars.map(|c| c.to_string()).collect()),
+        // //     }
+        // // }),
+        // selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
+        // folding_range_provider: Some(FoldingRangeProviderCapability::Simple(true)),
+        // rename_provider: Some(OneOf::Right(RenameOptions {
+        //     prepare_provider: Some(true),
+        //     work_done_progress_options: WorkDoneProgressOptions {
+        //         work_done_progress: None,
+        //     },
+        // })),
+        // linked_editing_range_provider: None,
+        // document_link_provider: None,
+        // color_provider: None,
+        // execute_command_provider: None,
+        // workspace: Some(WorkspaceServerCapabilities {
+        //     workspace_folders: Some(WorkspaceFoldersServerCapabilities {
+        //         supported: Some(true),
+        //         change_notifications: Some(OneOf::Left(true)),
+        //     }),
+        //     file_operations: Some(WorkspaceFileOperationsServerCapabilities {
+        //         did_create: None,
+        //         will_create: None,
+        //         did_rename: None,
+        //         will_rename: Some(FileOperationRegistrationOptions {
+        //             filters: vec![
+        //                 FileOperationFilter {
+        //                     scheme: Some(String::from("file")),
+        //                     pattern: FileOperationPattern {
+        //                         glob: String::from("**/*.rito"),
+        //                         matches: Some(FileOperationPatternKind::File),
+        //                         options: None,
+        //                     },
+        //                 },
+        //                 FileOperationFilter {
+        //                     scheme: Some(String::from("file")),
+        //                     pattern: FileOperationPattern {
+        //                         glob: String::from("**"),
+        //                         matches: Some(FileOperationPatternKind::Folder),
+        //                         options: None,
+        //                     },
+        //                 },
+        //             ],
+        //         }),
+        //         did_delete: None,
+        //         will_delete: None,
+        //     }),
+        // }),
+        // call_hierarchy_provider: Some(CallHierarchyServerCapability::Simple(true)),
+        // semantic_tokens_provider: Some(
+        //     SemanticTokensOptions {
+        //         legend: SemanticTokensLegend {
+        //             token_types: semantic_tokens::SUPPORTED_TYPES.to_vec(),
+        //             token_modifiers: semantic_tokens::SUPPORTED_MODIFIERS.to_vec(),
+        //         },
+        //
+        //         full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
+        //         range: Some(true),
+        //         work_done_progress_options: Default::default(),
+        //     }
+        //     .into(),
+        // ),
+        // moniker_provider: None,
+        // // inlay_hint_provider: Some(OneOf::Right(InlayHintServerCapabilities::Options(
+        // //     InlayHintOptions {
+        // //         work_done_progress_options: Default::default(),
+        // //         resolve_provider: Some(config.caps().inlay_hints_resolve_provider()),
+        // //     },
+        // // ))),
+        // inline_value_provider: None,
+        // // experimental: Some(json!({
+        // //     "matchingBrace": true,
+        // //     "moveItem": true,
+        // //     "onEnter": true,
+        // // })),
+        // diagnostic_provider: Some(lsp_types::DiagnosticServerCapabilities::Options(
+        //     lsp_types::DiagnosticOptions {
+        //         identifier: Some("ritobin-lsp".to_owned()),
+        //         inter_file_dependencies: true,
+        //         // FIXME
+        //         workspace_diagnostics: false,
+        //         work_done_progress_options: WorkDoneProgressOptions {
+        //             work_done_progress: None,
+        //         },
+        //     },
+        // )),
+        // inline_completion_provider: None,
+        text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
+        completion_provider: Some(CompletionOptions::default()),
+        definition_provider: Some(OneOf::Left(true)),
+        hover_provider: Some(HoverProviderCapability::Simple(true)),
+        document_formatting_provider: Some(OneOf::Left(true)),
         ..Default::default()
     }
 }

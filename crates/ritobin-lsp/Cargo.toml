@@ -26,3 +26,4 @@ tracing-subscriber = { version = "0.3.22", default-features = false, features = 
     "time",
     "tracing-log",
 ] }
+itertools = "0.14.0"

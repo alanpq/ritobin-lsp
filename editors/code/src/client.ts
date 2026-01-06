@@ -3,7 +3,7 @@ import * as lc from "vscode-languageclient/node";
 import * as vscode from "vscode";
 import * as ra from "../src/lsp_ext";
 import * as Is from "vscode-languageclient/lib/common/utils/is";
-import { assert } from "./util";
+import { assert, log } from "./util";
 import * as diagnostics from "./diagnostics";
 import { WorkspaceEdit } from "vscode";
 import { type Config, prepareVSCodeConfig } from "./config";
@@ -172,6 +172,7 @@ export async function createClient(
           client.code2ProtocolConverter.asTextDocumentIdentifier(document),
         position: positionOrRange,
       };
+      log.debug("hover req", { params });
       return client.sendRequest(ra.hover, params, token).then(
         (result) => {
           if (!result) return null;
@@ -291,7 +292,7 @@ export async function createClient(
     },
   };
   const clientOptions: lc.LanguageClientOptions = {
-    documentSelector: [{ scheme: "file", language: "rust" }],
+    documentSelector: [{ scheme: "file", language: "ritobin" }],
     initializationOptions,
     diagnosticCollectionName: "rustc",
     traceOutputChannel,
