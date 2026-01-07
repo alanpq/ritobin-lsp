@@ -1,5 +1,6 @@
 use serde::de::DeserializeOwned;
 
+pub mod cst_ext;
 pub mod line_ends;
 
 pub fn from_json<T: DeserializeOwned>(

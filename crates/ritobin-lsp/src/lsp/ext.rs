@@ -675,6 +675,21 @@ pub enum PositionOrRange {
     Range(lsp_types::Range),
 }
 
+impl PositionOrRange {
+    pub fn start(&self) -> &lsp_types::Position {
+        match &self {
+            PositionOrRange::Position(position) => position,
+            PositionOrRange::Range(range) => &range.start,
+        }
+    }
+    pub fn end(&self) -> &lsp_types::Position {
+        match &self {
+            PositionOrRange::Position(position) => position,
+            PositionOrRange::Range(range) => &range.end,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Deserialize, Serialize)]
 pub struct Hover {
     #[serde(flatten)]

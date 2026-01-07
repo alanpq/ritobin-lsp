@@ -1,5 +1,3 @@
-//! Semantic Tokens helpers
-
 use std::ops;
 
 use lsp_types::{
@@ -7,137 +5,7 @@ use lsp_types::{
     SemanticTokensEdit,
 };
 
-macro_rules! define_semantic_token_types {
-    (
-        standard {
-            $($standard:ident),*$(,)?
-        }
-        custom {
-            $(($custom:ident, $string:literal) $(=> $fallback:ident)?),*$(,)?
-        }
-
-    ) => {
-        pub(crate) mod types {
-            use super::SemanticTokenType;
-            $(pub(crate) const $standard: SemanticTokenType = SemanticTokenType::$standard;)*
-            $(pub(crate) const $custom: SemanticTokenType = SemanticTokenType::new($string);)*
-        }
-
-        pub(crate) const SUPPORTED_TYPES: &[SemanticTokenType] = &[
-            $(self::types::$standard,)*
-            $(self::types::$custom),*
-        ];
-
-        pub(crate) fn standard_fallback_type(token: SemanticTokenType) -> Option<SemanticTokenType> {
-            use self::types::*;
-            $(
-                if token == $custom {
-                    None $(.or(Some(self::types::$fallback)))?
-                } else
-            )*
-            { Some(token )}
-        }
-    };
-}
-
-define_semantic_token_types![
-    standard {
-        COMMENT,
-        DECORATOR,
-        ENUM_MEMBER,
-        ENUM,
-        KEYWORD,
-        METHOD,
-        NAMESPACE,
-        NUMBER,
-        OPERATOR,
-        PARAMETER,
-        PROPERTY,
-        STRING,
-        STRUCT,
-        TYPE_PARAMETER,
-        VARIABLE,
-        TYPE,
-    }
-
-    custom {
-        (BOOLEAN, "boolean"),
-        (BRACE, "brace"),
-        (BRACKET, "bracket"),
-        (BUILTIN_TYPE, "builtinType") => TYPE,
-        (COLON, "colon"),
-        (ESCAPE_SEQUENCE, "escapeSequence") => STRING,
-        (INVALID_ESCAPE_SEQUENCE, "invalidEscapeSequence") => STRING,
-        (PUNCTUATION, "punctuation"),
-        (UNRESOLVED_REFERENCE, "unresolvedReference"),
-    }
-];
-
-macro_rules! count_tts {
-    () => {0usize};
-    ($_head:tt $($tail:tt)*) => {1usize + count_tts!($($tail)*)};
-}
-macro_rules! define_semantic_token_modifiers {
-    (
-        standard {
-            $($standard:ident),*$(,)?
-        }
-        custom {
-            $(($custom:ident, $string:literal)),*$(,)?
-        }
-
-    ) => {
-        pub(crate) mod modifiers {
-            use super::SemanticTokenModifier;
-
-            $(pub(crate) const $standard: SemanticTokenModifier = SemanticTokenModifier::$standard;)*
-            $(pub(crate) const $custom: SemanticTokenModifier = SemanticTokenModifier::new($string);)*
-        }
-
-        pub(crate) const SUPPORTED_MODIFIERS: &[SemanticTokenModifier] = &[
-            $(SemanticTokenModifier::$standard,)*
-            $(self::modifiers::$custom),*
-        ];
-
-        const LAST_STANDARD_MOD: usize = count_tts!($($standard)*);
-    };
-}
-
-define_semantic_token_modifiers![
-    standard {
-        DOCUMENTATION,
-        DECLARATION,
-        STATIC,
-        DEFAULT_LIBRARY,
-        DEPRECATED,
-    }
-    custom {
-        (CALLABLE, "callable"),
-        (CONSTANT, "constant"),
-        (INTRA_DOC_LINK, "intraDocLink"),
-        (LIBRARY, "library"),
-    }
-];
-
-#[derive(Default)]
-pub(crate) struct ModifierSet(pub(crate) u32);
-
-impl ModifierSet {
-    pub(crate) fn standard_fallback(&mut self) {
-        // Remove all non standard modifiers
-        self.0 &= !(!0u32 << LAST_STANDARD_MOD)
-    }
-}
-
-impl ops::BitOrAssign<SemanticTokenModifier> for ModifierSet {
-    fn bitor_assign(&mut self, rhs: SemanticTokenModifier) {
-        let idx = SUPPORTED_MODIFIERS
-            .iter()
-            .position(|it| it == &rhs)
-            .unwrap();
-        self.0 |= 1 << idx;
-    }
-}
+use crate::lsp::semantic_tokens::types::SUPPORTED_TYPES;
 
 /// Tokens are encoded relative to each other.
 ///
@@ -197,46 +65,14 @@ impl SemanticTokensBuilder {
     }
 }
 
-pub(crate) fn diff_tokens(old: &[SemanticToken], new: &[SemanticToken]) -> Vec<SemanticTokensEdit> {
-    let offset = new
-        .iter()
-        .zip(old.iter())
-        .take_while(|&(n, p)| n == p)
-        .count();
-
-    let (_, old) = old.split_at(offset);
-    let (_, new) = new.split_at(offset);
-
-    let offset_from_end = new
-        .iter()
-        .rev()
-        .zip(old.iter().rev())
-        .take_while(|&(n, p)| n == p)
-        .count();
-
-    let (old, _) = old.split_at(old.len() - offset_from_end);
-    let (new, _) = new.split_at(new.len() - offset_from_end);
-
-    if old.is_empty() && new.is_empty() {
-        vec![]
-    } else {
-        // The lsp data field is actually a byte-diff but we
-        // travel in tokens so `start` and `delete_count` are in multiples of the
-        // serialized size of `SemanticToken`.
-        vec![SemanticTokensEdit {
-            start: 5 * offset as u32,
-            delete_count: 5 * old.len() as u32,
-            data: Some(new.into()),
-        }]
-    }
-}
-
 pub(crate) fn type_index(ty: &SemanticTokenType) -> u32 {
     SUPPORTED_TYPES.iter().position(|it| it == ty).unwrap() as u32
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::lsp::semantic_tokens::diff_tokens;
+
     use super::*;
 
     fn from(t: (u32, u32, u32, u32, u32)) -> SemanticToken {

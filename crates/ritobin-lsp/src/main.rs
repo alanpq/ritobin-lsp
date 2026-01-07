@@ -2,11 +2,11 @@ use std::{env, error::Error, fs, io::Write, path::PathBuf, sync::Arc};
 
 use crossbeam_channel::Sender;
 use ltk_ritobin::parser::{
-    real::{TreeKind, Visitor},
+    real::{Tree, TreeKind, Visit, Visitor, parse},
     tokenizer::{Token, TokenKind},
 };
 use paths::{AbsPathBuf, Utf8PathBuf};
-use ritobin_lsp::{from_json, line_ends::LineNumbers};
+use ritobin_lsp::{cst_ext::CstExt, from_json, line_ends::LineNumbers};
 use rustc_hash::FxHashMap;
 use std::process::Stdio;
 use tracing_subscriber::{
@@ -42,8 +42,11 @@ use crate::{
     config::{Config, ConfigChange, ConfigErrors},
     lsp::{
         capabilities::server_capabilities,
-        ext::{ServerStatusNotification, ServerStatusParams},
-        semantic_tokens::{self, SemanticTokensBuilder},
+        ext::{HoverParams, ServerStatusNotification, ServerStatusParams},
+        semantic_tokens::{
+            self,
+            builder::{SemanticTokensBuilder, type_index},
+        },
     },
 };
 
@@ -305,7 +308,7 @@ fn patch_path_prefix(path: PathBuf) -> PathBuf {
 }
 
 fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
-    let mut docs: FxHashMap<Url, String> = FxHashMap::default();
+    let mut docs: FxHashMap<Url, Document> = FxHashMap::default();
 
     let not = lsp_server::Notification::new(
         ServerStatusNotification::METHOD.to_owned(),
@@ -344,21 +347,21 @@ fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
 fn handle_notification(
     conn: &Connection,
     note: &lsp_server::Notification,
-    docs: &mut FxHashMap<Url, String>,
+    docs: &mut FxHashMap<Url, Document>,
 ) -> Result<()> {
     tracing::debug!(?note, "handle_notification");
     match note.method.as_str() {
         DidOpenTextDocument::METHOD => {
             let p: DidOpenTextDocumentParams = serde_json::from_value(note.params.clone())?;
             let uri = p.text_document.uri;
-            docs.insert(uri.clone(), p.text_document.text);
+            docs.insert(uri.clone(), Document::new(p.text_document.text));
             publish_dummy_diag(conn, &uri)?;
         }
         DidChangeTextDocument::METHOD => {
             let p: DidChangeTextDocumentParams = serde_json::from_value(note.params.clone())?;
             if let Some(change) = p.content_changes.into_iter().next() {
                 let uri = p.text_document.uri;
-                docs.insert(uri.clone(), change.text);
+                docs.insert(uri.clone(), Document::new(change.text));
                 publish_dummy_diag(conn, &uri)?;
             }
         }
@@ -367,10 +370,26 @@ fn handle_notification(
     Ok(())
 }
 
+pub struct Document {
+    pub text: String,
+    pub cst: Tree,
+    pub line_numbers: LineNumbers,
+}
+
+impl Document {
+    pub fn new(text: String) -> Self {
+        Self {
+            cst: parse(&text),
+            line_numbers: LineNumbers::new(&text),
+            text,
+        }
+    }
+}
+
 fn handle_request(
     conn: &Connection,
     req: &ServerRequest,
-    docs: &mut FxHashMap<Url, String>,
+    docs: &mut FxHashMap<Url, Document>,
 ) -> Result<()> {
     tracing::debug!(?req, "handle_request");
     match req.method.as_str() {
@@ -391,10 +410,26 @@ fn handle_request(
             send_ok(conn, req.id.clone(), &CompletionResponse::Array(vec![item]))?;
         }
         HoverRequest::METHOD => {
+            let p: HoverParams = serde_json::from_value(req.params.clone())?;
+            let pos = p.position.start();
+
+            let doc = docs
+                .get(&p.text_document.uri)
+                .ok_or_else(|| anyhow!("document not in cache – did you send DidOpen?"))?;
+
+            let txt = match doc
+                .cst
+                .find_node(doc.line_numbers.byte_index(pos.line, pos.character))
+            {
+                Some((node, tok)) => {
+                    let txt = &doc.text[tok.span.start as _..tok.span.end as _];
+                    format!("{txt:?} | {node:?} | {:?}", tok.kind)
+                }
+                None => "".into(),
+            };
+
             let hover = Hover {
-                contents: HoverContents::Scalar(MarkedString::String(
-                    "Hello from *minimal_lsp*".into(),
-                )),
+                contents: HoverContents::Scalar(MarkedString::String(txt)),
                 range: None,
             };
             send_ok(conn, req.id.clone(), &hover)?;
@@ -402,13 +437,13 @@ fn handle_request(
         Formatting::METHOD => {
             let p: DocumentFormattingParams = serde_json::from_value(req.params.clone())?;
             let uri = p.text_document.uri;
-            let text = docs
+            let doc = docs
                 .get(&uri)
                 .ok_or_else(|| anyhow!("document not in cache – did you send DidOpen?"))?;
             // let formatted = run_rustfmt(text)?;
-            let formatted = text.clone();
+            let formatted = doc.text.clone();
             let edit = TextEdit {
-                range: full_range(text),
+                range: full_range(&doc.text),
                 new_text: formatted,
             };
             send_ok(conn, req.id.clone(), &vec![edit])?;
@@ -416,11 +451,9 @@ fn handle_request(
         SemanticTokensFullRequest::METHOD => {
             let p: SemanticTokensParams = serde_json::from_value(req.params.clone())?;
             let builder = SemanticTokensBuilder::new(p.text_document.uri.to_string());
-            let text = docs
+            let doc = docs
                 .get(&p.text_document.uri)
                 .ok_or_else(|| anyhow!("document not in cache – did you send DidOpen?"))?;
-
-            let tree = ltk_ritobin::parser::real::parse(text);
 
             struct SemanticVisitor<'a> {
                 text: &'a str,
@@ -430,20 +463,22 @@ fn handle_request(
             }
 
             impl Visitor for SemanticVisitor<'_> {
-                fn enter_tree(&mut self, kind: TreeKind) {
+                fn enter_tree(&mut self, kind: TreeKind) -> Visit {
                     if matches!(kind, TreeKind::ErrorTree) {
-                        return;
+                        return Visit::Continue;
                     }
                     self.stack.push(kind);
+                    Visit::Continue
                 }
 
-                fn exit_tree(&mut self, kind: TreeKind) {
+                fn exit_tree(&mut self, kind: TreeKind) -> Visit {
                     if matches!(kind, TreeKind::ErrorTree) {
-                        return;
+                        return Visit::Continue;
                     }
                     self.stack.pop();
+                    Visit::Continue
                 }
-                fn visit_token(&mut self, token: &Token, _context: TreeKind) {
+                fn visit_token(&mut self, token: &Token, _context: TreeKind) -> Visit {
                     let last_tree = self.stack.last().unwrap();
                     tracing::debug!(
                         "{:?} ({:?}) | last tree: {last_tree:?}",
@@ -468,7 +503,7 @@ fn handle_request(
                         }
                         (_, TokenKind::Int) => semantic_tokens::types::NUMBER,
                         _ => {
-                            return;
+                            return Visit::Continue;
                         }
                     };
                     for (line, range) in self.line_nums.iter_span_lines(token.span) {
@@ -477,22 +512,21 @@ fn handle_request(
                                 Position::new((line - 1) as _, *range.start() - 1),
                                 Position::new((line - 1) as _, *range.end() - 1),
                             ),
-                            semantic_tokens::type_index(&token_kind),
-                            semantic_tokens::ModifierSet::default().0,
+                            type_index(&token_kind),
+                            semantic_tokens::modifier_set::ModifierSet::default().0,
                         );
                     }
+                    Visit::Continue
                 }
             }
 
-            let line_nums = LineNumbers::new(text);
-
             let mut visitor = SemanticVisitor {
-                text,
-                line_nums: &line_nums,
+                text: &doc.text,
+                line_nums: &doc.line_numbers,
                 stack: Vec::new(),
                 builder,
             };
-            tree.walk(&mut visitor);
+            doc.cst.walk(&mut visitor);
 
             let tokens = visitor.builder.build();
             send_ok(conn, req.id.clone(), &tokens)?;

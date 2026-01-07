@@ -141,8 +141,8 @@ pub fn server_capabilities(config: &Config) -> ServerCapabilities {
         semantic_tokens_provider: Some(
             SemanticTokensOptions {
                 legend: SemanticTokensLegend {
-                    token_types: semantic_tokens::SUPPORTED_TYPES.to_vec(),
-                    token_modifiers: semantic_tokens::SUPPORTED_MODIFIERS.to_vec(),
+                    token_types: semantic_tokens::types::SUPPORTED_TYPES.to_vec(),
+                    token_modifiers: semantic_tokens::types::SUPPORTED_MODIFIERS.to_vec(),
                 },
 
                 full: Some(SemanticTokensFullOptions::Bool(true)),
