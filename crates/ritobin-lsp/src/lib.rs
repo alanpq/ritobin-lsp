@@ -1,5 +1,7 @@
 use serde::de::DeserializeOwned;
 
+pub mod line_ends;
+
 pub fn from_json<T: DeserializeOwned>(
     what: &'static str,
     json: &serde_json::Value,

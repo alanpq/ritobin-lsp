@@ -46,10 +46,7 @@ define_semantic_token_types![
         DECORATOR,
         ENUM_MEMBER,
         ENUM,
-        FUNCTION,
-        INTERFACE,
         KEYWORD,
-        MACRO,
         METHOD,
         NAMESPACE,
         NUMBER,
@@ -64,44 +61,14 @@ define_semantic_token_types![
     }
 
     custom {
-        (ANGLE, "angle"),
-        (ARITHMETIC, "arithmetic") => OPERATOR,
-        (ATTRIBUTE_BRACKET, "attributeBracket") => DECORATOR,
-        (ATTRIBUTE, "attribute") => DECORATOR,
-        (BITWISE, "bitwise") => OPERATOR,
         (BOOLEAN, "boolean"),
         (BRACE, "brace"),
         (BRACKET, "bracket"),
-        (BUILTIN_ATTRIBUTE, "builtinAttribute") => DECORATOR,
         (BUILTIN_TYPE, "builtinType") => TYPE,
-        (CHAR, "character") => STRING,
         (COLON, "colon"),
-        (COMMA, "comma"),
-        (COMPARISON, "comparison") => OPERATOR,
-        (CONST_PARAMETER, "constParameter"),
-        (CONST, "const") => VARIABLE,
-        (DERIVE_HELPER, "deriveHelper") => DECORATOR,
-        (DERIVE, "derive") => DECORATOR,
-        (DOT, "dot"),
         (ESCAPE_SEQUENCE, "escapeSequence") => STRING,
-        (FORMAT_SPECIFIER, "formatSpecifier") => STRING,
-        (GENERIC, "generic") => TYPE_PARAMETER,
         (INVALID_ESCAPE_SEQUENCE, "invalidEscapeSequence") => STRING,
-        (LABEL, "label"),
-        (LIFETIME, "lifetime"),
-        (LOGICAL, "logical") => OPERATOR,
-        (MACRO_BANG, "macroBang") => MACRO,
-        (NEGATION, "negation") => OPERATOR,
-        (PARENTHESIS, "parenthesis"),
-        (PROC_MACRO, "procMacro") => MACRO,
         (PUNCTUATION, "punctuation"),
-        (SELF_KEYWORD, "selfKeyword") => KEYWORD,
-        (SELF_TYPE_KEYWORD, "selfTypeKeyword") => KEYWORD,
-        (SEMICOLON, "semicolon"),
-        (STATIC, "static") => VARIABLE,
-        (TOOL_MODULE, "toolModule") => DECORATOR,
-        (TYPE_ALIAS, "typeAlias") => TYPE,
-        (UNION, "union") => TYPE,
         (UNRESOLVED_REFERENCE, "unresolvedReference"),
     }
 ];
@@ -138,7 +105,6 @@ macro_rules! define_semantic_token_modifiers {
 
 define_semantic_token_modifiers![
     standard {
-        ASYNC,
         DOCUMENTATION,
         DECLARATION,
         STATIC,
@@ -146,23 +112,10 @@ define_semantic_token_modifiers![
         DEPRECATED,
     }
     custom {
-        (ASSOCIATED, "associated"),
-        (ATTRIBUTE_MODIFIER, "attribute"),
         (CALLABLE, "callable"),
         (CONSTANT, "constant"),
-        (CONSUMING, "consuming"),
-        (CONTROL_FLOW, "controlFlow"),
-        (CRATE_ROOT, "crateRoot"),
-        (INJECTED, "injected"),
         (INTRA_DOC_LINK, "intraDocLink"),
         (LIBRARY, "library"),
-        (MACRO_MODIFIER, "macro"),
-        (MUTABLE, "mutable"),
-        (PROC_MACRO_MODIFIER, "procMacro"),
-        (PUBLIC, "public"),
-        (REFERENCE, "reference"),
-        (TRAIT_MODIFIER, "trait"),
-        (UNSAFE, "unsafe"),
     }
 ];
 
@@ -212,6 +165,7 @@ impl SemanticTokensBuilder {
         let mut push_char = range.start.character;
 
         if !self.data.is_empty() {
+            tracing::debug!(?push_line, ?self.prev_line);
             push_line -= self.prev_line;
             if push_line == 0 {
                 push_char -= self.prev_char;
@@ -277,8 +231,8 @@ pub(crate) fn diff_tokens(old: &[SemanticToken], new: &[SemanticToken]) -> Vec<S
     }
 }
 
-pub(crate) fn type_index(ty: SemanticTokenType) -> u32 {
-    SUPPORTED_TYPES.iter().position(|it| *it == ty).unwrap() as u32
+pub(crate) fn type_index(ty: &SemanticTokenType) -> u32 {
+    SUPPORTED_TYPES.iter().position(|it| it == ty).unwrap() as u32
 }
 
 #[cfg(test)]

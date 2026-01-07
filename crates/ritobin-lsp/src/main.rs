@@ -1,57 +1,12 @@
-//! ### Minimal manual session (all nine packets)
-//! ```no_run
-//! # 1. initialize - server replies with capabilities
-//! Content-Length: 85
-
-//! {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}
-//!
-//! # 2. initialized - no response expected
-//! Content-Length: 59
-
-//! {"jsonrpc":"2.0","method":"initialized","params":{}}
-//!
-//! # 3. didOpen - provide initial buffer text
-//! Content-Length: 173
-
-//! {"jsonrpc":"2.0","method":"textDocument/didOpen","params":{"textDocument":{"uri":"file:///tmp/foo.rs","languageId":"rust","version":1,"text":"fn  main( ){println!(\"hi\") }"}}}
-//!
-//! # 4. completion - expect HelloFromLSP
-//! Content-Length: 139
-
-//! {"jsonrpc":"2.0","id":2,"method":"textDocument/completion","params":{"textDocument":{"uri":"file:///tmp/foo.rs"},"position":{"line":0,"character":0}}}
-//!
-//! # 5. hover - expect markdown greeting
-//! Content-Length: 135
-
-//! {"jsonrpc":"2.0","id":3,"method":"textDocument/hover","params":{"textDocument":{"uri":"file:///tmp/foo.rs"},"position":{"line":0,"character":0}}}
-//!
-//! # 6. goto-definition - dummy empty array
-//! Content-Length: 139
-
-//! {"jsonrpc":"2.0","id":4,"method":"textDocument/definition","params":{"textDocument":{"uri":"file:///tmp/foo.rs"},"position":{"line":0,"character":0}}}
-//!
-//! # 7. formatting - rustfmt full document
-//! Content-Length: 157
-
-//! {"jsonrpc":"2.0","id":5,"method":"textDocument/formatting","params":{"textDocument":{"uri":"file:///tmp/foo.rs"},"options":{"tabSize":4,"insertSpaces":true}}}
-//!
-//! # 8. shutdown request - server acks and prepares to exit
-//! Content-Length: 67
-
-//! {"jsonrpc":"2.0","id":6,"method":"shutdown","params":null}
-//!
-//! # 9. exit notification - terminates the server
-//! Content-Length: 54
-
-//! {"jsonrpc":"2.0","method":"exit","params":null}
-//! ```
-//!
-
 use std::{env, error::Error, fs, io::Write, path::PathBuf, sync::Arc};
 
 use crossbeam_channel::Sender;
+use ltk_ritobin::parser::{
+    real::{TreeKind, Visitor},
+    tokenizer::{Token, TokenKind},
+};
 use paths::{AbsPathBuf, Utf8PathBuf};
-use ritobin_lsp::from_json;
+use ritobin_lsp::{from_json, line_ends::LineNumbers};
 use rustc_hash::FxHashMap;
 use std::process::Stdio;
 use tracing_subscriber::{
@@ -68,38 +23,17 @@ use tracing_subscriber::{
 )]
 use anyhow::{Context, Result, anyhow, bail};
 use lsp_server::{Connection, Message, Request as ServerRequest, RequestId, Response};
-use lsp_types::request::Request as _;
 use lsp_types::{
-    CompletionItem,
-    CompletionItemKind,
-    // capability helpers
-    CompletionOptions,
-    CompletionResponse,
-    Diagnostic,
-    DiagnosticSeverity,
-    DidChangeTextDocumentParams,
-    DidOpenTextDocumentParams,
-    DocumentFormattingParams,
-    Hover,
-    HoverContents,
-    HoverProviderCapability,
-    // core
-    InitializeParams,
-    MarkedString,
-    OneOf,
-    Position,
-    PublishDiagnosticsParams,
-    Range,
-    ServerCapabilities,
-    TextDocumentSyncCapability,
-    TextDocumentSyncKind,
-    TextEdit,
-    Url,
-    // notifications
+    CompletionItem, CompletionItemKind, CompletionOptions, CompletionResponse, Diagnostic,
+    DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
+    DocumentFormattingParams, Hover, HoverContents, HoverProviderCapability, InitializeParams,
+    MarkedString, OneOf, Position, PublishDiagnosticsParams, Range, SemanticTokens,
+    SemanticTokensFullOptions, SemanticTokensParams, ServerCapabilities,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url,
     notification::{DidChangeTextDocument, DidOpenTextDocument, PublishDiagnostics},
-    // requests
-    request::{Completion, Formatting, GotoDefinition, HoverRequest},
+    request::{Completion, Formatting, GotoDefinition, HoverRequest, SemanticTokensFullRequest},
 };
+use lsp_types::{SemanticToken, request::Request as _};
 use lsp_types::{WorkDoneProgressOptions, notification::Notification as _}; // for METHOD consts // for METHOD consts
 
 use clap::{Parser, Subcommand};
@@ -109,6 +43,7 @@ use crate::{
     lsp::{
         capabilities::server_capabilities,
         ext::{ServerStatusNotification, ServerStatusParams},
+        semantic_tokens::{self, SemanticTokensBuilder},
     },
 };
 
@@ -477,6 +412,90 @@ fn handle_request(
                 new_text: formatted,
             };
             send_ok(conn, req.id.clone(), &vec![edit])?;
+        }
+        SemanticTokensFullRequest::METHOD => {
+            let p: SemanticTokensParams = serde_json::from_value(req.params.clone())?;
+            let builder = SemanticTokensBuilder::new(p.text_document.uri.to_string());
+            let text = docs
+                .get(&p.text_document.uri)
+                .ok_or_else(|| anyhow!("document not in cache – did you send DidOpen?"))?;
+
+            let tree = ltk_ritobin::parser::real::parse(text);
+
+            struct SemanticVisitor<'a> {
+                text: &'a str,
+                line_nums: &'a LineNumbers,
+                builder: SemanticTokensBuilder,
+                stack: Vec<TreeKind>,
+            }
+
+            impl Visitor for SemanticVisitor<'_> {
+                fn enter_tree(&mut self, kind: TreeKind) {
+                    if matches!(kind, TreeKind::ErrorTree) {
+                        return;
+                    }
+                    self.stack.push(kind);
+                }
+
+                fn exit_tree(&mut self, kind: TreeKind) {
+                    if matches!(kind, TreeKind::ErrorTree) {
+                        return;
+                    }
+                    self.stack.pop();
+                }
+                fn visit_token(&mut self, token: &Token, _context: TreeKind) {
+                    let last_tree = self.stack.last().unwrap();
+                    tracing::debug!(
+                        "{:?} ({:?}) | last tree: {last_tree:?}",
+                        token.kind,
+                        &self.text[token.span.start as usize..token.span.end as usize],
+                    );
+
+                    let token_kind = match (last_tree, token.kind) {
+                        (_, TokenKind::RCurly)
+                        | (_, TokenKind::LCurly)
+                        | (_, TokenKind::RBrack)
+                        | (_, TokenKind::LBrack)
+                        | (_, TokenKind::Colon) => semantic_tokens::types::PUNCTUATION,
+
+                        (TreeKind::TypeExpr, _) => semantic_tokens::types::TYPE,
+                        (TreeKind::TypeArg, _) | (TreeKind::TypeArgList, _) => {
+                            semantic_tokens::types::TYPE_PARAMETER
+                        }
+                        (_, TokenKind::Name) => semantic_tokens::types::KEYWORD,
+                        (_, TokenKind::Quote) | (_, TokenKind::String) => {
+                            semantic_tokens::types::STRING
+                        }
+                        (_, TokenKind::Int) => semantic_tokens::types::NUMBER,
+                        _ => {
+                            return;
+                        }
+                    };
+                    for (line, range) in self.line_nums.iter_span_lines(token.span) {
+                        self.builder.push(
+                            Range::new(
+                                Position::new((line - 1) as _, *range.start() - 1),
+                                Position::new((line - 1) as _, *range.end() - 1),
+                            ),
+                            semantic_tokens::type_index(&token_kind),
+                            semantic_tokens::ModifierSet::default().0,
+                        );
+                    }
+                }
+            }
+
+            let line_nums = LineNumbers::new(text);
+
+            let mut visitor = SemanticVisitor {
+                text,
+                line_nums: &line_nums,
+                stack: Vec::new(),
+                builder,
+            };
+            tree.walk(&mut visitor);
+
+            let tokens = visitor.builder.build();
+            send_ok(conn, req.id.clone(), &tokens)?;
         }
         _ => send_err(
             conn,

@@ -138,19 +138,19 @@ pub fn server_capabilities(config: &Config) -> ServerCapabilities {
         //     }),
         // }),
         // call_hierarchy_provider: Some(CallHierarchyServerCapability::Simple(true)),
-        // semantic_tokens_provider: Some(
-        //     SemanticTokensOptions {
-        //         legend: SemanticTokensLegend {
-        //             token_types: semantic_tokens::SUPPORTED_TYPES.to_vec(),
-        //             token_modifiers: semantic_tokens::SUPPORTED_MODIFIERS.to_vec(),
-        //         },
-        //
-        //         full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
-        //         range: Some(true),
-        //         work_done_progress_options: Default::default(),
-        //     }
-        //     .into(),
-        // ),
+        semantic_tokens_provider: Some(
+            SemanticTokensOptions {
+                legend: SemanticTokensLegend {
+                    token_types: semantic_tokens::SUPPORTED_TYPES.to_vec(),
+                    token_modifiers: semantic_tokens::SUPPORTED_MODIFIERS.to_vec(),
+                },
+
+                full: Some(SemanticTokensFullOptions::Bool(true)),
+                range: Some(true),
+                work_done_progress_options: Default::default(),
+            }
+            .into(),
+        ),
         // moniker_provider: None,
         // // inlay_hint_provider: Some(OneOf::Right(InlayHintServerCapabilities::Options(
         // //     InlayHintOptions {
