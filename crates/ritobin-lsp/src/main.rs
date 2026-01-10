@@ -1,6 +1,7 @@
 use std::{env, error::Error, fmt::format, fs, io::Write, path::PathBuf, sync::Arc};
 
 use crossbeam_channel::Sender;
+use itertools::Itertools;
 use ltk_ritobin::{
     Span,
     parser::{
@@ -383,6 +384,22 @@ pub struct Document {
     pub line_numbers: LineNumbers,
 }
 
+macro_rules! match_token {
+    ($expr:expr, $kind:path) => {{
+        match $expr {
+            Child::Token(token @ Token { kind: $kind, .. }) => Some(token),
+            _ => None,
+        }
+    }};
+}
+macro_rules! match_tree {
+    ($expr:expr, $kind:path) => {{
+        match $expr {
+            Child::Tree(tree @ Tree { kind: $kind, .. }) => Some(tree),
+            _ => None,
+        }
+    }};
+}
 impl Document {
     pub fn new(uri: Url, text: String) -> Self {
         let cst = parse(&text);
@@ -438,6 +455,28 @@ impl Document {
                 }
                 Some(equals.span())
             }
+
+            fn expect_type_params<'a, 'b, T: Iterator<Item = &'b Child>>(
+                &'a mut self,
+                type_children: &mut T,
+            ) -> Option<impl Iterator<Item = &'b Child> + use<'b, T>> {
+                match_token!(type_children.next()?, TokenKind::LBrack)?;
+                let next = type_children.next()?;
+                let Some(arg_list) = match_tree!(next, TreeKind::TypeArgList) else {
+                    self.report(next.span(), "list requires type parameter");
+                    return None;
+                };
+
+                Some(arg_list.children.iter().filter(|c| {
+                    !matches!(
+                        c,
+                        Child::Token(Token {
+                            kind: TokenKind::Comma,
+                            ..
+                        })
+                    )
+                }))
+            }
         }
 
         impl Visitor for TypeChecker<'_> {
@@ -454,23 +493,6 @@ impl Document {
                     Visit::Continue
                 }
 
-                macro_rules! match_token {
-                    ($expr:expr, $kind:path) => {{
-                        match $expr {
-                            Child::Token(token @ Token { kind: $kind, .. }) => Some(token),
-                            _ => None,
-                        }
-                    }};
-                }
-                macro_rules! match_tree {
-                    ($expr:expr, $kind:path) => {{
-                        match $expr {
-                            Child::Tree(tree @ Tree { kind: $kind, .. }) => Some(tree),
-                            _ => None,
-                        }
-                    }};
-                }
-
                 option_to_visit(|| {
                     #[allow(clippy::single_match)]
                     match tree.kind {
@@ -478,8 +500,10 @@ impl Document {
                             match_tree!(children.next()?, TreeKind::EntryKey)?;
                             match_token!(children.next()?, TokenKind::Colon)?;
                             let tree = match_tree!(children.next()?, TreeKind::TypeExpr)?;
+                            let mut type_children = tree.children.iter();
+                            let type_name = type_children.next()?;
 
-                            match &self.text[tree.span] {
+                            match &self.text[type_name.span()] {
                                 name @ ("u8" | "u16" | "u32" | "i8" | "i16" | "i32") => {
                                     self.eat_equals(name, &mut children)?;
                                 }
@@ -500,6 +524,45 @@ impl Document {
                                     };
                                 }
                                 "map" => {}
+                                "embed" => {}
+                                "list" => {
+                                    let Some(mut args) =
+                                        self.expect_type_params(&mut type_children)
+                                    else {
+                                        self.report(type_name.span(), "missing type parameter");
+                                        return None;
+                                    };
+
+                                    let kind = match args.next() {
+                                        Some(Child::Tree(Tree {
+                                            kind: TreeKind::TypeArg,
+                                            span,
+                                            ..
+                                        })) => &self.text[span],
+                                        Some(c) => {
+                                            self.report(
+                                                type_name.span(),
+                                                format!("unexpected type parameter {c:?}"),
+                                            );
+                                            return None;
+                                        }
+                                        None => {
+                                            self.report(type_name.span(), "missing type parameter");
+                                            return None;
+                                        }
+                                    };
+
+                                    if let Some(arg) = args.next() {
+                                        self.report(
+                                            Span::new(arg.span().start, tree.span.end - 1),
+                                            "too many type parameters",
+                                        );
+                                        return None;
+                                    }
+
+                                    drop(args);
+                                    match_token!(type_children.next()?, TokenKind::RBrack)?;
+                                }
                                 type_name => {
                                     self.report(tree.span, format!("unknown type '{type_name}'"));
                                 }
