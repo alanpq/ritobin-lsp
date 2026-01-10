@@ -24,7 +24,7 @@ impl NodeFinder {
 }
 
 impl Visitor for NodeFinder {
-    fn visit_token(&mut self, token: &Token, context: TreeKind) -> Visit {
+    fn visit_token(&mut self, token: &Token, context: &Tree) -> Visit {
         if token.span.contains(self.offset) {
             self.found.replace(*token);
             return Visit::Stop;
@@ -33,11 +33,11 @@ impl Visitor for NodeFinder {
         Visit::Continue
     }
 
-    fn enter_tree(&mut self, kind: TreeKind) -> Visit {
-        self.stack.push(kind);
+    fn enter_tree(&mut self, tree: &Tree) -> Visit {
+        self.stack.push(tree.kind);
         Visit::Continue
     }
-    fn exit_tree(&mut self, kind: TreeKind) -> Visit {
+    fn exit_tree(&mut self, _tree: &Tree) -> Visit {
         self.stack.pop();
         Visit::Continue
     }
