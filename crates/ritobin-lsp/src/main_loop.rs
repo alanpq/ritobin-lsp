@@ -20,7 +20,7 @@ use ltk_ritobin::parse::{
 use paths::{AbsPathBuf, Utf8PathBuf};
 use ritobin_lsp::{cst_ext::CstExt, from_json, line_ends::LineNumbers};
 use rustc_hash::FxHashMap;
-use std::process::Stdio;
+use std::{process::Stdio, sync::Arc};
 use tracing_subscriber::{
     Layer as _, Registry,
     filter::Targets,
@@ -40,7 +40,7 @@ use crate::{
 };
 
 pub fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
-    let server = Server::new(connection, config);
+    let server = Arc::new(Server::new(connection, config));
 
     let not = lsp_server::Notification::new(
         ServerStatusNotification::METHOD.to_owned(),
@@ -62,14 +62,20 @@ pub fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
                 if server.conn.handle_shutdown(&req)? {
                     break;
                 }
-                if let Err(err) = handlers::request(&server, &req) {
-                    tracing::error!("[lsp] request {} failed: {err}", &req.method);
-                }
+                let server = server.clone();
+                std::thread::spawn(move || {
+                    if let Err(err) = handlers::request(&server, &req) {
+                        tracing::error!("[lsp] request {} failed: {err}", &req.method);
+                    }
+                });
             }
             Message::Notification(note) => {
-                if let Err(err) = handlers::notification(&server, &note) {
-                    tracing::error!("[lsp] notification {} failed: {err}", note.method);
-                }
+                let server = server.clone();
+                std::thread::spawn(move || {
+                    if let Err(err) = handlers::notification(&server, &note) {
+                        tracing::error!("[lsp] notification {} failed: {err}", note.method);
+                    }
+                });
             }
             Message::Response(resp) => tracing::error!("[lsp] response: {resp:?}"),
         }
