@@ -1,3 +1,4 @@
+use lsp_types::{Position, Range};
 use ltk_ritobin::Span;
 
 #[derive(Debug)]
@@ -21,20 +22,18 @@ impl LineNumbers {
         self.line_starts
             .binary_search(&byte_index)
             .unwrap_or_else(|next_line| next_line - 1) as u32
-            + 1
     }
 
     // TODO: handle unicode characters that may be more than 1 byte in width
-    pub fn line_and_column_number(&self, byte_index: u32) -> LineColumn {
+    pub fn position(&self, byte_index: u32) -> Position {
         let line = self.line_number(byte_index);
         let column = byte_index
             - self
                 .line_starts
-                .get(line as usize - 1)
+                .get(line as usize)
                 .copied()
-                .unwrap_or_default()
-            + 1;
-        LineColumn { line, column }
+                .unwrap_or_default();
+        Position::new(line, column)
     }
 
     // TODO: handle unicode characters that may be more than 1 byte in width
@@ -46,6 +45,10 @@ impl LineNumbers {
         }
     }
 
+    pub fn from_span(&self, span: Span) -> Range {
+        Range::new(self.position(span.start), self.position(span.end))
+    }
+
     pub fn iter_span_lines(
         &self,
         span: Span,
@@ -53,30 +56,32 @@ impl LineNumbers {
         let span_start = span.start;
         let span_end = span.end;
 
-        let start_lc = self.line_and_column_number(span_start);
-        let end_lc = self.line_and_column_number(span_end);
+        let start_lc = self.position(span_start);
+        let end_lc = self.position(span_end);
 
         let start_line = start_lc.line;
         let end_line = end_lc.line;
 
         (start_line..=end_line).map(move |line| {
-            let line_start = self.line_starts[(line - 1) as usize];
+            let line_start = self.line_starts[(line) as usize];
             let line_end = self
                 .line_starts
-                .get(line as usize)
+                .get(line as usize + 1)
                 .copied()
                 .unwrap_or(self.length);
 
             let line_len = line_end - line_start;
+            tracing::debug!(?start_line, ?end_line, ?self.length);
+            tracing::debug!(?line, ?line_start, ?line_end, ?line_len);
 
             let (from, to) = if start_line == end_line {
-                (start_lc.column, end_lc.column)
+                (start_lc.character, end_lc.character)
             } else if line == start_line {
-                (start_lc.column, line_len)
+                (start_lc.character, line_len)
             } else if line == end_line {
-                (1, end_lc.column)
+                (0, end_lc.character)
             } else {
-                (1, line_len)
+                (0, line_len)
             };
 
             (line, from..=to)
@@ -98,10 +103,4 @@ pub fn main() {
     assert_eq!(line_numbers.byte_index(0, 4), 4);
     assert_eq!(line_numbers.byte_index(100, 1), src.len() as u32);
     assert_eq!(line_numbers.byte_index(2, 1), 18);
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct LineColumn {
-    pub line: u32,
-    pub column: u32,
 }
