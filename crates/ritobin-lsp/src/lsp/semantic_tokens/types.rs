@@ -45,6 +45,7 @@ define_semantic_token_types![
         PARAMETER,
         PROPERTY,
         STRING,
+        CLASS,
         STRUCT,
         TYPE_PARAMETER,
         VARIABLE,

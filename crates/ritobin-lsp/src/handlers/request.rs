@@ -133,36 +133,34 @@ pub fn request(server: &Server, req: &ServerRequest) -> Result<()> {
                 }
                 fn visit_token(&mut self, token: &Token, _context: &Cst) -> Visit {
                     let last_tree = self.stack.last().unwrap();
-                    tracing::debug!(
-                        "{:?} ({:?}) | last tree: {last_tree:?}",
-                        token.kind,
-                        &self.text[token.span.start as usize..token.span.end as usize],
-                    );
+                    // tracing::debug!(
+                    //     "{:?} ({:?}) | last tree: {last_tree:?}",
+                    //     token.kind,
+                    //     &self.text[token.span.start as usize..token.span.end as usize],
+                    // );
 
+                    use TokenKind::*;
                     let token_kind = match (last_tree, token.kind) {
-                        (_, TokenKind::RCurly)
-                        | (_, TokenKind::LCurly)
-                        | (_, TokenKind::RBrack)
-                        | (_, TokenKind::LBrack)
-                        | (_, TokenKind::Colon) => semantic_tokens::types::PUNCTUATION,
+                        (_, Comment) => semantic_tokens::types::COMMENT,
+                        (_, Colon | Comma | Eq) => semantic_tokens::types::PUNCTUATION,
+                        (_, RCurly | LCurly | RBrack | LBrack) => semantic_tokens::types::BRACKET,
 
                         (TreeKind::TypeExpr, _) => semantic_tokens::types::TYPE,
                         (TreeKind::TypeArg, _) | (TreeKind::TypeArgList, _) => {
                             semantic_tokens::types::TYPE_PARAMETER
                         }
-                        (_, TokenKind::Name) => semantic_tokens::types::KEYWORD,
-                        (_, TokenKind::Quote)
-                        | (_, TokenKind::String)
-                        | (_, TokenKind::UnterminatedString) => semantic_tokens::types::STRING,
-                        (_, TokenKind::Number) | (_, TokenKind::HexLit) => {
-                            semantic_tokens::types::NUMBER
+                        (TreeKind::Class, _) => semantic_tokens::types::CLASS,
+                        (_, Name) => semantic_tokens::types::KEYWORD,
+                        (_, Quote) | (_, String) | (_, UnterminatedString) => {
+                            semantic_tokens::types::STRING
                         }
+                        (_, Number) | (_, HexLit) => semantic_tokens::types::NUMBER,
                         _ => {
                             return Visit::Continue;
                         }
                     };
                     for (line, range) in self.line_nums.iter_span_lines(token.span) {
-                        tracing::debug!(?line, ?range);
+                        // tracing::debug!(?line, ?range);
                         self.builder.push(
                             Range::new(
                                 Position::new((line) as _, *range.start()),
