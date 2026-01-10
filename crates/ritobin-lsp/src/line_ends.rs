@@ -1,5 +1,5 @@
 use lsp_types::{Position, Range};
-use ltk_ritobin::Span;
+use ltk_ritobin::parse::Span;
 
 #[derive(Debug)]
 pub struct LineNumbers {

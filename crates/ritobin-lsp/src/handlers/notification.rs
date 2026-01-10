@@ -28,51 +28,30 @@ use tracing_subscriber::{
     layer::SubscriberExt as _,
 };
 
-use crate::{
-    config::Config,
-    document::Document,
-    handlers,
-    lsp::{
-        self,
-        ext::{ServerStatusNotification, ServerStatusParams},
-    },
-    server::Server,
-};
+use crate::{document::Document, server::Server};
 
-pub fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
-    let server = Server::new(connection, config);
-
-    let not = lsp_server::Notification::new(
-        ServerStatusNotification::METHOD.to_owned(),
-        ServerStatusParams {
-            health: lsp::ext::Health::Ok,
-            quiescent: true,
-            message: None,
-        },
-    );
-    server
-        .conn
-        .sender
-        .send(lsp_server::Message::Notification(not))?;
-
-    for msg in &server.conn.receiver {
-        tracing::info!("MSG");
-        match msg {
-            Message::Request(req) => {
-                if server.conn.handle_shutdown(&req)? {
-                    break;
-                }
-                if let Err(err) = handlers::request(&server, &req) {
-                    tracing::error!("[lsp] request {} failed: {err}", &req.method);
-                }
-            }
-            Message::Notification(note) => {
-                if let Err(err) = handlers::notification(&server, &note) {
-                    tracing::error!("[lsp] notification {} failed: {err}", note.method);
-                }
-            }
-            Message::Response(resp) => tracing::error!("[lsp] response: {resp:?}"),
+pub fn notification(server: &Server, note: &lsp_server::Notification) -> Result<()> {
+    tracing::debug!(?note, "handle_notification");
+    match note.method.as_str() {
+        DidOpenTextDocument::METHOD => {
+            let p: DidOpenTextDocumentParams = serde_json::from_value(note.params.clone())?;
+            let uri = p.text_document.uri;
+            let doc = Document::new(uri.clone(), p.text_document.text);
+            doc.publish_parse_errors(&server.conn)?;
+            let mut docs = server.docs.write().unwrap();
+            docs.insert(uri.clone(), doc);
         }
+        DidChangeTextDocument::METHOD => {
+            let p: DidChangeTextDocumentParams = serde_json::from_value(note.params.clone())?;
+            if let Some(change) = p.content_changes.into_iter().next() {
+                let uri = p.text_document.uri;
+                let doc = Document::new(uri.clone(), change.text);
+                doc.publish_parse_errors(&server.conn)?;
+                let mut docs = server.docs.write().unwrap();
+                docs.insert(uri.clone(), doc);
+            }
+        }
+        _ => {}
     }
     Ok(())
 }

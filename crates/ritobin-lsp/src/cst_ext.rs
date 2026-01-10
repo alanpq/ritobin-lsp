@@ -1,6 +1,9 @@
-use ltk_ritobin::parser::{
-    real::{Tree, TreeKind, Visit, Visitor},
-    tokenizer::Token,
+use ltk_ritobin::parse::{
+    Token,
+    cst::{
+        Cst, TreeKind,
+        visitor::{Visit, Visitor},
+    },
 };
 
 pub trait CstExt {
@@ -24,7 +27,7 @@ impl NodeFinder {
 }
 
 impl Visitor for NodeFinder {
-    fn visit_token(&mut self, token: &Token, context: &Tree) -> Visit {
+    fn visit_token(&mut self, token: &Token, context: &Cst) -> Visit {
         if token.span.contains(self.offset) {
             self.found.replace(*token);
             return Visit::Stop;
@@ -33,17 +36,17 @@ impl Visitor for NodeFinder {
         Visit::Continue
     }
 
-    fn enter_tree(&mut self, tree: &Tree) -> Visit {
+    fn enter_tree(&mut self, tree: &Cst) -> Visit {
         self.stack.push(tree.kind);
         Visit::Continue
     }
-    fn exit_tree(&mut self, _tree: &Tree) -> Visit {
+    fn exit_tree(&mut self, _tree: &Cst) -> Visit {
         self.stack.pop();
         Visit::Continue
     }
 }
 
-impl CstExt for Tree {
+impl CstExt for Cst {
     fn find_node(&self, byte_index: u32) -> Option<(Vec<TreeKind>, Token)> {
         let mut visitor = NodeFinder::new(byte_index);
 
