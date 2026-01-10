@@ -154,7 +154,9 @@ pub fn request(server: &Server, req: &ServerRequest) -> Result<()> {
                         (_, TokenKind::Quote)
                         | (_, TokenKind::String)
                         | (_, TokenKind::UnterminatedString) => semantic_tokens::types::STRING,
-                        (_, TokenKind::Int) => semantic_tokens::types::NUMBER,
+                        (_, TokenKind::Number) | (_, TokenKind::HexLit) => {
+                            semantic_tokens::types::NUMBER
+                        }
                         _ => {
                             return Visit::Continue;
                         }
