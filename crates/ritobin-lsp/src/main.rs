@@ -1,9 +1,12 @@
-use std::{env, error::Error, fs, io::Write, path::PathBuf, sync::Arc};
+use std::{env, error::Error, fmt::format, fs, io::Write, path::PathBuf, sync::Arc};
 
 use crossbeam_channel::Sender;
-use ltk_ritobin::parser::{
-    real::{Tree, TreeKind, Visit, Visitor, parse},
-    tokenizer::{Token, TokenKind},
+use ltk_ritobin::{
+    Span,
+    parser::{
+        real::{Child, ErrorKind, FlatErrors, ParseError, Tree, TreeKind, Visit, Visitor, parse},
+        tokenizer::{Token, TokenKind},
+    },
 };
 use paths::{AbsPathBuf, Utf8PathBuf};
 use ritobin_lsp::{cst_ext::CstExt, from_json, line_ends::LineNumbers};
@@ -354,15 +357,17 @@ fn handle_notification(
         DidOpenTextDocument::METHOD => {
             let p: DidOpenTextDocumentParams = serde_json::from_value(note.params.clone())?;
             let uri = p.text_document.uri;
-            docs.insert(uri.clone(), Document::new(p.text_document.text));
-            publish_dummy_diag(conn, &uri)?;
+            let doc = Document::new(uri.clone(), p.text_document.text);
+            doc.publish_parse_errors(conn)?;
+            docs.insert(uri.clone(), doc);
         }
         DidChangeTextDocument::METHOD => {
             let p: DidChangeTextDocumentParams = serde_json::from_value(note.params.clone())?;
             if let Some(change) = p.content_changes.into_iter().next() {
                 let uri = p.text_document.uri;
-                docs.insert(uri.clone(), Document::new(change.text));
-                publish_dummy_diag(conn, &uri)?;
+                let doc = Document::new(uri.clone(), change.text);
+                doc.publish_parse_errors(conn)?;
+                docs.insert(uri.clone(), doc);
             }
         }
         _ => {}
@@ -371,18 +376,177 @@ fn handle_notification(
 }
 
 pub struct Document {
+    pub uri: Url,
     pub text: String,
     pub cst: Tree,
+    pub parse_errors: Vec<ParseError>,
     pub line_numbers: LineNumbers,
 }
 
 impl Document {
-    pub fn new(text: String) -> Self {
+    pub fn new(uri: Url, text: String) -> Self {
+        let cst = parse(&text);
+        let parse_errors = FlatErrors::walk(&cst);
         Self {
-            cst: parse(&text),
+            uri,
+            cst,
+            parse_errors,
             line_numbers: LineNumbers::new(&text),
             text,
         }
+    }
+
+    pub fn publish_parse_errors(&self, conn: &Connection) -> Result<()> {
+        struct TypeChecker<'a> {
+            text: &'a str,
+            lines: &'a LineNumbers,
+            diagnostics: Vec<Diagnostic>,
+        }
+
+        impl TypeChecker<'_> {
+            fn report(&mut self, span: Span, message: impl Into<String>) {
+                self.diagnostics.push(Diagnostic {
+                    range: self.lines.from_span(span),
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    code: None,
+                    code_description: None,
+                    source: Some("ritobin-lsp".into()),
+                    message: message.into(),
+                    related_information: None,
+                    tags: None,
+                    data: None,
+                });
+            }
+
+            fn eat_equals<'a>(
+                &mut self,
+                type_name: &str,
+                children: &mut impl Iterator<Item = &'a Child>,
+            ) -> Option<crate::Span> {
+                let equals = children.next()?;
+                if matches!(
+                    equals,
+                    Child::Token(Token {
+                        kind: TokenKind::LBrack,
+                        ..
+                    }),
+                ) {
+                    self.report(
+                        equals.span(),
+                        format!("type {type_name} does not take type parameters"),
+                    );
+                }
+                Some(equals.span())
+            }
+        }
+
+        impl Visitor for TypeChecker<'_> {
+            fn enter_tree(&mut self, tree: &Tree) -> Visit {
+                let mut children = tree.children.iter();
+
+                fn option_to_visit<F>(f: F) -> Visit
+                where
+                    F: FnOnce() -> Option<()>,
+                {
+                    if f().is_none() {
+                        return Visit::Skip;
+                    }
+                    Visit::Continue
+                }
+
+                macro_rules! match_token {
+                    ($expr:expr, $kind:path) => {{
+                        match $expr {
+                            Child::Token(token @ Token { kind: $kind, .. }) => Some(token),
+                            _ => None,
+                        }
+                    }};
+                }
+                macro_rules! match_tree {
+                    ($expr:expr, $kind:path) => {{
+                        match $expr {
+                            Child::Tree(tree @ Tree { kind: $kind, .. }) => Some(tree),
+                            _ => None,
+                        }
+                    }};
+                }
+
+                option_to_visit(|| {
+                    #[allow(clippy::single_match)]
+                    match tree.kind {
+                        TreeKind::Entry => {
+                            match_tree!(children.next()?, TreeKind::EntryKey)?;
+                            match_token!(children.next()?, TokenKind::Colon)?;
+                            let tree = match_tree!(children.next()?, TreeKind::TypeExpr)?;
+
+                            match &self.text[tree.span] {
+                                name @ ("u8" | "u16" | "u32" | "i8" | "i16" | "i32") => {
+                                    self.eat_equals(name, &mut children)?;
+                                }
+                                name @ "string" => {
+                                    self.eat_equals(name, &mut children)?;
+
+                                    let value =
+                                        match_tree!(children.next()?, TreeKind::EntryValue)?;
+
+                                    let mut children = value.children.iter();
+                                    let next = children.next()?;
+                                    if match_token!(next, TokenKind::String).is_none() {
+                                        self.report(
+                                            next.span(),
+                                            "type of bin value must be string",
+                                        );
+                                        return None;
+                                    };
+                                }
+                                "map" => {}
+                                type_name => {
+                                    self.report(tree.span, format!("unknown type '{type_name}'"));
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                    Some(())
+                });
+
+                Visit::Continue
+            }
+        }
+
+        let mut visitor = TypeChecker {
+            diagnostics: Vec::new(),
+            lines: &self.line_numbers,
+            text: &self.text,
+        };
+        self.cst.walk(&mut visitor);
+
+        for err in &self.parse_errors {
+            visitor.report(
+                err.span,
+                match err.kind {
+                    ErrorKind::Expected { expected, got } => {
+                        format!("Missing {expected} for {} - got {got}", err.tree)
+                    }
+                    ErrorKind::Unexpected { token } => {
+                        format!("Unexpected {token}, expected {}", err.tree)
+                    }
+                    kind => format!("{kind:#?}"),
+                },
+            );
+        }
+
+        let params = PublishDiagnosticsParams {
+            uri: self.uri.clone(),
+            diagnostics: visitor.diagnostics,
+            version: None,
+        };
+        conn.sender
+            .send(Message::Notification(lsp_server::Notification::new(
+                PublishDiagnostics::METHOD.to_owned(),
+                params,
+            )))?;
+        Ok(())
     }
 }
 
@@ -419,7 +583,7 @@ fn handle_request(
 
             let txt = match doc
                 .cst
-                .find_node(doc.line_numbers.byte_index(pos.line, pos.character))
+                .find_node(doc.line_numbers.byte_index(pos.line, pos.character + 1))
             {
                 Some((node, tok)) => {
                     let txt = &doc.text[tok.span.start as _..tok.span.end as _];
@@ -463,22 +627,22 @@ fn handle_request(
             }
 
             impl Visitor for SemanticVisitor<'_> {
-                fn enter_tree(&mut self, kind: TreeKind) -> Visit {
-                    if matches!(kind, TreeKind::ErrorTree) {
+                fn enter_tree(&mut self, tree: &Tree) -> Visit {
+                    if matches!(tree.kind, TreeKind::ErrorTree) {
                         return Visit::Continue;
                     }
-                    self.stack.push(kind);
+                    self.stack.push(tree.kind);
                     Visit::Continue
                 }
 
-                fn exit_tree(&mut self, kind: TreeKind) -> Visit {
-                    if matches!(kind, TreeKind::ErrorTree) {
+                fn exit_tree(&mut self, tree: &Tree) -> Visit {
+                    if matches!(tree.kind, TreeKind::ErrorTree) {
                         return Visit::Continue;
                     }
                     self.stack.pop();
                     Visit::Continue
                 }
-                fn visit_token(&mut self, token: &Token, _context: TreeKind) -> Visit {
+                fn visit_token(&mut self, token: &Token, _context: &Tree) -> Visit {
                     let last_tree = self.stack.last().unwrap();
                     tracing::debug!(
                         "{:?} ({:?}) | last tree: {last_tree:?}",
@@ -498,19 +662,20 @@ fn handle_request(
                             semantic_tokens::types::TYPE_PARAMETER
                         }
                         (_, TokenKind::Name) => semantic_tokens::types::KEYWORD,
-                        (_, TokenKind::Quote) | (_, TokenKind::String) => {
-                            semantic_tokens::types::STRING
-                        }
+                        (_, TokenKind::Quote)
+                        | (_, TokenKind::String)
+                        | (_, TokenKind::UnterminatedString) => semantic_tokens::types::STRING,
                         (_, TokenKind::Int) => semantic_tokens::types::NUMBER,
                         _ => {
                             return Visit::Continue;
                         }
                     };
                     for (line, range) in self.line_nums.iter_span_lines(token.span) {
+                        tracing::debug!(?line, ?range);
                         self.builder.push(
                             Range::new(
-                                Position::new((line - 1) as _, *range.start() - 1),
-                                Position::new((line - 1) as _, *range.end() - 1),
+                                Position::new((line) as _, *range.start()),
+                                Position::new((line) as _, *range.end()),
                             ),
                             type_index(&token_kind),
                             semantic_tokens::modifier_set::ModifierSet::default().0,
@@ -538,31 +703,6 @@ fn handle_request(
             "unhandled method",
         )?,
     }
-    Ok(())
-}
-
-fn publish_dummy_diag(conn: &Connection, uri: &Url) -> Result<()> {
-    let diag = Diagnostic {
-        range: Range::new(Position::new(0, 0), Position::new(0, 1)),
-        severity: Some(DiagnosticSeverity::INFORMATION),
-        code: None,
-        code_description: None,
-        source: Some("minimal_lsp".into()),
-        message: "dummy diagnostic".into(),
-        related_information: None,
-        tags: None,
-        data: None,
-    };
-    let params = PublishDiagnosticsParams {
-        uri: uri.clone(),
-        diagnostics: vec![diag],
-        version: None,
-    };
-    conn.sender
-        .send(Message::Notification(lsp_server::Notification::new(
-            PublishDiagnostics::METHOD.to_owned(),
-            params,
-        )))?;
     Ok(())
 }
 
