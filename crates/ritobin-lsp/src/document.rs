@@ -251,6 +251,7 @@ impl Document {
             );
         }
 
+        visitor.diagnostics.truncate(20);
         let params = PublishDiagnosticsParams {
             uri: self.uri.clone(),
             diagnostics: visitor.diagnostics,
