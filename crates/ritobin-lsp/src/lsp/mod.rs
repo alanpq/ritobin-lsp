@@ -7,11 +7,11 @@ pub mod ext;
 pub mod semantic_tokens;
 
 pub fn src_span_to_lsp_range(location: Span, line_numbers: &LineNumbers) -> Range {
-    let start = line_numbers.line_and_column_number(location.start);
-    let end = line_numbers.line_and_column_number(location.end);
+    let start = line_numbers.position(location.start);
+    let end = line_numbers.position(location.end);
 
     Range::new(
-        Position::new(start.line - 1, start.column - 1),
-        Position::new(end.line - 1, end.column - 1),
+        Position::new(start.line - 1, start.character - 1),
+        Position::new(end.line - 1, end.character - 1),
     )
 }
