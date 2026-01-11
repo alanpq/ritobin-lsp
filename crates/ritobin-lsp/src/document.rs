@@ -82,6 +82,9 @@ impl Document {
                 code_description: None,
                 source: Some("ritobin-lsp".into()),
                 message: match d.diagnostic {
+                    ltk_ritobin::typecheck::visitor::Diagnostic::RootNonEntry => {
+                        "Top-level bin entries must be of form 'name: type = ..'".into()
+                    }
                     ltk_ritobin::typecheck::visitor::Diagnostic::UnexpectedSubtypes {
                         base_type,
                         ..
