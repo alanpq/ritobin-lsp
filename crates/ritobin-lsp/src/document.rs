@@ -72,8 +72,9 @@ impl Document {
         let mut visitor = TypeChecker::new(&self.text);
         self.cst.walk(&mut visitor);
 
-        let mut diagnostics = visitor
-            .into_diagnostics()
+        let (roots, diagnostics) = visitor.into_parts();
+
+        let mut diagnostics = diagnostics
             .into_iter()
             .map(|d| Diagnostic {
                 range: self.line_numbers.from_span(d.span),
