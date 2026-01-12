@@ -6,16 +6,22 @@ use lsp_types::{
     DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
     DocumentFormattingParams, Hover, HoverContents, HoverProviderCapability, InitializeParams,
     MarkedString, OneOf, Position, PublishDiagnosticsParams, Range, SemanticTokens,
-    SemanticTokensFullOptions, SemanticTokensParams, ServerCapabilities,
+    SemanticTokensFullOptions, SemanticTokensParams, SemanticTokensRangeParams, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url,
     notification::{DidChangeTextDocument, DidOpenTextDocument, PublishDiagnostics},
-    request::{Completion, Formatting, GotoDefinition, HoverRequest, SemanticTokensFullRequest},
+    request::{
+        Completion, Formatting, GotoDefinition, HoverRequest, SemanticTokensFullRequest,
+        SemanticTokensRangeRequest,
+    },
 };
 use lsp_types::{SemanticToken, request::Request as _};
 use lsp_types::{WorkDoneProgressOptions, notification::Notification as _};
 use ltk_ritobin::parse::{
     self, ErrorKind, Span, Token, TokenKind,
-    cst::{Child, Cst, FlatErrors, TreeKind, Visitor, visitor::Visit},
+    cst::{
+        Child, Cst, FlatErrors, TreeKind, Visitor,
+        visitor::{Visit, VisitorExt},
+    },
 };
 use paths::{AbsPathBuf, Utf8PathBuf};
 use ritobin_lsp::{cst_ext::CstExt, from_json, line_ends::LineNumbers};
@@ -100,6 +106,28 @@ pub fn request(server: &Server, req: &ServerRequest) -> Result<()> {
             };
             server.send_ok(req.id.clone(), &vec![edit])?;
         }
+        SemanticTokensRangeRequest::METHOD => {
+            let p: SemanticTokensRangeParams = serde_json::from_value(req.params.clone())?;
+            let builder = SemanticTokensBuilder::new(p.text_document.uri.to_string());
+            let docs = server.docs.read().unwrap();
+            let doc = docs
+                .get(&p.text_document.uri)
+                .ok_or_else(|| anyhow!("document not in cache – did you send DidOpen?"))?;
+
+            let range = doc.line_numbers.from_range(&p.range);
+
+            let visitor = SemanticVisitor {
+                text: &doc.text,
+                line_nums: &doc.line_numbers,
+                stack: Vec::new(),
+                range: Some(range),
+                builder,
+            }
+            .walk(&doc.cst);
+
+            let tokens = visitor.builder.build();
+            server.send_ok(req.id.clone(), &tokens)?;
+        }
         SemanticTokensFullRequest::METHOD => {
             let p: SemanticTokensParams = serde_json::from_value(req.params.clone())?;
             let builder = SemanticTokensBuilder::new(p.text_document.uri.to_string());
@@ -108,79 +136,14 @@ pub fn request(server: &Server, req: &ServerRequest) -> Result<()> {
                 .get(&p.text_document.uri)
                 .ok_or_else(|| anyhow!("document not in cache – did you send DidOpen?"))?;
 
-            struct SemanticVisitor<'a> {
-                text: &'a str,
-                line_nums: &'a LineNumbers,
-                builder: SemanticTokensBuilder,
-                stack: Vec<TreeKind>,
-            }
-
-            impl Visitor for SemanticVisitor<'_> {
-                fn enter_tree(&mut self, tree: &Cst) -> Visit {
-                    if matches!(tree.kind, TreeKind::ErrorTree) {
-                        return Visit::Continue;
-                    }
-                    self.stack.push(tree.kind);
-                    Visit::Continue
-                }
-
-                fn exit_tree(&mut self, tree: &Cst) -> Visit {
-                    if matches!(tree.kind, TreeKind::ErrorTree) {
-                        return Visit::Continue;
-                    }
-                    self.stack.pop();
-                    Visit::Continue
-                }
-                fn visit_token(&mut self, token: &Token, _context: &Cst) -> Visit {
-                    let last_tree = self.stack.last().unwrap();
-                    // tracing::debug!(
-                    //     "{:?} ({:?}) | last tree: {last_tree:?}",
-                    //     token.kind,
-                    //     &self.text[token.span.start as usize..token.span.end as usize],
-                    // );
-
-                    use TokenKind::*;
-                    let token_kind = match (last_tree, token.kind) {
-                        (_, Comment) => semantic_tokens::types::COMMENT,
-                        (_, Colon | Comma | Eq) => semantic_tokens::types::PUNCTUATION,
-                        (_, RCurly | LCurly | RBrack | LBrack) => semantic_tokens::types::BRACKET,
-
-                        (TreeKind::TypeExpr, _) => semantic_tokens::types::TYPE,
-                        (TreeKind::TypeArg, _) | (TreeKind::TypeArgList, _) => {
-                            semantic_tokens::types::TYPE_PARAMETER
-                        }
-                        (TreeKind::Class, _) => semantic_tokens::types::CLASS,
-                        (_, Name) => semantic_tokens::types::KEYWORD,
-                        (_, Quote) | (_, String) | (_, UnterminatedString) => {
-                            semantic_tokens::types::STRING
-                        }
-                        (_, Number) | (_, HexLit) => semantic_tokens::types::NUMBER,
-                        _ => {
-                            return Visit::Continue;
-                        }
-                    };
-                    for (line, range) in self.line_nums.iter_span_lines(token.span) {
-                        // tracing::debug!(?line, ?range);
-                        self.builder.push(
-                            Range::new(
-                                Position::new((line) as _, *range.start()),
-                                Position::new((line) as _, *range.end()),
-                            ),
-                            type_index(&token_kind),
-                            semantic_tokens::modifier_set::ModifierSet::default().0,
-                        );
-                    }
-                    Visit::Continue
-                }
-            }
-
-            let mut visitor = SemanticVisitor {
+            let visitor = SemanticVisitor {
                 text: &doc.text,
                 line_nums: &doc.line_numbers,
                 stack: Vec::new(),
+                range: None,
                 builder,
-            };
-            doc.cst.walk(&mut visitor);
+            }
+            .walk(&doc.cst);
 
             let tokens = visitor.builder.build();
             server.send_ok(req.id.clone(), &tokens)?;
@@ -192,4 +155,74 @@ pub fn request(server: &Server, req: &ServerRequest) -> Result<()> {
         )?,
     }
     Ok(())
+}
+
+struct SemanticVisitor<'a> {
+    text: &'a str,
+    line_nums: &'a LineNumbers,
+    builder: SemanticTokensBuilder,
+    stack: Vec<TreeKind>,
+    range: Option<Span>,
+}
+
+impl Visitor for SemanticVisitor<'_> {
+    fn enter_tree(&mut self, tree: &Cst) -> Visit {
+        if matches!(tree.kind, TreeKind::ErrorTree) {
+            return Visit::Continue;
+        }
+        self.stack.push(tree.kind);
+        Visit::Continue
+    }
+
+    fn exit_tree(&mut self, tree: &Cst) -> Visit {
+        if matches!(tree.kind, TreeKind::ErrorTree) {
+            return Visit::Continue;
+        }
+        self.stack.pop();
+        Visit::Continue
+    }
+    fn visit_token(&mut self, token: &Token, _context: &Cst) -> Visit {
+        if let Some(range) = self.range
+            && !token.span.intersects(&range)
+        {
+            return Visit::Continue;
+        }
+        let last_tree = self.stack.last().unwrap();
+        // tracing::debug!(
+        //     "{:?} ({:?}) | last tree: {last_tree:?}",
+        //     token.kind,
+        //     &self.text[token.span.start as usize..token.span.end as usize],
+        // );
+
+        use TokenKind::*;
+        let token_kind = match (last_tree, token.kind) {
+            (_, Comment) => semantic_tokens::types::COMMENT,
+            (_, Colon | Comma | Eq) => semantic_tokens::types::PUNCTUATION,
+            (_, RCurly | LCurly | RBrack | LBrack) => semantic_tokens::types::BRACKET,
+
+            (TreeKind::TypeExpr, _) => semantic_tokens::types::TYPE,
+            (TreeKind::TypeArg, _) | (TreeKind::TypeArgList, _) => {
+                semantic_tokens::types::TYPE_PARAMETER
+            }
+            (TreeKind::Class, _) => semantic_tokens::types::CLASS,
+            (_, Name) => semantic_tokens::types::KEYWORD,
+            (_, Quote) | (_, String) | (_, UnterminatedString) => semantic_tokens::types::STRING,
+            (_, Number) | (_, HexLit) => semantic_tokens::types::NUMBER,
+            _ => {
+                return Visit::Continue;
+            }
+        };
+        for (line, range) in self.line_nums.iter_span_lines(token.span) {
+            // tracing::debug!(?line, ?range);
+            self.builder.push(
+                Range::new(
+                    Position::new((line) as _, *range.start()),
+                    Position::new((line) as _, *range.end()),
+                ),
+                type_index(&token_kind),
+                semantic_tokens::modifier_set::ModifierSet::default().0,
+            );
+        }
+        Visit::Continue
+    }
 }
