@@ -36,6 +36,17 @@ impl LineNumbers {
         Position::new(line, column)
     }
 
+    pub fn from_position(&self, position: &Position) -> u32 {
+        self.byte_index(position.line, position.character)
+    }
+
+    pub fn from_range(&self, range: &Range) -> Span {
+        Span::new(
+            self.from_position(&range.start),
+            self.from_position(&range.end),
+        )
+    }
+
     // TODO: handle unicode characters that may be more than 1 byte in width
     /// 0 indexed line and character to byte index
     pub fn byte_index(&self, line: u32, character: u32) -> u32 {
