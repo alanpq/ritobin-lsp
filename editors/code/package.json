@@ -1,5 +1,5 @@
 {
-    "name": "ritobin-lsp",
+    "name": "ritobin-lsp-vs",
     "description": "VSCode plugin for Ritobin language support",
     "private": true,
     "author": "alanpq",
@@ -9,7 +9,7 @@
     "type": "commonjs",
     "repository": {
         "type": "git",
-        "url": "https://github.com/alanpq/vscode-ritobin"
+        "url": "https://github.com/alanpq/ritobin-lsp"
     },
     "keywords": [
         "ritobin",
@@ -22,7 +22,7 @@
     "capabilities": {
         "untritobinedWorkspaces": {
             "supported": false,
-            "description": "ritobin-lsp invokes binaries set up by its configuration as well as the Ritobin toolchain's binaries. A malicious actor could exploit this to run arbitrary code on your machine."
+            "description": "ritobin-lsp-vs invokes binaries set up by its configuration as well as the Ritobin toolchain's binaries. A malicious actor could exploit this to run arbitrary code on your machine."
         }
     },
     "engines": {
