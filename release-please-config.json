@@ -7,7 +7,7 @@
       "bump-patch-for-minor-pre-major": true,
       "draft": false,
       "prerelease": false,
-      "include-component-in-tag": false,
+      "include-component-in-tag": true,
       "include-v-in-tag": true
     },
     "editors/code": {
@@ -17,7 +17,7 @@
       "bump-patch-for-minor-pre-major": true,
       "draft": false,
       "prerelease": false,
-      "include-component-in-tag": false,
+      "include-component-in-tag": true,
       "include-v-in-tag": true
     }
   },

@@ -79,23 +79,22 @@ jobs:
     needs: [test]
 
     outputs:
-      created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
+      rust_created: ${{ steps.release.outputs['crates/ritobin-lsp--release_created'] }}
+      rust_tag_name: ${{ steps.release.outputs['crates/ritobin-lsp--tag_name'] }}
 
     steps:
       - uses: googleapis/release-please-action@v4
-        if: ${{ !github.event.inputs.git_ref }}
         id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  packaging:
-    name: packaging-${{ matrix.platform.target }}
+  rust-packaging:
+    name: rust-packaging-${{ matrix.platform.target }}
     runs-on: ${{ matrix.platform.os }}
     needs:
       - release-please
-    if: needs.release-please.outputs.created
+    if: needs.release-please.outputs.rust_created
     strategy:
       fail-fast: false
       matrix:
@@ -104,35 +103,35 @@ jobs:
           - os_name: Linux-x86_64
             os: ubuntu-latest
             target: x86_64-unknown-linux-musl
-            bin: lsp-ritobin
-            name: lsp-ritobin-Linux-x86_64-musl.tar.gz
+            bin: ritobin-lsp
+            name: ritobin-lsp-Linux-x86_64-musl.tar.gz
           - os_name: Linux-aarch64
             os: ubuntu-latest
             target: aarch64-unknown-linux-musl
-            bin: lsp-ritobin
-            name: lsp-ritobin-Linux-aarch64-musl.tar.gz
+            bin: ritobin-lsp
+            name: ritobin-lsp-Linux-aarch64-musl.tar.gz
             skip_tests: true
           - os_name: Windows-i686
             os: windows-latest
             target: i686-pc-windows-msvc
-            bin: lsp-ritobin.exe
-            name: lsp-ritobin-Windows-i686.zip
+            bin: ritobin-lsp.exe
+            name: ritobin-lsp-Windows-i686.zip
             skip_tests: true
           - os_name: Windows-x86_64
             os: windows-latest
             target: x86_64-pc-windows-msvc
-            bin: lsp-ritobin.exe
-            name: lsp-ritobin-Windows-x86_64.zip
+            bin: ritobin-lsp.exe
+            name: ritobin-lsp-Windows-x86_64.zip
           - os_name: macOS-x86_64
             os: macOS-latest
             target: x86_64-apple-darwin
-            bin: lsp-ritobin
-            name: lsp-ritobin-macOS-Darwin-x86_64.tar.gz
+            bin: ritobin-lsp
+            name: ritobin-lsp-macOS-Darwin-x86_64.tar.gz
           - os_name: macOS-aarch64
             os: macOS-latest
             target: aarch64-apple-darwin
-            bin: lsp-ritobin
-            name: lsp-ritobin-macOS-Darwin-aarch64.tar.gz
+            bin: ritobin-lsp
+            name: ritobin-lsp-macOS-Darwin-aarch64.tar.gz
             skip_tests: true
         toolchain:
           - stable
@@ -175,6 +174,6 @@ jobs:
         if: matrix.toolchain == 'stable'
         with:
           file_glob: true
-          tag: ${{ (startsWith(github.event.inputs.git_ref, 'v') && github.event.inputs.git_ref) || needs.release-please.outputs.tag_name }}
+          tag: ${{ needs.release-please.outputs.rust_tag_name }}
           file: ${{ matrix.platform.name }}
           overwrite: true
