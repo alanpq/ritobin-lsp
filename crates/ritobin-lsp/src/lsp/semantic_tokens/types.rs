@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 macro_rules! define_semantic_token_types {
     (
         standard {
