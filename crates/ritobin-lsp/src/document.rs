@@ -3,11 +3,12 @@ use itertools::Itertools;
 use lsp_server::{Connection, Message, Request as ServerRequest, RequestId, Response};
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionOptions, CompletionResponse, Diagnostic,
-    DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentFormattingParams, Hover, HoverContents, HoverProviderCapability, InitializeParams,
-    MarkedString, OneOf, Position, PublishDiagnosticsParams, Range, SemanticTokens,
-    SemanticTokensFullOptions, SemanticTokensParams, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url,
+    DiagnosticRelatedInformation, DiagnosticSeverity, DidChangeTextDocumentParams,
+    DidOpenTextDocumentParams, DocumentFormattingParams, Hover, HoverContents,
+    HoverProviderCapability, InitializeParams, Location, MarkedString, OneOf, Position,
+    PublishDiagnosticsParams, Range, SemanticTokens, SemanticTokensFullOptions,
+    SemanticTokensParams, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextEdit, Url,
     notification::{DidChangeTextDocument, DidOpenTextDocument, PublishDiagnostics},
     request::{Completion, Formatting, GotoDefinition, HoverRequest, SemanticTokensFullRequest},
 };
@@ -76,30 +77,77 @@ impl Document {
 
         let mut diagnostics = diagnostics
             .into_iter()
-            .map(|d| Diagnostic {
-                range: self.line_numbers.from_span(d.span),
-                severity: Some(DiagnosticSeverity::ERROR),
-                code: None,
-                code_description: None,
-                source: Some("ritobin-lsp".into()),
-                message: match d.diagnostic {
-                    ltk_ritobin::typecheck::visitor::Diagnostic::RootNonEntry => {
-                        "Top-level bin entries must be of form 'name: type = ..'".into()
-                    }
+            .flat_map(|d| {
+                [match d.diagnostic {
+                    ltk_ritobin::typecheck::visitor::Diagnostic::TypeMismatch {
+                        span,
+                        expected,
+                        expected_span,
+                        got,
+                    } => Diagnostic {
+                        range: self.line_numbers.from_span(span),
+                        severity: Some(DiagnosticSeverity::ERROR),
+                        related_information: expected_span.map(|span| {
+                            vec![DiagnosticRelatedInformation {
+                                location: Location {
+                                    uri: self.uri.clone(),
+                                    range: self.line_numbers.from_span(span),
+                                },
+                                message: "due to this type expression".into(),
+                            }]
+                        }),
+                        message: format!("Type mismatch - expected {expected}, got {got}"),
+                        ..Default::default()
+                    },
+                    ltk_ritobin::typecheck::visitor::Diagnostic::ShadowedEntry {
+                        shadowee,
+                        shadower,
+                    } => Diagnostic {
+                        range: self.line_numbers.from_span(d.span),
+                        severity: Some(DiagnosticSeverity::WARNING),
+
+                        related_information: Some(vec![DiagnosticRelatedInformation {
+                            location: Location {
+                                uri: self.uri.clone(),
+                                range: self.line_numbers.from_span(shadowee),
+                            },
+                            message: "Shadowed here".into(),
+                        }]),
+
+                        message: format!(
+                            "Entry '{}' shadows previous entry",
+                            &self.text.as_str()[shadower]
+                        ),
+                        ..Default::default()
+                    },
+                    ltk_ritobin::typecheck::visitor::Diagnostic::RootNonEntry => Diagnostic {
+                        range: self.line_numbers.from_span(d.span),
+                        severity: Some(DiagnosticSeverity::ERROR),
+                        message: "Top-level bin entries must be of form 'name: type = ..'".into(),
+                        ..Default::default()
+                    },
                     ltk_ritobin::typecheck::visitor::Diagnostic::UnexpectedSubtypes {
                         base_type,
                         ..
-                    } => {
-                        format!(
+                    } => Diagnostic {
+                        range: self.line_numbers.from_span(d.span),
+                        severity: Some(DiagnosticSeverity::ERROR),
+                        message: format!(
                             "{} does not accept type parameters",
                             &self.text.as_str()[base_type]
-                        )
-                    }
-                    d => format!("{d:?}"),
-                },
-                related_information: None,
-                tags: None,
-                data: None,
+                        ),
+                        ..Default::default()
+                    },
+                    inner => Diagnostic {
+                        range: self.line_numbers.from_span(d.span),
+                        severity: Some(DiagnosticSeverity::ERROR),
+                        message: format!("{inner:?}"),
+                        ..Default::default()
+                    },
+                }]
+            })
+            .update(|d| {
+                d.source.replace("ritobin-lsp".into());
             })
             .collect_vec();
 
