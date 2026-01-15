@@ -27,7 +27,7 @@ impl NodeFinder {
 }
 
 impl Visitor for NodeFinder {
-    fn visit_token(&mut self, token: &Token, context: &Cst) -> Visit {
+    fn visit_token(&mut self, token: &Token, _context: &Cst) -> Visit {
         if token.span.contains(self.offset) {
             self.found.replace(*token);
             return Visit::Stop;
