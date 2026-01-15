@@ -79,7 +79,7 @@ jobs:
     needs: [test]
 
     outputs:
-      rust_created: ${{ steps.release.outputs['crates/ritobin--release_created'] }}
+      rust_created: ${{ steps.release.outputs['crates/ritobin-lsp--release_created'] }}
       tag_name: ${{ steps.release.outputs.tag_name }}
 
     steps:
