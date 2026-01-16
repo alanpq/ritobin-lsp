@@ -80,7 +80,11 @@ jobs:
 
     outputs:
       rust_created: ${{ steps.release.outputs['crates/ritobin-lsp--release_created'] }}
+      vsc_created: ${{ steps.release.outputs['editors/code--release_created'] }}
+      releases_created: ${{ steps.release.outputs.releases-created }}
+
       rust_tag_name: ${{ steps.release.outputs['crates/ritobin-lsp--tag_name'] }}
+      vsc_tag_name: ${{ steps.release.outputs['editors/code--tag_name'] }}
 
     steps:
       - uses: googleapis/release-please-action@v4
@@ -96,44 +100,43 @@ jobs:
     runs-on: ${{ matrix.platform.os }}
     needs:
       - release-please
-    if: needs.release-please.outputs.rust_created
+    if: needs.release-please.outputs.rust_created || needs.release-please.outputs.vsc_created
     strategy:
       fail-fast: false
       matrix:
         platform:
-          # From https://github.com/houseabsolute/precious/blob/master/.github/workflows/ci.yml
-          - os_name: Linux-x86_64
+          - vsix_target: linux-x64
             os: ubuntu-latest
             target: x86_64-unknown-linux-musl
             bin: ritobin-lsp
-            name: ritobin-lsp-Linux-x86_64-musl.tar.gz
-          - os_name: Linux-aarch64
+            name: ritobin-lsp-linux-x86_64-musl.tar.gz
+          - vsix_target: linux-arm64
             os: ubuntu-latest
             target: aarch64-unknown-linux-musl
             bin: ritobin-lsp
-            name: ritobin-lsp-Linux-aarch64-musl.tar.gz
+            name: ritobin-lsp-linux-aarch64-musl.tar.gz
             skip_tests: true
-          - os_name: Windows-i686
+          - vsix_target: win32-arm64
             os: windows-latest
             target: i686-pc-windows-msvc
             bin: ritobin-lsp.exe
-            name: ritobin-lsp-Windows-i686.zip
+            name: ritobin-lsp-windows-i686.zip
             skip_tests: true
-          - os_name: Windows-x86_64
+          - vsix_target: win32-x64
             os: windows-latest
             target: x86_64-pc-windows-msvc
             bin: ritobin-lsp.exe
-            name: ritobin-lsp-Windows-x86_64.zip
-          - os_name: macOS-x86_64
-            os: macOS-latest
+            name: ritobin-lsp-windows-x86_64.zip
+          - vsix_target: darwin-x64
+            os: macos-latest
             target: x86_64-apple-darwin
             bin: ritobin-lsp
-            name: ritobin-lsp-macOS-Darwin-x86_64.tar.gz
-          - os_name: macOS-aarch64
-            os: macOS-latest
+            name: ritobin-lsp-macos-darwin-x86_64.tar.gz
+          - vsix_target: darwin-arm64
+            os: macos-latest
             target: aarch64-apple-darwin
             bin: ritobin-lsp
-            name: ritobin-lsp-macOS-Darwin-aarch64.tar.gz
+            name: ritobin-lsp-macos-darwin-aarch64.tar.gz
             skip_tests: true
         toolchain:
           - stable
@@ -161,7 +164,27 @@ jobs:
             toolchain: ${{ matrix.toolchain }}
             args: "--locked --release"
         if: ${{ !matrix.platform.skip_tests }}
+      - name: Package vscode extension
+        if: needs.release-please.outputs.vsc_created && matrix.toolchain == 'stable'
+        run: |
+          cd editors/code
+          mkdir server
+          cp -v ../../target/${{ matrix.platform.target }}/release/${{ matrix.platform.bin }} ./server/.
+          npx vsce package --target ${{ matrix.vsix_target }} --out ${{ needs.release-please.outputs.vsc_tag_name }}-${{ matrix.vsix_target }}
+      - name: Publish vscode extension to GitHub release
+        uses: svenstaro/upload-release-action@v2
+        if: needs.release-please.outputs.vsc_created && matrix.toolchain == 'stable'
+        with:
+          file_glob: true
+          tag: ${{ needs.release-please.outputs.rust_tag_name }}
+          file: ${{ matrix.platform.name }}
+          overwrite: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.target }}
+          path: "*.vsix"
       - name: Package as archive
+        if: needs.release-please.outputs.rust_created && matrix.toolchain == 'stable'
         shell: bash
         run: |
             cd target/${{ matrix.platform.target }}/release
@@ -173,7 +196,7 @@ jobs:
             cd -
       - name: Publish release artifacts to GitHub release
         uses: svenstaro/upload-release-action@v2
-        if: matrix.toolchain == 'stable'
+        if: needs.release-please.outputs.rust_created && matrix.toolchain == 'stable'
         with:
           file_glob: true
           tag: ${{ needs.release-please.outputs.rust_tag_name }}
