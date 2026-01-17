@@ -121,7 +121,7 @@ async function getServer(
   await vscode.window.showErrorMessage(
     "Unfortunately we don't ship binaries for your platform yet. " +
       "You need to manually clone the ritobin-lsp repository and " +
-      "run `cargo xtask install --server` to build the language server from sources. " +
+      "run `cargo build --release` to build the language server from sources. " +
       "If you feel that your platform should be supported, please create an issue " +
       "about that [here](https://github.com/alanpq/ritobin-lsp/issues) and we " +
       "will consider it.",
