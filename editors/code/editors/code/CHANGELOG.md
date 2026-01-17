@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.4](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.3...ritobin-lsp-vs-v0.0.4) (2026-01-17)
+
+
+### Bug Fixes
+
+* remove some rust-analyzer stolen legacy code ([e6497a8](https://github.com/alanpq/ritobin-lsp/commit/e6497a844bb8e91042259ecf21d51a523e5ea91d))
+
 ## [0.0.3](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.2...ritobin-lsp-vs-v0.0.3) (2026-01-17)
 
 
