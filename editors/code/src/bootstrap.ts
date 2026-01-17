@@ -58,40 +58,6 @@ async function getServer(
     return explicitPath;
   }
 
-  let toolchainServerPath = undefined;
-  if (vscode.workspace.workspaceFolders) {
-    for (const workspaceFolder of vscode.workspace.workspaceFolders) {
-      // otherwise check if there is a toolchain override for the current vscode workspace
-      // and if the toolchain of this override has a ritobin-lsp component
-      // if so, use the ritobin-lsp component
-      // Check both rust-toolchain.toml and rust-toolchain files
-      for (const toolchainFile of RUST_TOOLCHAIN_FILES) {
-        const toolchainUri = vscode.Uri.joinPath(
-          workspaceFolder.uri,
-          toolchainFile,
-        );
-        if (!(await hasToolchainFileWithRaDeclared(toolchainUri))) {
-          continue;
-        }
-        const res = await spawnAsync("rustup", ["which", "ritobin-lsp"], {
-          env: { ...process.env },
-          cwd: workspaceFolder.uri.fsPath,
-        });
-        if (!res.error && res.status === 0) {
-          toolchainServerPath = await earliestToolchainPath(
-            toolchainServerPath,
-            res.stdout.trim(),
-            raVersionResolver,
-          );
-          break;
-        }
-      }
-    }
-  }
-  if (toolchainServerPath) {
-    return toolchainServerPath;
-  }
-
   if (packageJson.releaseTag === null) return "ritobin-lsp";
 
   // finally, use the bundled one
