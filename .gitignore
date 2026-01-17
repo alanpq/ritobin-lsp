@@ -8,3 +8,4 @@ target/
 .vscode/settings.json
 .DS_Store
 .direnv
+.cargo/
