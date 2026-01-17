@@ -19,7 +19,7 @@
         // "--user-data-dir=${workspaceFolder}/target/code",
         "--disable-extensions",
         "--extensionDevelopmentPath=${workspaceFolder}/editors/code",
-        "--log alanpq.ritobin-lsp:debug"
+        "--log alanpq.ritobin-lsp-vs:debug"
       ],
       "outFiles": [
         "${workspaceFolder}/editors/code/out/**/*.js"
@@ -38,7 +38,7 @@
       "args": [
         "--disable-extensions",
         "--extensionDevelopmentPath=${workspaceFolder}/editors/code",
-        "--log alanpq.ritobin-lsp:debug"
+        "--log alanpq.ritobin-lsp-vs:debug"
       ],
       "outFiles": [
         "${workspaceFolder}/editors/code/out/**/*.js"
@@ -60,7 +60,7 @@
       "args": [
         "--disable-extensions",
         "--extensionDevelopmentPath=${workspaceFolder}/editors/code",
-        "--log alanpq.ritobin-lsp:debug"
+        "--log alanpq.ritobin-lsp-vs:debug"
       ],
       "outFiles": [
         "${workspaceFolder}/editors/code/out/**/*.js"
@@ -81,9 +81,9 @@
       "request": "launch",
       "runtimeExecutable": "${execPath}",
       "args": [
-        "--disable-extension", "alanpq.ritobin-lsp",
+        "--disable-extension", "alanpq.ritobin-lsp-vs",
         "--extensionDevelopmentPath=${workspaceFolder}/editors/code",
-        "--log alanpq.ritobin-lsp:debug"
+        "--log alanpq.ritobin-lsp-vs:debug"
       ],
       "outFiles": [
         "${workspaceFolder}/editors/code/out/**/*.js"
