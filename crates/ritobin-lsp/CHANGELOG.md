@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.0...ritobin-lsp-v0.1.1) (2026-01-17)
+
+
+### Bug Fixes
+
+* bump ltk_ritobin ([be2a364](https://github.com/alanpq/ritobin-lsp/commit/be2a36423eed90cb3cd836f0aede0de0f68ce6c4))
+
 ## 0.1.0 (2026-01-16)
 
 
