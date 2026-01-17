@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.3](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.2...ritobin-lsp-vs-v0.0.3) (2026-01-17)
+
+
+### Bug Fixes
+
+* activation fail from wrong extension id ([844829e](https://github.com/alanpq/ritobin-lsp/commit/844829e7f78ae8d3d15bf83d6ddbb7c4963fceae))
+
 ## [0.0.2](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.1...ritobin-lsp-vs-v0.0.2) (2026-01-16)
 
 
