@@ -40,7 +40,17 @@ use crate::{
 };
 
 pub fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
+    let files = directories_next::ProjectDirs::from("com", "alanpq", "ritobin-lsp")
+        .expect("invalid app id for dirs");
+
     let server = Arc::new(Server::new(connection, config));
+
+    server.meta.load_file(
+        std::env::var("RB_META_DUMP_PATH")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or_else(|| files.cache_dir().join("dump.json")),
+    );
 
     let not = lsp_server::Notification::new(
         ServerStatusNotification::METHOD.to_owned(),

@@ -4,12 +4,13 @@ use lsp_server::{Connection, Message, RequestId, Response};
 use lsp_types::Url;
 use rustc_hash::FxHashMap;
 
-use crate::{config::Config, document::Document};
+use crate::{config::Config, document::Document, lol_meta::service::MetaService};
 
 pub struct Server {
     pub conn: Connection,
     pub config: Config,
     pub docs: RwLock<FxHashMap<Url, Document>>,
+    pub meta: MetaService,
 }
 
 impl Server {
@@ -18,6 +19,7 @@ impl Server {
             conn,
             config,
             docs: Default::default(),
+            meta: MetaService::default(),
         }
     }
 
