@@ -29,3 +29,4 @@ tracing-subscriber = { version = "0.3.22", default-features = false, features = 
 itertools = "0.14.0"
 directories-next = "2.0.0"
 dashmap = { version = "6.1.0", features = ["serde"] }
+ltk_hash = "0.2.5"

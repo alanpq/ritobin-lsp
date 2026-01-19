@@ -558,6 +558,12 @@ dependencies = [
 [[package]]
 name = "ltk_hash"
 version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a0081deb694867c5ca11658f3df01425ae4181bdf5c6fbdc5fb1818fa0b52e5"
+
+[[package]]
+name = "ltk_hash"
+version = "0.2.5"
 source = "git+https://github.com/LeagueToolkit/league-toolkit.git?rev=fa1b3d90bc730e230c87d305e4980aa311fe6bb0#fa1b3d90bc730e230c87d305e4980aa311fe6bb0"
 
 [[package]]
@@ -608,7 +614,7 @@ source = "git+https://github.com/LeagueToolkit/league-toolkit.git?rev=fa1b3d90bc
 dependencies = [
  "glam",
  "indexmap",
- "ltk_hash",
+ "ltk_hash 0.2.5 (git+https://github.com/LeagueToolkit/league-toolkit.git?rev=fa1b3d90bc730e230c87d305e4980aa311fe6bb0)",
  "ltk_meta",
  "ltk_primitives",
  "miette",
@@ -873,6 +879,7 @@ dependencies = [
  "log",
  "lsp-server",
  "lsp-types",
+ "ltk_hash 0.2.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "ltk_ritobin",
  "paths",
  "rustc-hash",

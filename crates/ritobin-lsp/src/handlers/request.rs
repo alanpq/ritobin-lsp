@@ -16,6 +16,7 @@ use lsp_types::{
 };
 use lsp_types::{SemanticToken, request::Request as _};
 use lsp_types::{WorkDoneProgressOptions, notification::Notification as _};
+use ltk_hash::fnv1a;
 use ltk_ritobin::parse::{
     self, ErrorKind, Span, Token, TokenKind,
     cst::{
@@ -46,6 +47,52 @@ use crate::{
     server::Server,
 };
 
+struct ClassFinder {
+    stack: Vec<TreeKind>,
+    offset: u32,
+    class_depth: usize,
+    pub found_token: Option<Token>,
+    pub found_class: Option<Span>,
+}
+
+impl ClassFinder {
+    pub fn new(offset: u32) -> Self {
+        Self {
+            stack: Vec::new(),
+            offset,
+            class_depth: 0,
+            found_token: None,
+            found_class: None,
+        }
+    }
+}
+
+impl Visitor for ClassFinder {
+    fn visit_token(&mut self, token: &Token, _context: &Cst) -> Visit {
+        if token.span.contains(self.offset) {
+            self.found_token.replace(*token);
+            return Visit::Stop;
+        }
+
+        Visit::Continue
+    }
+
+    fn enter_tree(&mut self, tree: &Cst) -> Visit {
+        if tree.kind == TreeKind::Class {
+            self.found_class = tree.children.first().map(|c| c.span());
+            self.class_depth = self.stack.len();
+        }
+        self.stack.push(tree.kind);
+        Visit::Continue
+    }
+    fn exit_tree(&mut self, _tree: &Cst) -> Visit {
+        self.found_class
+            .take_if(|_| self.stack.len() == self.class_depth);
+        self.stack.pop();
+        Visit::Continue
+    }
+}
+
 pub fn request(server: &Server, req: &ServerRequest) -> Result<()> {
     tracing::debug!(?req, "handle_request");
     match req.method.as_str() {
@@ -73,16 +120,29 @@ pub fn request(server: &Server, req: &ServerRequest) -> Result<()> {
                 .get(&p.text_document.uri)
                 .ok_or_else(|| anyhow!("document not in cache – did you send DidOpen?"))?;
 
-            let txt = match doc
-                .cst
-                .find_node(doc.line_numbers.byte_index(pos.line, pos.character + 1))
-            {
-                Some((node, tok)) => {
-                    let txt = &doc.text[tok.span.start as _..tok.span.end as _];
-                    format!("{txt:?} | {node:?} | {:?}", tok.kind)
-                }
+            let class = ClassFinder::new(doc.line_numbers.from_position(pos)).walk(&doc.cst);
+            let classes = server.meta.classes.read();
+            let class_hash = class
+                .found_class
+                .map(|class| fnv1a::hash_lower(&doc.text.as_str()[class]))
+                .map(|hash| format!("0x{hash:08x}"))
+                .and_then(|hash| classes.get(&hash));
+
+            let txt = match class_hash {
+                Some(class) => format!("class: {class:#?}"),
                 None => "".into(),
             };
+
+            // let txt = match doc
+            //     .cst
+            //     .find_node(doc.line_numbers.byte_index(pos.line, pos.character + 1))
+            // {
+            //     Some((node, tok)) => {
+            //         let txt = &doc.text[tok.span.start as _..tok.span.end as _];
+            //         format!("{txt:?} | {node:?} | {:?}", tok.kind)
+            //     }
+            //     None => "".into(),
+            // };
 
             let hover = Hover {
                 contents: HoverContents::Scalar(MarkedString::String(txt)),
