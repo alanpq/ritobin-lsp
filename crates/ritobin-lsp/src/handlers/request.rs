@@ -132,6 +132,7 @@ pub fn request(server: &Server, req: &ServerRequest) -> Result<()> {
                 Some(class) => format!("class: {class:#?}"),
                 None => "".into(),
             };
+            tracing::info!("{txt}");
 
             // let txt = match doc
             //     .cst

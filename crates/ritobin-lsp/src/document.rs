@@ -71,7 +71,7 @@ impl Document {
 
     pub fn publish_parse_errors(&self, conn: &Connection) -> Result<()> {
         let mut visitor = TypeChecker::new(&self.text);
-        self.cst.walk(&mut visitor);
+        // self.cst.walk(&mut visitor);
 
         let (roots, diagnostics) = visitor.into_parts();
 
