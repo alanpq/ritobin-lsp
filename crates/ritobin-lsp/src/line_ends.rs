@@ -82,8 +82,8 @@ impl LineNumbers {
                 .unwrap_or(self.length);
 
             let line_len = line_end - line_start;
-            tracing::debug!(?start_line, ?end_line, ?self.length);
-            tracing::debug!(?line, ?line_start, ?line_end, ?line_len);
+            // tracing::debug!(?start_line, ?end_line, ?self.length);
+            // tracing::debug!(?line, ?line_start, ?line_end, ?line_len);
 
             let (from, to) = if start_line == end_line {
                 (start_lc.character, end_lc.character)

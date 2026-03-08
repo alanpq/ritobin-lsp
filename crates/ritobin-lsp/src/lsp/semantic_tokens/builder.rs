@@ -33,7 +33,7 @@ impl SemanticTokensBuilder {
         let mut push_char = range.start.character;
 
         if !self.data.is_empty() {
-            tracing::debug!(?push_line, ?self.prev_line);
+            // tracing::debug!(?push_line, ?self.prev_line);
             push_line -= self.prev_line;
             if push_line == 0 {
                 push_char -= self.prev_char;
