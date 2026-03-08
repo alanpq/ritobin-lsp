@@ -98,10 +98,22 @@ pub fn request(server: &Server, req: &ServerRequest) -> Result<()> {
                 .get(&uri)
                 .ok_or_else(|| anyhow!("document not in cache – did you send DidOpen?"))?;
             // let formatted = run_rustfmt(text)?;
-            let formatted = doc.text.clone();
+
+            let mut formatted = String::new();
+            ltk_ritobin::print::Printer::new(&doc.text, &mut formatted, 80)
+                .print(&doc.cst)
+                .unwrap();
+
             let edit = TextEdit {
-                // range: full_range(&doc.text),
-                range: todo!(),
+                range: Range {
+                    start: Position {
+                        line: 0,
+                        character: 0,
+                    },
+                    end: doc
+                        .line_numbers
+                        .position(doc.text.len().try_into().unwrap()),
+                },
                 new_text: formatted,
             };
             server.send_ok(req.id.clone(), &vec![edit])?;
