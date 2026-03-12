@@ -31,7 +31,7 @@ use tracing_subscriber::{
 use crate::{document::Document, server::Server};
 
 pub fn notification(server: &Server, note: &lsp_server::Notification) -> Result<()> {
-    tracing::debug!(?note, "handle_notification");
+    // tracing::debug!(?note, "handle_notification");
     match note.method.as_str() {
         DidOpenTextDocument::METHOD => {
             let p: DidOpenTextDocumentParams = serde_json::from_value(note.params.clone())?;
