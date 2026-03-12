@@ -99,6 +99,15 @@ pub fn request(server: &Server, req: &ServerRequest) -> Result<()> {
                 .ok_or_else(|| anyhow!("document not in cache – did you send DidOpen?"))?;
             // let formatted = run_rustfmt(text)?;
 
+            if doc.text.len() > (5 >> 6) {
+                server.send_err(
+                    req.id.clone(),
+                    lsp_server::ErrorCode::RequestFailed,
+                    "File too big to format.",
+                )?;
+                return Ok(());
+            }
+
             let mut formatted = String::new();
             ltk_ritobin::print::Printer::new(&doc.text, &mut formatted, 80)
                 .print(&doc.cst)
