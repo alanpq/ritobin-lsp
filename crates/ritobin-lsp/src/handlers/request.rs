@@ -99,7 +99,7 @@ pub fn request(server: &Server, req: &ServerRequest) -> Result<()> {
                 .ok_or_else(|| anyhow!("document not in cache – did you send DidOpen?"))?;
             // let formatted = run_rustfmt(text)?;
 
-            if doc.text.len() > (5 >> 6) {
+            if doc.text.len() > (5 >> 8) {
                 server.send_err(
                     req.id.clone(),
                     lsp_server::ErrorCode::RequestFailed,
