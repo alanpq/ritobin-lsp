@@ -12,7 +12,7 @@ crossbeam-channel = "0.5.15"
 log = "0.4.29"
 lsp-server = "0.7.9"
 lsp-types = { version = "=0.95.0", features = ["proposed"] }
-ltk_ritobin = { git = "https://github.com/LeagueToolkit/league-toolkit.git", rev = "5d301848976d8c728f488991c34d8b4da834f7ae", features = ["serde"] }
+ltk_ritobin = { git = "https://github.com/LeagueToolkit/league-toolkit.git", rev = "8d6b9705471bfbc9583a26c79d94e777e0c4d3e5", features = ["serde"] }
 rustc-hash = "2.1.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.148"
