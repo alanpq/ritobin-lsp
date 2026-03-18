@@ -160,7 +160,7 @@ jobs:
             command: "build"
             target: ${{ matrix.platform.target }}
             toolchain: ${{ matrix.toolchain }}
-            args: "--locked --release"
+            args: "--offline --release"
             strip: true
       - name: Run tests
         uses: houseabsolute/actions-rust-cross@v0
@@ -168,7 +168,7 @@ jobs:
             command: "test"
             target: ${{ matrix.platform.target }}
             toolchain: ${{ matrix.toolchain }}
-            args: "--locked --release"
+            args: "--offline --release"
         if: ${{ !matrix.platform.skip_tests }}
       - uses: actions/setup-node@v4
         if: needs.release-please.outputs.vsc_created && matrix.toolchain == 'stable'
