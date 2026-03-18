@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.1](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.0...ritobin-lsp-v0.1.1) (2026-03-18)
+
+
+### Features
+
+* basic format support ([ba65879](https://github.com/alanpq/ritobin-lsp/commit/ba658795050fd0ccf80e505820423527941b1b78))
+* bump ltk ([a4cf561](https://github.com/alanpq/ritobin-lsp/commit/a4cf56178d3c42e94ff8cdf1e27f9ff1416db01a))
+* don't format files &gt; ~5MiB ([9bc8bce](https://github.com/alanpq/ritobin-lsp/commit/9bc8bcec97ce430390ad0dee51e1da22120824e2))
+
+
+### Bug Fixes
+
+* bump ltk_ritobin ([be2a364](https://github.com/alanpq/ritobin-lsp/commit/be2a36423eed90cb3cd836f0aede0de0f68ce6c4))
+* bump max format limit ([13fdc9c](https://github.com/alanpq/ritobin-lsp/commit/13fdc9ce9af6bc4ec9249c5868d99b89f2a261c5))
+* disable useless log ([e0fd7f1](https://github.com/alanpq/ritobin-lsp/commit/e0fd7f1e3da07b503c1870e9d6edc6d7464b4a24))
+
 ## 0.1.0 (2026-01-16)
 
 
