@@ -44,16 +44,16 @@ jobs:
         if: env.HAS_CODECOV_ACCESS == 'true'
         run: cargo install cargo-llvm-cov
       - name: Test compilation
-        run: cargo check --all --all-targets
+        run: cargo check --all --all-targets --locked
       - name: Test formatting
         run: cargo fmt --all -- --check
       - name: Test clippy
-        run: cargo clippy --all --all-targets
+        run: cargo clippy --all --all-targets --locked
       - name: Test documentation
-        run: cargo doc --all --no-deps
+        run: cargo doc --all --no-deps --locked
       - name: Run tests with code coverage
         if: env.HAS_CODECOV_ACCESS == 'true'
-        run: cargo llvm-cov --all-features --workspace --codecov --output-path codecov.json
+        run: cargo llvm-cov --locked --all-features --workspace --codecov --output-path codecov.json
       - name: Upload coverage to Codecov
         if: env.HAS_CODECOV_ACCESS == 'true'
         uses: codecov/codecov-action@v5
@@ -65,7 +65,7 @@ jobs:
           verbose: true
       - name: Run tests
         if: env.HAS_CODECOV_ACCESS != 'true'
-        run: cargo test --all
+        run: cargo test --all --locked
 
   release-please:
     name: Execute release chores
