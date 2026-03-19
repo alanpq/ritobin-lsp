@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.2](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.1...ritobin-lsp-v0.1.2) (2026-03-19)
+
+
+### Bug Fixes
+
+* 10MiB format limit ([d3e7c25](https://github.com/alanpq/ritobin-lsp/commit/d3e7c257e00526a012a3d2efac30c8a4933fc9d5))
+* test ([bcc7266](https://github.com/alanpq/ritobin-lsp/commit/bcc7266899fd7005865bf047524157d04e094fb7))
+* update ltk ([ab91e8c](https://github.com/alanpq/ritobin-lsp/commit/ab91e8c0337bc4fe6acdc25cf8bf68c155ab7655))
+
 ## [0.1.1](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.0...ritobin-lsp-v0.1.1) (2026-03-19)
 
 
