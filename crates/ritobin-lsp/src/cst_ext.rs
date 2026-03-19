@@ -1,9 +1,9 @@
-use ltk_ritobin::parse::{
-    Token,
+use ltk_ritobin::{
     cst::{
         Cst, TreeKind,
         visitor::{Visit, Visitor},
     },
+    parse::Token,
 };
 
 pub trait CstExt {

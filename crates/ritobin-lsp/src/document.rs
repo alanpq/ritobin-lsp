@@ -15,10 +15,8 @@ use lsp_types::{
 use lsp_types::{SemanticToken, request::Request as _};
 use lsp_types::{WorkDoneProgressOptions, notification::Notification as _};
 use ltk_ritobin::{
-    parse::{
-        self, ErrorKind, Span, Token, TokenKind,
-        cst::{Child, Cst, FlatErrors, TreeKind, Visitor, visitor::Visit},
-    },
+    cst::{Child, Cst, FlatErrors, TreeKind, Visitor, visitor::Visit},
+    parse::{self, ErrorKind, Span, Token, TokenKind},
     typecheck::visitor::TypeChecker,
 };
 use paths::{AbsPathBuf, Utf8PathBuf};

@@ -16,12 +16,13 @@ use lsp_types::{
 };
 use lsp_types::{SemanticToken, request::Request as _};
 use lsp_types::{WorkDoneProgressOptions, notification::Notification as _};
-use ltk_ritobin::parse::{
-    self, ErrorKind, Span, Token, TokenKind,
+use ltk_ritobin::{
     cst::{
         Child, Cst, FlatErrors, TreeKind, Visitor,
         visitor::{Visit, VisitorExt},
     },
+    parse::{Span, Token, TokenKind},
+    print::PrintConfig,
 };
 use paths::{AbsPathBuf, Utf8PathBuf};
 use ritobin_lsp::{cst_ext::CstExt, from_json, line_ends::LineNumbers};
@@ -109,7 +110,7 @@ pub fn request(server: &Server, req: &ServerRequest) -> Result<()> {
             }
 
             let mut formatted = String::new();
-            ltk_ritobin::print::Printer::new(&doc.text, &mut formatted, 80)
+            ltk_ritobin::print::CstPrinter::new(&doc.text, &mut formatted, PrintConfig::default())
                 .print(&doc.cst)
                 .unwrap();
 

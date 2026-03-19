@@ -515,12 +515,12 @@ dependencies = [
 [[package]]
 name = "ltk_hash"
 version = "0.2.5"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?rev=8d6b9705471bfbc9583a26c79d94e777e0c4d3e5#8d6b9705471bfbc9583a26c79d94e777e0c4d3e5"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#07cdf1d0d933cc7bb9c98405088a0c0bc001bc7c"
 
 [[package]]
 name = "ltk_io_ext"
 version = "0.4.1"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?rev=8d6b9705471bfbc9583a26c79d94e777e0c4d3e5#8d6b9705471bfbc9583a26c79d94e777e0c4d3e5"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#07cdf1d0d933cc7bb9c98405088a0c0bc001bc7c"
 dependencies = [
  "byteorder",
  "glam",
@@ -531,7 +531,7 @@ dependencies = [
 [[package]]
 name = "ltk_meta"
 version = "0.4.0"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?rev=8d6b9705471bfbc9583a26c79d94e777e0c4d3e5#8d6b9705471bfbc9583a26c79d94e777e0c4d3e5"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#07cdf1d0d933cc7bb9c98405088a0c0bc001bc7c"
 dependencies = [
  "byteorder",
  "enum_dispatch",
@@ -550,7 +550,7 @@ dependencies = [
 [[package]]
 name = "ltk_primitives"
 version = "0.3.2"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?rev=8d6b9705471bfbc9583a26c79d94e777e0c4d3e5#8d6b9705471bfbc9583a26c79d94e777e0c4d3e5"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#07cdf1d0d933cc7bb9c98405088a0c0bc001bc7c"
 dependencies = [
  "byteorder",
  "glam",
@@ -561,7 +561,7 @@ dependencies = [
 [[package]]
 name = "ltk_ritobin"
 version = "0.2.1"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?rev=8d6b9705471bfbc9583a26c79d94e777e0c4d3e5#8d6b9705471bfbc9583a26c79d94e777e0c4d3e5"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#07cdf1d0d933cc7bb9c98405088a0c0bc001bc7c"
 dependencies = [
  "glam",
  "indexmap",

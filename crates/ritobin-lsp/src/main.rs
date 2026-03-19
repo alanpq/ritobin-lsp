@@ -2,10 +2,6 @@ use std::{env, error::Error, fmt::format, fs, io::Write, path::PathBuf, sync::Ar
 
 use crossbeam_channel::Sender;
 use itertools::Itertools;
-use ltk_ritobin::parse::{
-    self, ErrorKind, Span, Token, TokenKind,
-    cst::{Child, Cst, FlatErrors, TreeKind, Visitor, visitor::Visit},
-};
 use paths::{AbsPathBuf, Utf8PathBuf};
 use ritobin_lsp::{cst_ext::CstExt, from_json, line_ends::LineNumbers};
 use rustc_hash::FxHashMap;
