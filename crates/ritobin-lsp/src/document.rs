@@ -1,34 +1,20 @@
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::Result;
 use itertools::Itertools;
-use lsp_server::{Connection, Message, Request as ServerRequest, RequestId, Response};
+use lsp_server::{Connection, Message};
 use lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionOptions, CompletionResponse, Diagnostic,
-    DiagnosticRelatedInformation, DiagnosticSeverity, DidChangeTextDocumentParams,
-    DidOpenTextDocumentParams, DocumentFormattingParams, Hover, HoverContents,
-    HoverProviderCapability, InitializeParams, Location, MarkedString, OneOf, Position,
-    PublishDiagnosticsParams, Range, SemanticTokens, SemanticTokensFullOptions,
-    SemanticTokensParams, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextEdit, Url,
-    notification::{DidChangeTextDocument, DidOpenTextDocument, PublishDiagnostics},
-    request::{Completion, Formatting, GotoDefinition, HoverRequest, SemanticTokensFullRequest},
+    Diagnostic,
+    DiagnosticRelatedInformation, DiagnosticSeverity, Location,
+    PublishDiagnosticsParams, Url,
+    notification::PublishDiagnostics,
 };
-use lsp_types::{SemanticToken, request::Request as _};
-use lsp_types::{WorkDoneProgressOptions, notification::Notification as _};
+use lsp_types::request::Request as _;
+use lsp_types::notification::Notification as _;
 use ltk_ritobin::{
-    cst::{Child, Cst, FlatErrors, TreeKind, Visitor, visitor::Visit},
-    parse::{self, ErrorKind, Span, Token, TokenKind},
+    cst::{Cst, FlatErrors},
+    parse::{self, ErrorKind},
     typecheck::visitor::TypeChecker,
 };
-use paths::{AbsPathBuf, Utf8PathBuf};
-use ritobin_lsp::{cst_ext::CstExt, from_json, line_ends::LineNumbers};
-use rustc_hash::FxHashMap;
-use std::process::Stdio;
-use tracing_subscriber::{
-    Layer as _, Registry,
-    filter::Targets,
-    fmt::{time, writer::BoxMakeWriter},
-    layer::SubscriberExt as _,
-};
+use ritobin_lsp::line_ends::LineNumbers;
 
 pub struct Document {
     pub uri: Url,
@@ -71,7 +57,7 @@ impl Document {
         let mut visitor = TypeChecker::new(&self.text);
         self.cst.walk(&mut visitor);
 
-        let (roots, diagnostics) = visitor.into_parts();
+        let (_roots, diagnostics) = visitor.into_parts();
 
         let mut diagnostics = diagnostics
             .into_iter()

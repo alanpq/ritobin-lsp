@@ -1,9 +1,8 @@
 //! Semantic Tokens helpers
 
-use std::ops;
 
 use lsp_types::{
-    Range, SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens,
+    SemanticToken, SemanticTokenModifier, SemanticTokenType,
     SemanticTokensEdit,
 };
 

@@ -1,42 +1,28 @@
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Result, anyhow};
 use itertools::Itertools;
-use lsp_server::{Connection, Message, Request as ServerRequest, RequestId, Response};
+use lsp_server::Request as ServerRequest;
 use lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionOptions, CompletionResponse, Diagnostic,
-    DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentFormattingParams, Hover, HoverContents, HoverProviderCapability, InitializeParams,
-    MarkedString, OneOf, Position, PublishDiagnosticsParams, Range, SemanticTokens,
-    SemanticTokensFullOptions, SemanticTokensParams, SemanticTokensRangeParams, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url,
-    notification::{DidChangeTextDocument, DidOpenTextDocument, PublishDiagnostics},
+    CompletionItem, CompletionItemKind, CompletionResponse,
+    DocumentFormattingParams, Hover, HoverContents,
+    MarkedString, Position, Range, SemanticTokensParams, SemanticTokensRangeParams, TextEdit,
     request::{
         Completion, Formatting, GotoDefinition, HoverRequest, SemanticTokensFullRequest,
         SemanticTokensRangeRequest,
     },
 };
-use lsp_types::{SemanticToken, request::Request as _};
-use lsp_types::{WorkDoneProgressOptions, notification::Notification as _};
+use lsp_types::request::Request as _;
+use lsp_types::notification::Notification as _;
 use ltk_ritobin::{
     cst::{
-        Child, Cst, FlatErrors, TreeKind, Visitor,
+        Cst, TreeKind, Visitor,
         visitor::{Visit, VisitorExt},
     },
     parse::{Span, Token, TokenKind},
     print::PrintConfig,
 };
-use paths::{AbsPathBuf, Utf8PathBuf};
-use ritobin_lsp::{cst_ext::CstExt, from_json, line_ends::LineNumbers};
-use rustc_hash::FxHashMap;
-use std::process::Stdio;
-use tracing_subscriber::{
-    Layer as _, Registry,
-    filter::Targets,
-    fmt::{time, writer::BoxMakeWriter},
-    layer::SubscriberExt as _,
-};
+use ritobin_lsp::{cst_ext::CstExt, line_ends::LineNumbers};
 
 use crate::{
-    document::Document,
     lsp::{
         ext::HoverParams,
         semantic_tokens::{

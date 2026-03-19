@@ -1,10 +1,10 @@
 use std::{
     fmt, iter,
-    sync::{Arc, OnceLock},
+    sync::Arc,
 };
 
 use itertools::Itertools as _;
-use paths::{AbsPathBuf, Utf8PathBuf};
+use paths::AbsPathBuf;
 use semver::Version;
 use serde::de::DeserializeOwned;
 

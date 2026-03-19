@@ -1,25 +1,17 @@
 use lsp_types::{
-    CallHierarchyServerCapability, CodeActionKind, CodeActionOptions, CodeActionProviderCapability,
-    CodeLensOptions, CompletionOptions, CompletionOptionsCompletionItem, DeclarationCapability,
-    DocumentOnTypeFormattingOptions, FileOperationFilter, FileOperationPattern,
-    FileOperationPatternKind, FileOperationRegistrationOptions, FoldingRangeProviderCapability,
-    HoverProviderCapability, ImplementationProviderCapability, InlayHintOptions,
-    InlayHintServerCapabilities, OneOf, PositionEncodingKind, RenameOptions, SaveOptions,
-    SelectionRangeProviderCapability, SemanticTokensFullOptions, SemanticTokensLegend,
-    SemanticTokensOptions, ServerCapabilities, SignatureHelpOptions, TextDocumentSyncCapability,
-    TextDocumentSyncKind, TextDocumentSyncOptions, TypeDefinitionProviderCapability,
-    WorkDoneProgressOptions, WorkspaceFileOperationsServerCapabilities,
-    WorkspaceFoldersServerCapabilities, WorkspaceServerCapabilities,
+    CodeActionKind, CodeActionOptions, CodeActionProviderCapability, CompletionOptions, CompletionOptionsCompletionItem,
+    HoverProviderCapability, OneOf, SemanticTokensFullOptions, SemanticTokensLegend,
+    SemanticTokensOptions, ServerCapabilities, TextDocumentSyncCapability,
+    TextDocumentSyncKind,
 };
 use rustc_hash::FxHashSet;
-use serde_json::json;
 
 use crate::{
     config::Config,
     lsp::{ext, semantic_tokens},
 };
 
-pub fn server_capabilities(config: &Config) -> ServerCapabilities {
+pub fn server_capabilities(_config: &Config) -> ServerCapabilities {
     ServerCapabilities {
         // text_document_sync: Some(TextDocumentSyncCapability::Options(
         //     TextDocumentSyncOptions {

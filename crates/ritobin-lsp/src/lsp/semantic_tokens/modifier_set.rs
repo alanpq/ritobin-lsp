@@ -1,9 +1,6 @@
 use std::ops;
 
-use lsp_types::{
-    Range, SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokens,
-    SemanticTokensEdit,
-};
+use lsp_types::SemanticTokenModifier;
 
 use crate::lsp::semantic_tokens::types::{LAST_STANDARD_MOD, SUPPORTED_MODIFIERS};
 

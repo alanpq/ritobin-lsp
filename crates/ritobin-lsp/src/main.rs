@@ -1,11 +1,8 @@
-use std::{env, error::Error, fmt::format, fs, io::Write, path::PathBuf, sync::Arc};
+use std::{env, error::Error, fs, path::PathBuf, sync::Arc};
 
-use crossbeam_channel::Sender;
 use itertools::Itertools;
 use paths::{AbsPathBuf, Utf8PathBuf};
-use ritobin_lsp::{cst_ext::CstExt, from_json, line_ends::LineNumbers};
-use rustc_hash::FxHashMap;
-use std::process::Stdio;
+use ritobin_lsp::from_json;
 use tracing_subscriber::{
     Layer as _, Registry,
     filter::Targets,
@@ -18,33 +15,18 @@ use tracing_subscriber::{
     clippy::disallowed_types,
     clippy::disallowed_methods
 )]
-use anyhow::{Context, Result, anyhow, bail};
-use lsp_server::{Connection, Message, Request as ServerRequest, RequestId, Response};
+use anyhow::Context;
+use lsp_server::Connection;
 use lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionOptions, CompletionResponse, Diagnostic,
-    DiagnosticSeverity, DidChangeTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentFormattingParams, Hover, HoverContents, HoverProviderCapability, InitializeParams,
-    MarkedString, OneOf, Position, PublishDiagnosticsParams, Range, SemanticTokens,
-    SemanticTokensFullOptions, SemanticTokensParams, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Url,
-    notification::{DidChangeTextDocument, DidOpenTextDocument, PublishDiagnostics},
-    request::{Completion, Formatting, GotoDefinition, HoverRequest, SemanticTokensFullRequest},
+    Position, Range,
 };
-use lsp_types::{SemanticToken, request::Request as _};
-use lsp_types::{WorkDoneProgressOptions, notification::Notification as _}; // for METHOD consts // for METHOD consts
+ // for METHOD consts // for METHOD consts
 
 use clap::{Parser, Subcommand};
 
 use crate::{
-    config::{Config, ConfigChange, ConfigErrors},
-    lsp::{
-        capabilities::server_capabilities,
-        ext::{HoverParams, ServerStatusNotification, ServerStatusParams},
-        semantic_tokens::{
-            self,
-            builder::{SemanticTokensBuilder, type_index},
-        },
-    },
+    config::Config,
+    lsp::capabilities::server_capabilities,
 };
 
 pub mod config;
@@ -174,7 +156,7 @@ fn main() -> std::result::Result<(), Box<dyn Error + Sync + Send>> {
     tracing::error!("starting minimal_lsp");
     tracing::debug!("test");
 
-    let subcommand = cli.command.take().unwrap_or_default();
+    let _subcommand = cli.command.take().unwrap_or_default();
 
     // transport
     let (connection, io_threads) = Connection::stdio();
@@ -194,7 +176,7 @@ fn main() -> std::result::Result<(), Box<dyn Error + Sync + Send>> {
         root_uri,
         mut capabilities,
         workspace_folders,
-        initialization_options,
+        initialization_options: _,
         client_info,
         ..
     } = from_json::<lsp_types::InitializeParams>("InitializeParams", &initialize_params)?;
