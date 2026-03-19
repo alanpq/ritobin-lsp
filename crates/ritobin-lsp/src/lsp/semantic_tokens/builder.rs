@@ -1,7 +1,4 @@
-
-use lsp_types::{
-    Range, SemanticToken, SemanticTokenType, SemanticTokens,
-};
+use lsp_types::{Range, SemanticToken, SemanticTokenType, SemanticTokens};
 
 use crate::lsp::semantic_tokens::types::SUPPORTED_TYPES;
 
@@ -69,6 +66,8 @@ pub(crate) fn type_index(ty: &SemanticTokenType) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use lsp_types::SemanticTokensEdit;
+
     use crate::lsp::semantic_tokens::diff_tokens;
 
     use super::*;
