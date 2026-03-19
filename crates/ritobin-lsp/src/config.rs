@@ -1,7 +1,4 @@
-use std::{
-    fmt, iter,
-    sync::Arc,
-};
+use std::{fmt, iter, sync::Arc};
 
 use itertools::Itertools as _;
 use paths::AbsPathBuf;

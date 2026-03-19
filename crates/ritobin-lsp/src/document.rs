@@ -1,14 +1,12 @@
 use anyhow::Result;
 use itertools::Itertools;
 use lsp_server::{Connection, Message};
-use lsp_types::{
-    Diagnostic,
-    DiagnosticRelatedInformation, DiagnosticSeverity, Location,
-    PublishDiagnosticsParams, Url,
-    notification::PublishDiagnostics,
-};
-use lsp_types::request::Request as _;
 use lsp_types::notification::Notification as _;
+use lsp_types::request::Request as _;
+use lsp_types::{
+    Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, Location,
+    PublishDiagnosticsParams, Url, notification::PublishDiagnostics,
+};
 use ltk_ritobin::{
     cst::{Cst, FlatErrors},
     parse::{self, ErrorKind},

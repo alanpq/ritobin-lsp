@@ -1,10 +1,6 @@
 //! Semantic Tokens helpers
 
-
-use lsp_types::{
-    SemanticToken, SemanticTokenModifier, SemanticTokenType,
-    SemanticTokensEdit,
-};
+use lsp_types::{SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensEdit};
 
 pub mod builder;
 pub mod modifier_set;

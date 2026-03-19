@@ -1,10 +1,10 @@
 use anyhow::Result;
+use lsp_types::notification::Notification as _;
+use lsp_types::request::Request as _;
 use lsp_types::{
     DidChangeTextDocumentParams, DidOpenTextDocumentParams,
     notification::{DidChangeTextDocument, DidOpenTextDocument},
 };
-use lsp_types::request::Request as _;
-use lsp_types::notification::Notification as _;
 
 use crate::{document::Document, server::Server};
 

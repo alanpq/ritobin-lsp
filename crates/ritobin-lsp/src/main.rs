@@ -17,17 +17,12 @@ use tracing_subscriber::{
 )]
 use anyhow::Context;
 use lsp_server::Connection;
-use lsp_types::{
-    Position, Range,
-};
- // for METHOD consts // for METHOD consts
+use lsp_types::{Position, Range};
+// for METHOD consts // for METHOD consts
 
 use clap::{Parser, Subcommand};
 
-use crate::{
-    config::Config,
-    lsp::capabilities::server_capabilities,
-};
+use crate::{config::Config, lsp::capabilities::server_capabilities};
 
 pub mod config;
 pub mod document;

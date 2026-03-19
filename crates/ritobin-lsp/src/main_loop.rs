@@ -1,6 +1,6 @@
 use lsp_server::{Connection, Message};
-use lsp_types::request::Request as _;
 use lsp_types::notification::Notification as _;
+use lsp_types::request::Request as _;
 use std::sync::Arc;
 
 use crate::{

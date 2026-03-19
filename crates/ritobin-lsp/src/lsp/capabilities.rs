@@ -1,7 +1,7 @@
 use lsp_types::{
-    CodeActionKind, CodeActionOptions, CodeActionProviderCapability, CompletionOptions, CompletionOptionsCompletionItem,
-    HoverProviderCapability, OneOf, SemanticTokensFullOptions, SemanticTokensLegend,
-    SemanticTokensOptions, ServerCapabilities, TextDocumentSyncCapability,
+    CodeActionKind, CodeActionOptions, CodeActionProviderCapability, CompletionOptions,
+    CompletionOptionsCompletionItem, HoverProviderCapability, OneOf, SemanticTokensFullOptions,
+    SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities, TextDocumentSyncCapability,
     TextDocumentSyncKind,
 };
 use rustc_hash::FxHashSet;
