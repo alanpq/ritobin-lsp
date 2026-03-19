@@ -1,17 +1,17 @@
 use anyhow::{Result, anyhow};
 use itertools::Itertools;
 use lsp_server::Request as ServerRequest;
+use lsp_types::notification::Notification as _;
+use lsp_types::request::Request as _;
 use lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionResponse,
-    DocumentFormattingParams, Hover, HoverContents,
-    MarkedString, Position, Range, SemanticTokensParams, SemanticTokensRangeParams, TextEdit,
+    CompletionItem, CompletionItemKind, CompletionResponse, DocumentFormattingParams, Hover,
+    HoverContents, MarkedString, Position, Range, SemanticTokensParams, SemanticTokensRangeParams,
+    TextEdit,
     request::{
         Completion, Formatting, GotoDefinition, HoverRequest, SemanticTokensFullRequest,
         SemanticTokensRangeRequest,
     },
 };
-use lsp_types::request::Request as _;
-use lsp_types::notification::Notification as _;
 use ltk_ritobin::{
     cst::{
         Cst, TreeKind, Visitor,
@@ -86,7 +86,8 @@ pub fn request(server: &Server, req: &ServerRequest) -> Result<()> {
                 .ok_or_else(|| anyhow!("document not in cache – did you send DidOpen?"))?;
             // let formatted = run_rustfmt(text)?;
 
-            if doc.text.len() > (5 >> 8) {
+            // 10 MiB limit
+            if doc.text.len() > (10 * (2 << 20)) {
                 server.send_err(
                     req.id.clone(),
                     lsp_server::ErrorCode::RequestFailed,
