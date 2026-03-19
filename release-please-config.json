@@ -1,4 +1,5 @@
 {
+  "plugins": ["cargo-workspace"],
   "packages": {
     "crates/ritobin-lsp": {
       "changelog-path": "CHANGELOG.md",
