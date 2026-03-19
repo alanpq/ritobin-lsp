@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.5](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.4...ritobin-lsp-vs-v0.0.5) (2026-03-19)
+
+
+### Features
+
+* **vsc:** warn when running lsp version != bundled ([c9b9a83](https://github.com/alanpq/ritobin-lsp/commit/c9b9a8394fa6af460b7be5c850ecba0e1b4385d3))
+
 ## [0.0.4](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.3...ritobin-lsp-vs-v0.0.4) (2026-03-19)
 
 
