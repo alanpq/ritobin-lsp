@@ -1,15 +1,14 @@
-use std::sync::RwLock;
-
 use lsp_server::{Connection, Message, RequestId, Response};
 use lsp_types::Url;
 use rustc_hash::FxHashMap;
+use tokio::sync::RwLock;
 
-use crate::{config::Config, document::Document};
+use crate::{config::Config, document::Document, worker::WorkerHandle};
 
 pub struct Server {
     pub conn: Connection,
     pub config: Config,
-    pub docs: RwLock<FxHashMap<Url, Document>>,
+    pub workers: RwLock<FxHashMap<Url, WorkerHandle>>,
 }
 
 impl Server {
@@ -17,7 +16,7 @@ impl Server {
         Self {
             conn,
             config,
-            docs: Default::default(),
+            workers: Default::default(),
         }
     }
 

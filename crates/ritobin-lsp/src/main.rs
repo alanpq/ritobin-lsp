@@ -30,6 +30,7 @@ pub mod handlers;
 pub mod lsp;
 pub mod main_loop;
 pub mod server;
+pub mod worker;
 use main_loop::main_loop;
 
 #[derive(Parser, Debug)]
@@ -143,7 +144,8 @@ fn setup_logging(log_file_flag: Option<PathBuf>) -> anyhow::Result<()> {
 }
 
 #[allow(clippy::print_stderr)]
-fn main() -> std::result::Result<(), Box<dyn Error + Sync + Send>> {
+#[tokio::main]
+async fn main() -> std::result::Result<(), Box<dyn Error + Sync + Send>> {
     let mut cli = Cli::parse();
     if let Err(e) = setup_logging(cli.log_file.clone()) {
         eprintln!("Failed to setup logging: {e:#}");
@@ -247,7 +249,7 @@ fn main() -> std::result::Result<(), Box<dyn Error + Sync + Send>> {
         }
         return Err(e.into());
     }
-    main_loop(config, connection)?;
+    main_loop(config, connection).await?;
     io_threads.join()?;
     tracing::error!("shutting down server");
     Ok(())
