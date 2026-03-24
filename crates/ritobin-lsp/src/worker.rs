@@ -10,6 +10,7 @@ use lsp_types::{
 };
 use ltk_ritobin::{Cst, cst::visitor::VisitorExt as _, print::PrintConfig};
 use ritobin_lsp::{cst_ext::CstExt as _, line_ends::LineNumbers};
+use similar::{DiffOp, TextDiff};
 use tokio::{
     sync::{mpsc, oneshot},
     task::JoinHandle,
@@ -209,21 +210,72 @@ impl Worker {
         };
         let mut formatted = String::new();
         ltk_ritobin::print::CstPrinter::new(&doc.text, &mut formatted, PrintConfig::default())
-            .print(&cst)
+            .print(cst)
             .unwrap();
 
-        let edit = TextEdit {
-            range: Range {
-                start: Position {
-                    line: 0,
-                    character: 0,
-                },
-                end: doc
-                    .line_numbers
-                    .position(doc.text.len().try_into().unwrap()),
-            },
-            new_text: formatted,
-        };
-        Ok(Some(vec![edit]))
+        if formatted == doc.text {
+            return Ok(Some(vec![]));
+        }
+
+        // let edit = TextEdit {
+        //     range: Range {
+        //         start: Position {
+        //             line: 0,
+        //             character: 0,
+        //         },
+        //         end: doc
+        //             .line_numbers
+        //             .position(doc.text.len().try_into().unwrap()),
+        //     },
+        //     new_text: formatted,
+        // };
+        Ok(Some(diff_to_textedits(
+            &doc.text,
+            &formatted,
+            &self.document.line_numbers,
+        )))
     }
+}
+
+fn diff_to_textedits(original: &str, formatted: &str, line_nums: &LineNumbers) -> Vec<TextEdit> {
+    if original == formatted {
+        return Vec::new();
+    }
+
+    let diff = TextDiff::from_lines(original, formatted);
+    let mut edits = Vec::new();
+
+    for group in diff.grouped_ops(3) {
+        let mut old_start = usize::MAX;
+        let mut old_end = 0;
+        let mut new_start = usize::MAX;
+        let mut new_end = 0;
+
+        for op in group {
+            let o = op.old_range();
+            let n = op.new_range();
+
+            old_start = old_start.min(o.start);
+            old_end = old_end.max(o.end);
+
+            new_start = new_start.min(n.start);
+            new_end = new_end.max(n.end);
+        }
+
+        let fmt_lines: Vec<&str> = formatted.lines().collect();
+        let replacement = fmt_lines[new_start..new_end]
+            .iter()
+            .map(|l| format!("{l}\n"))
+            .collect::<String>();
+
+        edits.push(TextEdit {
+            range: Range {
+                start: Position::new(old_start as u32, 0),
+                end: Position::new(old_end as u32, 0),
+            },
+            new_text: replacement,
+        });
+    }
+
+    edits
 }
