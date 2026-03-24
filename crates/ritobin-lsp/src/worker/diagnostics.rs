@@ -81,6 +81,19 @@ impl Worker {
                         ),
                         ..Default::default()
                     },
+                    ltk_ritobin::typecheck::visitor::Diagnostic::UnexpectedContainerItem {
+                        span,
+                        expected,
+                        expected_span: _,
+                    } => {
+                        let mut expected = expected.to_string();
+                        make_ascii_titlecase(&mut expected);
+                        Diagnostic {
+                        range: self.document.line_numbers.from_span(span),
+                        severity: Some(DiagnosticSeverity::ERROR),
+                        message: format!("{expected} type does not accept container items / blocks!\nRemove any curly braces surrounding the value."),
+                        ..Default::default()
+                    }},
                     inner => Diagnostic {
                         range: self.document.line_numbers.from_span(d.span),
 
@@ -134,5 +147,11 @@ impl Worker {
                 lsp_server::Notification::new(PublishDiagnostics::METHOD.to_owned(), params),
             ))?;
         Ok(())
+    }
+}
+
+fn make_ascii_titlecase(s: &mut str) {
+    if let Some(r) = s.get_mut(0..1) {
+        r.make_ascii_uppercase();
     }
 }
