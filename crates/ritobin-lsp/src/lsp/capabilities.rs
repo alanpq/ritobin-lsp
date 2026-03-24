@@ -1,8 +1,8 @@
 use lsp_types::{
     CodeActionKind, CodeActionOptions, CodeActionProviderCapability, CompletionOptions,
-    CompletionOptionsCompletionItem, HoverProviderCapability, OneOf, SemanticTokensFullOptions,
-    SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities, TextDocumentSyncCapability,
-    TextDocumentSyncKind,
+    CompletionOptionsCompletionItem, HoverProviderCapability, OneOf, SaveOptions,
+    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions, ServerCapabilities,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
 };
 use rustc_hash::FxHashSet;
 
@@ -11,21 +11,21 @@ use crate::{
     lsp::{ext, semantic_tokens},
 };
 
-pub fn server_capabilities(_config: &Config) -> ServerCapabilities {
+pub fn server_capabilities(config: &Config) -> ServerCapabilities {
     ServerCapabilities {
-        // text_document_sync: Some(TextDocumentSyncCapability::Options(
-        //     TextDocumentSyncOptions {
-        //         open_close: Some(true),
-        //         change: Some(TextDocumentSyncKind::INCREMENTAL),
-        //         will_save: None,
-        //         will_save_wait_until: None,
-        //         save: if config.caps().did_save_text_document_dynamic_registration() {
-        //             None
-        //         } else {
-        //             Some(SaveOptions::default().into())
-        //         },
-        //     },
-        // )),
+        text_document_sync: Some(TextDocumentSyncCapability::Options(
+            TextDocumentSyncOptions {
+                open_close: Some(true),
+                change: Some(TextDocumentSyncKind::INCREMENTAL),
+                will_save: None,
+                will_save_wait_until: None,
+                save: if config.caps().did_save_text_document_dynamic_registration() {
+                    None
+                } else {
+                    Some(SaveOptions::default().into())
+                },
+            },
+        )),
         // hover_provider: Some(HoverProviderCapability::Simple(true)),
         // completion_provider: Some(CompletionOptions {
         //     resolve_provider: if config.client_is_neovim() {
@@ -168,7 +168,6 @@ pub fn server_capabilities(_config: &Config) -> ServerCapabilities {
         //     },
         // )),
         // inline_completion_provider: None,
-        text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
         completion_provider: Some(CompletionOptions::default()),
         definition_provider: Some(OneOf::Left(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
