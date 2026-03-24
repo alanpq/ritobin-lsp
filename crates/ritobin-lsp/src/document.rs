@@ -2,7 +2,6 @@ use anyhow::Result;
 use itertools::Itertools;
 use lsp_server::{Connection, Message};
 use lsp_types::notification::Notification as _;
-use lsp_types::request::Request as _;
 use lsp_types::{
     Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, Location,
     PublishDiagnosticsParams, Url, notification::PublishDiagnostics,
@@ -40,7 +39,7 @@ macro_rules! match_tree {
 }
 impl Document {
     pub fn new(uri: Url, text: String) -> Self {
-        let cst = parse::parse(&text);
+        let cst = Cst::parse(&text);
         let parse_errors = FlatErrors::walk(&cst);
         Self {
             uri,

@@ -515,12 +515,12 @@ dependencies = [
 [[package]]
 name = "ltk_hash"
 version = "0.2.5"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#ac72886f12785e7644e8c42288b8d457f81fa8fd"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#7cb47176828c6d95ce5546f5ffd819b824f6d9ce"
 
 [[package]]
 name = "ltk_io_ext"
 version = "0.4.1"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#ac72886f12785e7644e8c42288b8d457f81fa8fd"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#7cb47176828c6d95ce5546f5ffd819b824f6d9ce"
 dependencies = [
  "byteorder",
  "glam",
@@ -531,7 +531,7 @@ dependencies = [
 [[package]]
 name = "ltk_meta"
 version = "0.4.0"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#ac72886f12785e7644e8c42288b8d457f81fa8fd"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#7cb47176828c6d95ce5546f5ffd819b824f6d9ce"
 dependencies = [
  "byteorder",
  "enum_dispatch",
@@ -550,7 +550,7 @@ dependencies = [
 [[package]]
 name = "ltk_primitives"
 version = "0.3.2"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#ac72886f12785e7644e8c42288b8d457f81fa8fd"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#7cb47176828c6d95ce5546f5ffd819b824f6d9ce"
 dependencies = [
  "byteorder",
  "glam",
@@ -561,7 +561,7 @@ dependencies = [
 [[package]]
 name = "ltk_ritobin"
 version = "0.2.1"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#ac72886f12785e7644e8c42288b8d457f81fa8fd"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#7cb47176828c6d95ce5546f5ffd819b824f6d9ce"
 dependencies = [
  "glam",
  "indexmap",
