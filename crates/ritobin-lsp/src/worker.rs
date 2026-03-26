@@ -66,7 +66,7 @@ pub struct WorkerHandle {
 pub struct Worker {
     rx: mpsc::Receiver<Message>,
     document: Document,
-    cst: Option<Cst>,
+    bin: Option<(Cst, ltk_meta::Bin)>,
     server: Arc<Server>,
 }
 
@@ -78,7 +78,7 @@ impl Worker {
             handle: tokio::spawn(async move {
                 let mut worker = Self {
                     rx,
-                    cst: None,
+                    bin: None,
                     document: Document::new(uri, version, text),
                     server,
                 };
@@ -92,8 +92,10 @@ impl Worker {
     }
 
     fn update(&mut self) {
-        self.cst.replace(Cst::parse(&self.document.text));
-        let _ = self.publish_parse_errors();
+        let cst = Cst::parse(&self.document.text);
+        let (bin, errors) = cst.build_bin(&self.document.text);
+        let _ = self.publish_parse_errors(&cst, errors);
+        self.bin.replace((cst, bin));
     }
 
     pub async fn service(mut self) -> anyhow::Result<()> {
@@ -149,7 +151,7 @@ impl Worker {
         range: Option<Range>,
     ) -> anyhow::Result<Option<SemanticTokens>> {
         let doc = &self.document;
-        let Some(cst) = self.cst.as_ref() else {
+        let Some((cst, _)) = self.bin.as_ref() else {
             return Ok(None);
         };
 
@@ -175,7 +177,7 @@ impl Worker {
     ) -> anyhow::Result<Option<Hover>> {
         let pos = position.start();
         let doc = &self.document;
-        let Some(cst) = self.cst.as_ref() else {
+        let Some((cst, bin)) = self.bin.as_ref() else {
             return Ok(None);
         };
 
@@ -186,6 +188,14 @@ impl Worker {
             }
             None => "".into(),
         };
+
+        // let txt = match cst.find_node(doc.line_numbers.byte_index(pos.line, pos.character + 1)) {
+        //     Some((node, tok)) => {
+        //         let txt = &doc.text[tok.span.start as _..tok.span.end as _];
+        //         format!("{txt:?} | {node:?} | {:?}", tok.kind)
+        //     }
+        //     None => "".into(),
+        // };
         Ok(Some(Hover {
             contents: lsp_types::HoverContents::Scalar(lsp_types::MarkedString::String(txt)),
             range: None,
@@ -208,7 +218,7 @@ impl Worker {
             tracing::error!("file too big to format!");
             return Ok(None);
         }
-        let Some(cst) = self.cst.as_ref() else {
+        let Some((cst, _)) = self.bin.as_ref() else {
             return Ok(None);
         };
         let mut formatted = String::new();
