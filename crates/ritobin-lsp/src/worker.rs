@@ -1,4 +1,7 @@
-use std::sync::{Arc, atomic::AtomicI32};
+use std::{
+    sync::{Arc, atomic::AtomicI32},
+    time::{Duration, Instant},
+};
 
 use anyhow::bail;
 use lsp_server::RequestId;
@@ -213,36 +216,19 @@ impl Worker {
             .print(cst)
             .unwrap();
 
-        if formatted == doc.text {
-            return Ok(Some(vec![]));
-        }
-
-        // let edit = TextEdit {
-        //     range: Range {
-        //         start: Position {
-        //             line: 0,
-        //             character: 0,
-        //         },
-        //         end: doc
-        //             .line_numbers
-        //             .position(doc.text.len().try_into().unwrap()),
-        //     },
-        //     new_text: formatted,
-        // };
-        Ok(Some(diff_to_textedits(
-            &doc.text,
-            &formatted,
-            &self.document.line_numbers,
-        )))
+        Ok(Some(diff_to_textedits(&doc.text, &formatted)))
     }
 }
 
-fn diff_to_textedits(original: &str, formatted: &str, line_nums: &LineNumbers) -> Vec<TextEdit> {
+fn diff_to_textedits(original: &str, formatted: &str) -> Vec<TextEdit> {
     if original == formatted {
         return Vec::new();
     }
 
-    let diff = TextDiff::from_lines(original, formatted);
+    let diff = TextDiff::configure()
+        .algorithm(similar::Algorithm::Lcs)
+        .deadline(Instant::now() + Duration::from_secs(1))
+        .diff_lines(original, formatted);
     let mut edits = Vec::new();
 
     for group in diff.grouped_ops(3) {
