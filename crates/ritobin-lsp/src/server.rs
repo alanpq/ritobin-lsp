@@ -3,12 +3,15 @@ use lsp_types::Url;
 use rustc_hash::FxHashMap;
 use tokio::sync::RwLock;
 
-use crate::{config::Config, document::Document, worker::WorkerHandle};
+use crate::{
+    config::Config, document::Document, lol_meta::service::MetaService, worker::WorkerHandle,
+};
 
 pub struct Server {
     pub conn: Connection,
     pub config: Config,
     pub workers: RwLock<FxHashMap<Url, WorkerHandle>>,
+    pub meta: MetaService,
 }
 
 impl Server {
@@ -17,6 +20,7 @@ impl Server {
             conn,
             config,
             workers: Default::default(),
+            meta: MetaService::default(),
         }
     }
 

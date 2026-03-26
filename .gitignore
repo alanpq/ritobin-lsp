@@ -5,6 +5,7 @@ target/
 .idea/*
 *.log
 *.iml
+*.json
 .vscode/settings.json
 .DS_Store
 .direnv

@@ -12,7 +12,9 @@ crossbeam-channel = "0.5.15"
 log = "0.4.29"
 lsp-server = "0.7.9"
 lsp-types = { version = "=0.95.0", features = ["proposed"] }
+
 ltk_ritobin = { git = "https://github.com/LeagueToolkit/league-toolkit.git", branch = "alan/ritobin-rewrite", features = ["serde"] }
+ltk_meta = { git = "https://github.com/LeagueToolkit/league-toolkit.git", branch = "alan/ritobin-rewrite", features = ["serde"] }
 
 rustc-hash = "2.1.1"
 serde = { version = "1.0.228", features = ["derive"] }
@@ -30,3 +32,5 @@ tracing-subscriber = { version = "0.3.22", default-features = false, features = 
 itertools = "0.14.0"
 tokio = { version = "1.50.0", features = ["full"] }
 similar = "2.7.0"
+directories-next = "2.0.0"
+dashmap = { version = "6.1.0", features = ["serde"] }
