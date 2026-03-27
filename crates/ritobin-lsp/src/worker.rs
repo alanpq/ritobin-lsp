@@ -456,7 +456,7 @@ impl Visitor for ClassFinder {
             && let Some(c) = tree.children.first().map(|c| c.span())
         {
             self.class_stack.push((self.stack.len(), c));
-            eprintln!("-> {}: {:?}", self.stack.len(), &self.text.as_str()[c]);
+            // eprintln!("-> {}: {:?}", self.stack.len(), &self.text.as_str()[c]);
         }
         self.stack.push(tree.kind);
         Visit::Continue
@@ -469,12 +469,12 @@ impl Visitor for ClassFinder {
             .class_stack
             .pop_if(|(depth, _)| self.stack.len() == *depth)
         {
-            eprintln!(
-                "<- {}: {:?} ({})",
-                self.stack.len(),
-                &self.text.as_str()[taken.1],
-                tree.kind
-            );
+            // eprintln!(
+            //     "<- {}: {:?} ({})",
+            //     self.stack.len(),
+            //     &self.text.as_str()[taken.1],
+            //     tree.kind
+            // );
         }
         self.stack.pop();
         Visit::Continue
