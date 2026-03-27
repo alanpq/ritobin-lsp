@@ -366,9 +366,8 @@ fn diff_to_textedits(original: &str, formatted: &str) -> Vec<TextEdit> {
 struct ClassFinder {
     stack: Vec<TreeKind>,
     offset: u32,
-    class_depth: usize,
     text: String,
-    pub found_token: Option<Token>,
+    pub found_token: Option<(Token, TreeKind)>,
     pub class_stack: Vec<(usize, Span)>,
 }
 
@@ -378,7 +377,6 @@ impl ClassFinder {
             stack: Vec::new(),
             text,
             offset,
-            class_depth: 0,
             found_token: None,
             class_stack: vec![],
         }
@@ -386,9 +384,9 @@ impl ClassFinder {
 }
 
 impl Visitor for ClassFinder {
-    fn visit_token(&mut self, token: &Token, _context: &Cst) -> Visit {
+    fn visit_token(&mut self, token: &Token, context: &Cst) -> Visit {
         if token.span.contains(self.offset) {
-            self.found_token.replace(*token);
+            self.found_token.replace((*token, context.kind));
             return Visit::Stop;
         }
 
@@ -396,16 +394,22 @@ impl Visitor for ClassFinder {
     }
 
     fn enter_tree(&mut self, tree: &Cst) -> Visit {
-        if tree.kind == TreeKind::Class {
-            if let Some(c) = tree.children.first().map(|c| c.span()) {
-                self.class_stack.push((self.stack.len(), c));
-                eprintln!("-> {}: {:?}", self.class_depth, &self.text.as_str()[c]);
-            }
+        if tree.span.start > self.offset {
+            return Visit::Stop;
+        }
+        if tree.kind == TreeKind::Class
+            && let Some(c) = tree.children.first().map(|c| c.span())
+        {
+            self.class_stack.push((self.stack.len(), c));
+            eprintln!("-> {}: {:?}", self.stack.len(), &self.text.as_str()[c]);
         }
         self.stack.push(tree.kind);
         Visit::Continue
     }
     fn exit_tree(&mut self, tree: &Cst) -> Visit {
+        if tree.span.end > self.offset {
+            return Visit::Stop;
+        }
         if let Some(taken) = self
             .class_stack
             .pop_if(|(depth, _)| self.stack.len() == *depth)
