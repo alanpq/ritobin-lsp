@@ -7,13 +7,13 @@ use std::{
 
 use dashmap::RwLock;
 
-use crate::lol_meta::schema::{Class, DumpFile};
+use crate::lol_meta::schema::{Class, DumpFile, U32Hash};
 
 #[derive(Debug, Clone, Default)]
 pub struct MetaService {
     pub loaded: Arc<AtomicBool>,
     pub version: Arc<RwLock<String>>,
-    pub classes: Arc<RwLock<HashMap<String, Class>>>,
+    pub classes: Arc<RwLock<HashMap<U32Hash, Class>>>,
 }
 
 impl MetaService {
