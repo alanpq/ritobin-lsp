@@ -6,12 +6,21 @@ use std::{
 use anyhow::bail;
 use lsp_server::RequestId;
 use lsp_types::{
-    DocumentChanges, DocumentFormattingParams, FormattingOptions, Hover, HoverContents,
-    PartialResultParams, Position, Range, SemanticTokens, SemanticTokensParams,
-    SemanticTokensRangeParams, TextDocumentContentChangeEvent, TextEdit, Url,
-    WorkDoneProgressParams,
+    CompletionContext, CompletionItem, CompletionItemKind, CompletionResponse, DocumentChanges,
+    DocumentFormattingParams, FormattingOptions, Hover, HoverContents, PartialResultParams,
+    Position, Range, SemanticTokens, SemanticTokensParams, SemanticTokensRangeParams,
+    TextDocumentContentChangeEvent, TextEdit, Url, WorkDoneProgressParams,
 };
-use ltk_ritobin::{Cst, cst::visitor::VisitorExt as _, print::PrintConfig};
+use ltk_hash::fnv1a;
+use ltk_ritobin::{
+    Cst,
+    cst::{
+        Kind as TreeKind, Visitor,
+        visitor::{Visit, VisitorExt as _},
+    },
+    parse::{Span, Token},
+    print::PrintConfig,
+};
 use ritobin_lsp::{cst_ext::CstExt as _, line_ends::LineNumbers};
 use similar::{DiffOp, TextDiff};
 use tokio::{
@@ -33,12 +42,22 @@ pub mod diagnostics;
 pub mod semantic_tokens;
 
 #[derive(Debug)]
+pub struct CompletionRequest {
+    pub id: RequestId,
+    pub position: Position,
+    pub work_done_progress_params: WorkDoneProgressParams,
+    pub partial_result_params: PartialResultParams,
+    pub context: Option<CompletionContext>,
+}
+
+#[derive(Debug)]
 pub enum Message {
     HoverRequest {
         id: RequestId,
         position: PositionOrRange,
         work_done_progress_params: WorkDoneProgressParams,
     },
+    CompletionRequest(CompletionRequest),
     FormatRequest {
         id: RequestId,
         options: FormattingOptions,
@@ -112,6 +131,14 @@ impl Worker {
                         let _ = self.server.send_ok(id, &res);
                     }
                 }
+                Message::CompletionRequest(req) => {
+                    let _ = self.server.send_ok(
+                        req.id.clone(),
+                        &self
+                            .complete(req)?
+                            .unwrap_or_else(|| CompletionResponse::Array(vec![])),
+                    );
+                }
                 Message::FormatRequest {
                     id,
                     options,
@@ -170,6 +197,40 @@ impl Worker {
         Ok(Some(visitor.builder.build()))
     }
 
+    fn complete(&self, req: CompletionRequest) -> anyhow::Result<Option<CompletionResponse>> {
+        let doc = &self.document;
+        let Some((cst, bin)) = self.bin.as_ref() else {
+            return Ok(None);
+        };
+
+        let class = ClassFinder::new(
+            doc.line_numbers.from_position(&req.position),
+            doc.text.clone(),
+        )
+        .walk(cst);
+
+        let classes = self.server.meta.classes.read();
+        let Some(class) = class
+            .class_stack
+            .last()
+            .map(|(_, class)| fnv1a::hash_lower(&doc.text.as_str()[class]))
+            .and_then(|hash| classes.get(&hash.into()))
+        else {
+            return Ok(None);
+        };
+
+        let properties = class.properties.iter().map(|(k, prop)| CompletionItem {
+            label: k.to_string(),
+            label_details: Some(lsp_types::CompletionItemLabelDetails {
+                detail: Some(format!(": {}", prop.rito_type())),
+                description: None,
+            }),
+            kind: Some(CompletionItemKind::PROPERTY),
+            ..Default::default()
+        });
+        Ok(Some(CompletionResponse::Array(properties.collect())))
+    }
+
     fn hover(
         &self,
         position: PositionOrRange,
@@ -181,12 +242,30 @@ impl Worker {
             return Ok(None);
         };
 
-        let txt = match cst.find_node(doc.line_numbers.byte_index(pos.line, pos.character + 1)) {
-            Some((node, tok)) => {
-                let txt = &doc.text[tok.span.start as _..tok.span.end as _];
-                format!("{txt:?} | {node:?} | {:?}", tok.kind)
+        let class =
+            ClassFinder::new(doc.line_numbers.from_position(pos), doc.text.clone()).walk(cst);
+        let classes = self.server.meta.classes.read();
+        let class_hash = class
+            .class_stack
+            .last()
+            .map(|(_, class)| (class, fnv1a::hash_lower(&doc.text.as_str()[class])));
+
+        let txt = match class_hash {
+            Some((name, hash)) => {
+                let class = classes.get(&hash.into());
+                let properties = class.map(|c| &c.properties);
+                format!(
+                    "class ({}/{hash}): {properties:#?}",
+                    &doc.text.as_str()[*name]
+                )
             }
-            None => "".into(),
+            None => match cst.find_node(doc.line_numbers.byte_index(pos.line, pos.character + 1)) {
+                Some((node, tok)) => {
+                    let txt = &doc.text[tok.span.start as _..tok.span.end as _];
+                    format!("{txt:?} | {node:?} | {:?}", tok.kind)
+                }
+                None => "".into(),
+            },
         };
 
         // let txt = match cst.find_node(doc.line_numbers.byte_index(pos.line, pos.character + 1)) {
@@ -274,4 +353,63 @@ fn diff_to_textedits(original: &str, formatted: &str) -> Vec<TextEdit> {
     }
 
     edits
+}
+
+struct ClassFinder {
+    stack: Vec<TreeKind>,
+    offset: u32,
+    class_depth: usize,
+    text: String,
+    pub found_token: Option<Token>,
+    pub class_stack: Vec<(usize, Span)>,
+}
+
+impl ClassFinder {
+    pub fn new(offset: u32, text: String) -> Self {
+        Self {
+            stack: Vec::new(),
+            text,
+            offset,
+            class_depth: 0,
+            found_token: None,
+            class_stack: vec![],
+        }
+    }
+}
+
+impl Visitor for ClassFinder {
+    fn visit_token(&mut self, token: &Token, _context: &Cst) -> Visit {
+        if token.span.contains(self.offset) {
+            self.found_token.replace(*token);
+            return Visit::Stop;
+        }
+
+        Visit::Continue
+    }
+
+    fn enter_tree(&mut self, tree: &Cst) -> Visit {
+        if tree.kind == TreeKind::Class {
+            if let Some(c) = tree.children.first().map(|c| c.span()) {
+                self.class_stack.push((self.stack.len(), c));
+                eprintln!("-> {}: {:?}", self.class_depth, &self.text.as_str()[c]);
+            }
+        }
+        self.stack.push(tree.kind);
+        Visit::Continue
+    }
+    fn exit_tree(&mut self, tree: &Cst) -> Visit {
+        if let Some(taken) = self
+            .class_stack
+            .pop_if(|(depth, _)| self.stack.len() == *depth)
+        {
+            eprintln!(
+                "<- {}: {:?} ({})",
+                self.stack.len(),
+                &self.text.as_str()[taken.1],
+                tree.kind
+            );
+        }
+        self.stack.pop();
+        Visit::Continue
+    }
 }

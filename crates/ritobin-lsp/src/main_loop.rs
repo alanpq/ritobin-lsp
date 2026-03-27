@@ -45,8 +45,9 @@ pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result
                 if server.conn.handle_shutdown(&req)? {
                     break;
                 }
-                if let Err(err) = handlers::request(&server, &req).await {
-                    tracing::error!("[lsp] request {} failed: {err}", &req.method);
+                let method = req.method.clone();
+                if let Err(err) = handlers::request(&server, req).await {
+                    tracing::error!("[lsp] request {} failed: {err}", method);
                 }
             }
             Message::Notification(note) => {
