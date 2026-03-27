@@ -1,4 +1,4 @@
-//! rust-analyzer extensions to the LSP.
+//! ritobin-lsp extensions to the LSP.
 
 // Note when adding new resolve payloads, add a #[serde(default)] on boolean fields as some clients
 // might strip `false` values from the JSON payload due to their reserialization logic turning false
@@ -18,39 +18,12 @@ use paths::Utf8PathBuf;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
-pub enum InternalTestingFetchConfig {}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub enum InternalTestingFetchConfigOption {
-    AssistEmitMustUse,
-    CheckWorkspace,
-}
-
-#[derive(Deserialize, Serialize, Debug, PartialEq, Eq)]
-pub enum InternalTestingFetchConfigResponse {
-    AssistEmitMustUse(bool),
-    CheckWorkspace(bool),
-}
-
-impl Request for InternalTestingFetchConfig {
-    type Params = InternalTestingFetchConfigParams;
-    // Option is solely to circumvent Default bound.
-    type Result = Option<InternalTestingFetchConfigResponse>;
-    const METHOD: &'static str = "rust-analyzer-internal/internalTestingFetchConfig";
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct InternalTestingFetchConfigParams {
-    pub text_document: Option<TextDocumentIdentifier>,
-    pub config: InternalTestingFetchConfigOption,
-}
 pub enum AnalyzerStatus {}
 
 impl Request for AnalyzerStatus {
     type Params = AnalyzerStatusParams;
     type Result = String;
-    const METHOD: &'static str = "rust-analyzer/analyzerStatus";
+    const METHOD: &'static str = "ritobin-lsp/analyzerStatus";
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -71,7 +44,7 @@ pub enum FetchDependencyList {}
 impl Request for FetchDependencyList {
     type Params = FetchDependencyListParams;
     type Result = FetchDependencyListResult;
-    const METHOD: &'static str = "rust-analyzer/fetchDependencyList";
+    const METHOD: &'static str = "ritobin-lsp/fetchDependencyList";
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -89,7 +62,7 @@ pub enum MemoryUsage {}
 impl Request for MemoryUsage {
     type Params = ();
     type Result = String;
-    const METHOD: &'static str = "rust-analyzer/memoryUsage";
+    const METHOD: &'static str = "ritobin-lsp/memoryUsage";
 }
 
 pub enum ReloadWorkspace {}
@@ -97,15 +70,7 @@ pub enum ReloadWorkspace {}
 impl Request for ReloadWorkspace {
     type Params = ();
     type Result = ();
-    const METHOD: &'static str = "rust-analyzer/reloadWorkspace";
-}
-
-pub enum RebuildProcMacros {}
-
-impl Request for RebuildProcMacros {
-    type Params = ();
-    type Result = ();
-    const METHOD: &'static str = "rust-analyzer/rebuildProcMacros";
+    const METHOD: &'static str = "ritobin-lsp/reloadWorkspace";
 }
 
 pub enum ViewSyntaxTree {}
@@ -113,7 +78,7 @@ pub enum ViewSyntaxTree {}
 impl Request for ViewSyntaxTree {
     type Params = ViewSyntaxTreeParams;
     type Result = String;
-    const METHOD: &'static str = "rust-analyzer/viewSyntaxTree";
+    const METHOD: &'static str = "ritobin-lsp/viewSyntaxTree";
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -122,190 +87,19 @@ pub struct ViewSyntaxTreeParams {
     pub text_document: TextDocumentIdentifier,
 }
 
-pub enum ViewHir {}
+pub enum Unhash {}
 
-impl Request for ViewHir {
-    type Params = lsp_types::TextDocumentPositionParams;
-    type Result = String;
-    const METHOD: &'static str = "rust-analyzer/viewHir";
-}
-
-pub enum ViewMir {}
-
-impl Request for ViewMir {
-    type Params = lsp_types::TextDocumentPositionParams;
-    type Result = String;
-    const METHOD: &'static str = "rust-analyzer/viewMir";
-}
-
-pub enum InterpretFunction {}
-
-impl Request for InterpretFunction {
-    type Params = lsp_types::TextDocumentPositionParams;
-    type Result = String;
-    const METHOD: &'static str = "rust-analyzer/interpretFunction";
-}
-
-pub enum ViewFileText {}
-
-impl Request for ViewFileText {
-    type Params = lsp_types::TextDocumentIdentifier;
-    type Result = String;
-    const METHOD: &'static str = "rust-analyzer/viewFileText";
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ViewCrateGraphParams {
-    /// Include *all* crates, not just crates in the workspace.
-    pub full: bool,
-}
-
-pub enum ViewCrateGraph {}
-
-impl Request for ViewCrateGraph {
-    type Params = ViewCrateGraphParams;
-    type Result = String;
-    const METHOD: &'static str = "rust-analyzer/viewCrateGraph";
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ViewItemTreeParams {
-    pub text_document: TextDocumentIdentifier,
-}
-
-pub enum ViewItemTree {}
-
-impl Request for ViewItemTree {
-    type Params = ViewItemTreeParams;
-    type Result = String;
-    const METHOD: &'static str = "rust-analyzer/viewItemTree";
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct DiscoverTestParams {
-    pub test_id: Option<String>,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub enum TestItemKind {
-    Package,
-    Module,
-    Test,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct TestItem {
-    pub id: String,
-    pub label: String,
-    pub kind: TestItemKind,
-    pub can_resolve_children: bool,
-    pub parent: Option<String>,
-    pub text_document: Option<TextDocumentIdentifier>,
-    pub range: Option<Range>,
-    pub runnable: Option<Runnable>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct DiscoverTestResults {
-    pub tests: Vec<TestItem>,
-    pub scope: Option<Vec<String>>,
-    pub scope_file: Option<Vec<TextDocumentIdentifier>>,
-}
-
-pub enum DiscoverTest {}
-
-impl Request for DiscoverTest {
-    type Params = DiscoverTestParams;
-    type Result = DiscoverTestResults;
-    const METHOD: &'static str = "experimental/discoverTest";
-}
-
-pub enum DiscoveredTests {}
-
-impl Notification for DiscoveredTests {
-    type Params = DiscoverTestResults;
-    const METHOD: &'static str = "experimental/discoveredTests";
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct RunTestParams {
-    pub include: Option<Vec<String>>,
-    pub exclude: Option<Vec<String>>,
-}
-
-pub enum RunTest {}
-
-impl Request for RunTest {
-    type Params = RunTestParams;
-    type Result = ();
-    const METHOD: &'static str = "experimental/runTest";
-}
-
-pub enum EndRunTest {}
-
-impl Notification for EndRunTest {
-    type Params = ();
-    const METHOD: &'static str = "experimental/endRunTest";
-}
-
-pub enum AppendOutputToRunTest {}
-
-impl Notification for AppendOutputToRunTest {
-    type Params = String;
-    const METHOD: &'static str = "experimental/appendOutputToRunTest";
-}
-
-pub enum AbortRunTest {}
-
-impl Notification for AbortRunTest {
-    type Params = ();
-    const METHOD: &'static str = "experimental/abortRunTest";
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "camelCase", tag = "tag")]
-pub enum TestState {
-    Passed,
-    Failed { message: String },
-    Skipped,
-    Started,
-    Enqueued,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ChangeTestStateParams {
-    pub test_id: String,
-    pub state: TestState,
-}
-
-pub enum ChangeTestState {}
-
-impl Notification for ChangeTestState {
-    type Params = ChangeTestStateParams;
-    const METHOD: &'static str = "experimental/changeTestState";
-}
-
-pub enum ExpandMacro {}
-
-impl Request for ExpandMacro {
-    type Params = ExpandMacroParams;
+impl Request for Unhash {
+    type Params = UnhashParams;
     type Result = Option<ExpandedMacro>;
-    const METHOD: &'static str = "rust-analyzer/expandMacro";
+    const METHOD: &'static str = "ritobin-lsp/unhash";
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ExpandMacroParams {
+pub struct UnhashParams {
     pub text_document: TextDocumentIdentifier,
-    pub position: Position,
+    pub range: Option<Range>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -320,7 +114,7 @@ pub enum ViewRecursiveMemoryLayout {}
 impl Request for ViewRecursiveMemoryLayout {
     type Params = lsp_types::TextDocumentPositionParams;
     type Result = Option<RecursiveMemoryLayout>;
-    const METHOD: &'static str = "rust-analyzer/viewRecursiveMemoryLayout";
+    const METHOD: &'static str = "ritobin-lsp/viewRecursiveMemoryLayout";
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -346,28 +140,28 @@ pub enum CancelFlycheck {}
 
 impl Notification for CancelFlycheck {
     type Params = ();
-    const METHOD: &'static str = "rust-analyzer/cancelFlycheck";
+    const METHOD: &'static str = "ritobin-lsp/cancelFlycheck";
 }
 
 pub enum RunFlycheck {}
 
 impl Notification for RunFlycheck {
     type Params = RunFlycheckParams;
-    const METHOD: &'static str = "rust-analyzer/runFlycheck";
+    const METHOD: &'static str = "ritobin-lsp/runFlycheck";
 }
 
 pub enum ClearFlycheck {}
 
 impl Notification for ClearFlycheck {
     type Params = ();
-    const METHOD: &'static str = "rust-analyzer/clearFlycheck";
+    const METHOD: &'static str = "ritobin-lsp/clearFlycheck";
 }
 
 pub enum OpenServerLogs {}
 
 impl Notification for OpenServerLogs {
     type Params = ();
-    const METHOD: &'static str = "rust-analyzer/openServerLogs";
+    const METHOD: &'static str = "ritobin-lsp/openServerLogs";
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -501,7 +295,7 @@ pub enum RelatedTests {}
 impl Request for RelatedTests {
     type Params = lsp_types::TextDocumentPositionParams;
     type Result = Vec<TestInfo>;
-    const METHOD: &'static str = "rust-analyzer/relatedTests";
+    const METHOD: &'static str = "ritobin-lsp/relatedTests";
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -892,5 +686,5 @@ pub struct GetFailedObligationsParams {
 impl Request for GetFailedObligations {
     type Params = GetFailedObligationsParams;
     type Result = String;
-    const METHOD: &'static str = "rust-analyzer/getFailedObligations";
+    const METHOD: &'static str = "ritobin-lsp/getFailedObligations";
 }

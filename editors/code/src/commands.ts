@@ -3,6 +3,8 @@ import * as lc from "vscode-languageclient";
 import * as ra from "./lsp_ext";
 import * as path from "path";
 
+import { applySnippetTextEdits } from "./snippets";
+
 import type { Cmd, CtxInit } from "./ctx";
 import { log } from "./util";
 
@@ -43,6 +45,26 @@ export function lspStatus(ctx: CtxInit): Cmd {
       viewColumn: vscode.ViewColumn.Two,
       preserveFocus: true,
     }));
+  };
+}
+
+export function unhash(ctx: CtxInit): Cmd {
+  return async () => {
+    const editor = ctx.activeRitobinEditor;
+    if (!editor) return;
+    const client = ctx.client;
+
+    const lcEdits = await client.sendRequest(ra.unhash, {
+      range: client.code2ProtocolConverter.asRange(editor.selection),
+      textDocument: client.code2ProtocolConverter.asTextDocumentIdentifier(
+        editor.document,
+      ),
+    });
+
+    if (!lcEdits) return;
+
+    const edits = await client.protocol2CodeConverter.asTextEdits(lcEdits);
+    await applySnippetTextEdits(editor, edits);
   };
 }
 

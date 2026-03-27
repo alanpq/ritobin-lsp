@@ -168,6 +168,7 @@ function createCommands(): Record<string, CommandFactory> {
       disabled: (_) => async () => {},
     },
     lspStatus: { enabled: commands.lspStatus },
+    unhash: { enabled: commands.unhash },
     matchingBrace: {
       enabled: (_) => async () => {},
       disabled: (_) => async () => {},

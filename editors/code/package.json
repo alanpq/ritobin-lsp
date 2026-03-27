@@ -108,6 +108,11 @@
                 "category": "ritobin-lsp"
             },
             {
+                "command": "ritobin-lsp.unhash",
+                "title": "Unhash File",
+                "category": "ritobin-lsp"
+            },
+            {
                 "command": "ritobin-lsp.toggleLSPLogs",
                 "title": "Toggle LSP Logs",
                 "category": "ritobin-lsp"

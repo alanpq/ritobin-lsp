@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use itertools::Itertools;
 use lsp_server::Request as ServerRequest;
-use lsp_types::request::Request as _;
+use lsp_types::request::Request;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionResponse, DocumentFormattingParams, Hover,
     HoverContents, MarkedString, Position, Range, SemanticTokensParams, SemanticTokensRangeParams,
@@ -24,7 +24,7 @@ use ritobin_lsp::{cst_ext::CstExt, line_ends::LineNumbers};
 
 use crate::{
     lsp::{
-        ext::HoverParams,
+        ext::{HoverParams, Unhash, UnhashParams},
         semantic_tokens::{
             self,
             builder::{SemanticTokensBuilder, type_index},
@@ -45,6 +45,13 @@ pub async fn request(server: &Server, req: ServerRequest) -> Result<()> {
             //         &lsp_types::GotoDefinitionResponse::Array(Vec::new()),
             //     )?;
             // }
+            Unhash::METHOD => {
+                let p: UnhashParams = serde_json::from_value(req.params)?;
+                (
+                    p.text_document.uri,
+                    worker::Message::UnhashRequest { id, range: p.range },
+                )
+            }
             Completion::METHOD => {
                 let p: CompletionParams = serde_json::from_value(req.params)?;
                 (

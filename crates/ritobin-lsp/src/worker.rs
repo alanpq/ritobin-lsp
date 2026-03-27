@@ -42,6 +42,7 @@ use crate::{
 
 pub mod diagnostics;
 pub mod semantic_tokens;
+pub mod unhash;
 
 #[derive(Debug)]
 pub struct CompletionRequest {
@@ -54,6 +55,10 @@ pub struct CompletionRequest {
 
 #[derive(Debug)]
 pub enum Message {
+    UnhashRequest {
+        id: RequestId,
+        range: Option<Range>,
+    },
     HoverRequest {
         id: RequestId,
         position: PositionOrRange,
@@ -124,6 +129,11 @@ impl Worker {
             // TODO: propagate err to lsp client instead of killing worker
             tracing::debug!("[worker] got req: {req:#?}");
             match req {
+                Message::UnhashRequest { id, range } => {
+                    let _ = self
+                        .server
+                        .send_ok(id, &self.unhash(range)?.unwrap_or_default());
+                }
                 Message::HoverRequest {
                     id,
                     position,
