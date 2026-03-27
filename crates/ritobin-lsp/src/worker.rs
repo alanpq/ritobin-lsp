@@ -21,6 +21,7 @@ use ltk_ritobin::{
     parse::{Span, Token},
     print::PrintConfig,
 };
+use poro_hash::BinHash;
 use ritobin_lsp::{cst_ext::CstExt as _, line_ends::LineNumbers};
 use similar::{DiffOp, TextDiff};
 use tokio::{
@@ -219,8 +220,15 @@ impl Worker {
             return Ok(None);
         };
 
+        let hashes = self.server.hashes.fields.as_ref();
+        if hashes.is_none() {
+            tracing::error!("NO HASHES");
+        }
+
         let properties = class.properties.iter().map(|(k, prop)| CompletionItem {
-            label: k.to_string(),
+            label: hashes
+                .and_then(|h| h.hashes.get(&BinHash(**k)).cloned())
+                .unwrap_or_else(|| k.to_string()),
             label_details: Some(lsp_types::CompletionItemLabelDetails {
                 detail: Some(format!(": {}", prop.rito_type())),
                 description: None,

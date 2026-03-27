@@ -16,6 +16,8 @@ lsp-types = { version = "=0.95.0", features = ["proposed"] }
 ltk_ritobin = { git = "https://github.com/LeagueToolkit/league-toolkit.git", branch = "alan/ritobin-rewrite", features = ["serde"] }
 ltk_meta = { git = "https://github.com/LeagueToolkit/league-toolkit.git", branch = "alan/ritobin-rewrite", features = ["serde"] }
 
+poro_hash = { git = "https://github.com/alanpq/poropack.git", features = ["fst"], branch = "main", version = "0.1.0" }
+
 rustc-hash = "2.1.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.148"
@@ -36,3 +38,5 @@ directories-next = "2.0.0"
 dashmap = { version = "6.1.0", features = ["serde"] }
 ltk_hash = "0.2.5"
 serde_with = "3.18.0"
+memmap = "0.7.0"
+fst = "0.4.7"
