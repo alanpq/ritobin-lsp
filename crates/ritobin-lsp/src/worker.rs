@@ -7,9 +7,10 @@ use anyhow::bail;
 use lsp_server::RequestId;
 use lsp_types::{
     CompletionContext, CompletionItem, CompletionItemKind, CompletionResponse, DocumentChanges,
-    DocumentFormattingParams, FormattingOptions, Hover, HoverContents, PartialResultParams,
-    Position, Range, SemanticTokens, SemanticTokensParams, SemanticTokensRangeParams,
-    TextDocumentContentChangeEvent, TextEdit, Url, WorkDoneProgressParams,
+    DocumentFormattingParams, FormattingOptions, Hover, HoverContents, MarkedString, MarkupContent,
+    MarkupKind, PartialResultParams, Position, Range, SemanticTokens, SemanticTokensParams,
+    SemanticTokensRangeParams, TextDocumentContentChangeEvent, TextEdit, Url,
+    WorkDoneProgressParams,
 };
 use ltk_hash::fnv1a;
 use ltk_ritobin::{
@@ -128,9 +129,15 @@ impl Worker {
                     position,
                     work_done_progress_params,
                 } => {
-                    if let Some(res) = self.hover(position, work_done_progress_params)? {
-                        let _ = self.server.send_ok(id, &res);
-                    }
+                    let res = self
+                        .hover(position, work_done_progress_params)?
+                        .unwrap_or_else(|| Hover {
+                            contents: lsp_types::HoverContents::Scalar(MarkedString::String(
+                                String::new(),
+                            )),
+                            range: None,
+                        });
+                    let _ = self.server.send_ok(id, &res);
                 }
                 Message::CompletionRequest(req) => {
                     let _ = self.server.send_ok(
@@ -205,36 +212,53 @@ impl Worker {
         };
 
         let class = ClassFinder::new(
-            doc.line_numbers.from_position(&req.position),
+            doc.line_numbers.from_position(&Position::new(
+                req.position.line,
+                req.position.character + 1,
+            )),
             doc.text.clone(),
         )
         .walk(cst);
 
         let classes = self.server.meta.classes.read();
-        let Some(class) = class
+        let Some((name, class)) = class
             .class_stack
             .last()
-            .map(|(_, class)| fnv1a::hash_lower(&doc.text.as_str()[class]))
-            .and_then(|hash| classes.get(&hash.into()))
+            .map(|(_, class)| {
+                (
+                    &doc.text.as_str()[class],
+                    fnv1a::hash_lower(&doc.text.as_str()[class]),
+                )
+            })
+            .and_then(|(name, hash)| Some((name, classes.get(&hash.into())?)))
         else {
             return Ok(None);
         };
+
+        tracing::debug!("-> {name}");
 
         let hashes = self.server.hashes.fields.as_ref();
         if hashes.is_none() {
             tracing::error!("NO HASHES");
         }
 
-        let properties = class.properties.iter().map(|(k, prop)| CompletionItem {
-            label: hashes
-                .and_then(|h| h.hashes.get(&BinHash(**k)).cloned())
-                .unwrap_or_else(|| k.to_string()),
-            label_details: Some(lsp_types::CompletionItemLabelDetails {
-                detail: Some(format!(": {}", prop.rito_type())),
-                description: None,
-            }),
-            kind: Some(CompletionItemKind::PROPERTY),
-            ..Default::default()
+        let properties = class.properties.iter().map(|(k, prop)| {
+            let label = hashes.and_then(|h| h.hashes.get(&BinHash(**k)).cloned());
+            let type_part = format!(": {}", prop.rito_type());
+            CompletionItem {
+                sort_text: Some(label.clone().unwrap_or_else(|| format!("XXX{:x}", **k))),
+                insert_text: Some(format!(
+                    "{}{type_part} = ",
+                    label.clone().unwrap_or_else(|| k.to_string())
+                )),
+                label: label.unwrap_or_else(|| k.to_string()),
+                label_details: Some(lsp_types::CompletionItemLabelDetails {
+                    detail: Some(type_part),
+                    description: None,
+                }),
+                kind: Some(CompletionItemKind::PROPERTY),
+                ..Default::default()
+            }
         });
         Ok(Some(CompletionResponse::Array(properties.collect())))
     }
@@ -250,29 +274,60 @@ impl Worker {
             return Ok(None);
         };
 
-        let class =
+        let finder =
             ClassFinder::new(doc.line_numbers.from_position(pos), doc.text.clone()).walk(cst);
         let classes = self.server.meta.classes.read();
-        let class_hash = class
+        let class_name = finder
             .class_stack
             .last()
             .map(|(_, class)| (class, fnv1a::hash_lower(&doc.text.as_str()[class])));
 
-        let txt = match class_hash {
-            Some((name, hash)) => {
+        let markup = match class_name {
+            Some((name_span, hash)) => {
+                let class_name = &doc.text.as_str()[*name_span];
                 let class = classes.get(&hash.into());
-                let properties = class.map(|c| &c.properties);
-                format!(
-                    "class ({}/{hash}): {properties:#?}",
-                    &doc.text.as_str()[*name]
-                )
-            }
-            None => match cst.find_node(doc.line_numbers.byte_index(pos.line, pos.character + 1)) {
-                Some((node, tok)) => {
-                    let txt = &doc.text[tok.span.start as _..tok.span.end as _];
-                    format!("{txt:?} | {node:?} | {:?}", tok.kind)
+
+                MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: match finder.found_token {
+                        Some((token, TreeKind::EntryKey)) => {
+                            let Some(properties) = class.map(|c| &c.properties) else {
+                                return Ok(None);
+                            };
+                            let txt = &doc.text.as_str()[token.span];
+                            let hash = fnv1a::hash_lower(txt);
+                            match properties.get(&hash.into()) {
+                                Some(prop) => {
+                                    format!(
+                                        r#"### [{class_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/)
+
+`{txt}`: `{}`
+
+*No documentation available.*
+"#,
+                                        class_name.to_ascii_lowercase(),
+                                        prop.rito_type()
+                                    )
+                                }
+                                None => format!("{txt}: ??"),
+                            }
+                        }
+                        _ => {
+                            return Ok(None);
+                        }
+                    },
                 }
-                None => "".into(),
+            }
+            None => MarkupContent {
+                kind: lsp_types::MarkupKind::PlainText,
+                value: match cst.find_node(doc.line_numbers.byte_index(pos.line, pos.character + 1))
+                {
+                    Some((node, tok)) => {
+                        let txt = &doc.text[tok.span.start as _..tok.span.end as _];
+                        format!("{txt:?} | {node:?} | {:?}", tok.kind)
+                    }
+                    None => "".into(),
+                },
             },
         };
 
@@ -284,7 +339,7 @@ impl Worker {
         //     None => "".into(),
         // };
         Ok(Some(Hover {
-            contents: lsp_types::HoverContents::Scalar(lsp_types::MarkedString::String(txt)),
+            contents: lsp_types::HoverContents::Markup(markup),
             range: None,
         }))
     }
