@@ -1,4 +1,5 @@
 use std::{
+    fmt::Write as _,
     sync::{Arc, atomic::AtomicI32},
     time::{Duration, Instant},
 };
@@ -32,6 +33,7 @@ use tokio::{
 
 use crate::{
     document::Document,
+    lol_meta::schema::U32Hash,
     lsp::{
         ext::{HoverParams, PositionOrRange},
         semantic_tokens::builder::SemanticTokensBuilder,
@@ -240,7 +242,7 @@ impl Worker {
                     fnv1a::hash_lower(&doc.text.as_str()[class]),
                 )
             })
-            .and_then(|(name, hash)| Some((name, classes.get(&hash.into())?)))
+            .and_then(|(name, hash)| Some((name, classes.get(hash)?)))
         else {
             return Ok(None);
         };
@@ -293,20 +295,17 @@ impl Worker {
             .map(|(_, class)| (class, fnv1a::hash_lower(&doc.text.as_str()[class])));
 
         let markup = match class_name {
-            Some((name_span, hash)) => {
-                let class_name = &doc.text.as_str()[*name_span];
-                let class = classes.get(&hash.into());
+            Some((class_name_span, class_hash)) => {
+                let class_name = &doc.text.as_str()[*class_name_span];
+                let class = classes.get(class_hash);
 
                 MarkupContent {
                     kind: MarkupKind::Markdown,
                     value: match finder.found_token {
                         Some((token, TreeKind::EntryKey)) => {
-                            let Some(properties) = class.map(|c| &c.properties) else {
-                                return Ok(None);
-                            };
                             let txt = &doc.text.as_str()[token.span];
                             let hash = fnv1a::hash_lower(txt);
-                            match properties.get(&hash.into()) {
+                            match classes.find_property(class_hash, hash) {
                                 Some(prop) => {
                                     format!(
                                         r#"### [{class_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/)
@@ -325,6 +324,41 @@ impl Worker {
                                 None => format!("{txt}: ??"),
                             }
                         }
+                        Some((token, TreeKind::Class)) => match class {
+                            Some(class) => {
+                                let mut str = format!(
+                                    "[{class_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/) (`0x{:>08x}`)\n\n",
+                                    class_name.to_ascii_lowercase(),
+                                    class_hash,
+                                );
+
+                                let mut base = Some((U32Hash(class_hash), class));
+                                let mut d = 0;
+                                while let Some((hash, class)) = base {
+                                    if d > 0 {
+                                        let base_name = self
+                                            .server
+                                            .hashes
+                                            .types
+                                            .as_ref()
+                                            .and_then(|h| h.hashes.get(&BinHash(*hash)))
+                                            .map(|s| s.as_str())
+                                            .unwrap_or("??");
+                                        writeln!(
+                                            str,
+                                            "{}└─ [{base_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/)\n",
+                                            "  ".repeat(d),
+                                            base_name.to_ascii_lowercase()
+                                        )?;
+                                    }
+                                    d += 1;
+                                    base = class.base.and_then(|b| Some((b, classes.get(b)?)));
+                                }
+
+                                str
+                            }
+                            None => format!("*Unknown class `{class_name}`*"),
+                        },
                         _ => {
                             return Ok(None);
                         }

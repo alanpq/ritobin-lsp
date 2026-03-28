@@ -7,13 +7,37 @@ use std::{
 
 use dashmap::RwLock;
 
-use crate::lol_meta::schema::{Class, DumpFile, U32Hash};
+use crate::lol_meta::schema::{Class, DumpFile, Property, U32Hash};
+
+#[derive(Debug, Default)]
+pub struct Classes(HashMap<U32Hash, Class>);
+impl Classes {
+    pub fn get(&self, hash: impl Into<U32Hash>) -> Option<&Class> {
+        self.0.get(&hash.into())
+    }
+    pub fn find_property(
+        &self,
+        class: impl Into<U32Hash>,
+        property: impl Into<U32Hash>,
+    ) -> Option<&Property> {
+        let mut search = self.get(class);
+        let property = property.into();
+        while let Some(class) = search {
+            if let Some(prop) = class.properties.get(&property) {
+                return Some(prop);
+            }
+
+            search = class.base.and_then(|base| self.get(base));
+        }
+        None
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct MetaService {
     pub loaded: Arc<AtomicBool>,
     pub version: Arc<RwLock<String>>,
-    pub classes: Arc<RwLock<HashMap<U32Hash, Class>>>,
+    pub classes: Arc<RwLock<Classes>>,
 }
 
 impl MetaService {
@@ -26,7 +50,7 @@ impl MetaService {
         let dump: DumpFile = serde_json::from_reader(&mut file)?;
         let count = dump.classes.len();
         *self.version.write() = dump.version;
-        *self.classes.write() = dump.classes;
+        *self.classes.write() = Classes(dump.classes);
         self.loaded
             .store(true, std::sync::atomic::Ordering::Relaxed);
         tracing::info!("Loaded {count} meta classes");
