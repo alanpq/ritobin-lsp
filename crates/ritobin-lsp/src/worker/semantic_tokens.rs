@@ -1,23 +1,13 @@
 use lsp_types::{Position, Range};
 use ltk_ritobin::{
-    cst::{
-        Cst, TreeKind, Visitor,
-        visitor::{Visit, VisitorExt},
-    },
+    cst::{Cst, TreeKind, Visitor, visitor::Visit},
     parse::{Span, Token, TokenKind},
-    print::PrintConfig,
 };
-use ritobin_lsp::{cst_ext::CstExt, line_ends::LineNumbers};
+use ritobin_lsp::line_ends::LineNumbers;
 
-use crate::{
-    lsp::{
-        ext::HoverParams,
-        semantic_tokens::{
-            self,
-            builder::{SemanticTokensBuilder, type_index},
-        },
-    },
-    server::Server,
+use crate::lsp::semantic_tokens::{
+    self,
+    builder::{SemanticTokensBuilder, type_index},
 };
 
 pub struct SemanticVisitor<'a> {

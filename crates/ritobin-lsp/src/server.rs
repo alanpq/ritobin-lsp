@@ -1,4 +1,4 @@
-use std::{fs::File, io::BufReader, path::Path, sync::Arc};
+use std::{io::BufReader, path::Path};
 
 use anyhow::Context;
 use lsp_server::{Connection, Message, RequestId, Response};
@@ -7,9 +7,7 @@ use poro_hash::{BinHash, Hashtable};
 use rustc_hash::FxHashMap;
 use tokio::sync::RwLock;
 
-use crate::{
-    config::Config, document::Document, lol_meta::service::MetaService, worker::WorkerHandle,
-};
+use crate::{config::Config, lol_meta::service::MetaService, worker::WorkerHandle};
 
 #[derive(Default)]
 pub struct Hashes {

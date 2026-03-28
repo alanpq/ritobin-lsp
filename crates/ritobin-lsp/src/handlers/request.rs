@@ -1,35 +1,17 @@
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use itertools::Itertools;
 use lsp_server::Request as ServerRequest;
 use lsp_types::request::Request;
-use lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionResponse, DocumentFormattingParams, Hover,
-    HoverContents, MarkedString, Position, Range, SemanticTokensParams, SemanticTokensRangeParams,
-    TextEdit,
-    request::{
-        Completion, Formatting, GotoDefinition, HoverRequest, SemanticTokensFullRequest,
-        SemanticTokensRangeRequest,
-    },
-};
 use lsp_types::{CompletionParams, notification::Notification as _};
-use ltk_ritobin::{
-    cst::{
-        Cst, TreeKind, Visitor,
-        visitor::{Visit, VisitorExt},
+use lsp_types::{
+    DocumentFormattingParams, SemanticTokensParams, SemanticTokensRangeParams,
+    request::{
+        Completion, Formatting, HoverRequest, SemanticTokensFullRequest, SemanticTokensRangeRequest,
     },
-    parse::{Span, Token, TokenKind},
-    print::PrintConfig,
 };
-use ritobin_lsp::{cst_ext::CstExt, line_ends::LineNumbers};
 
 use crate::{
-    lsp::{
-        ext::{HoverParams, Unhash, UnhashParams},
-        semantic_tokens::{
-            self,
-            builder::{SemanticTokensBuilder, type_index},
-        },
-    },
+    lsp::ext::{HoverParams, Unhash, UnhashParams},
     server::Server,
     worker::{self, CompletionRequest},
 };

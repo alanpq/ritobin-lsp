@@ -4,12 +4,7 @@ use lsp_types::{
     PublishDiagnosticsParams,
     notification::{Notification as _, PublishDiagnostics},
 };
-use ltk_ritobin::{
-    Cst,
-    cst::FlatErrors,
-    parse::ErrorKind,
-    typecheck::visitor::{DiagnosticWithSpan, TypeChecker},
-};
+use ltk_ritobin::{Cst, cst::FlatErrors, parse::ErrorKind, typecheck::visitor::DiagnosticWithSpan};
 
 use crate::worker::Worker;
 

@@ -1,16 +1,5 @@
-use anyhow::Result;
-use itertools::Itertools;
-use lsp_server::{Connection, Message};
-use lsp_types::{
-    Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, Location,
-    PublishDiagnosticsParams, Url, notification::PublishDiagnostics,
-};
-use lsp_types::{TextDocumentContentChangeEvent, notification::Notification as _};
-use ltk_ritobin::{
-    cst::{Cst, FlatErrors},
-    parse::{self, ErrorKind},
-    typecheck::visitor::TypeChecker,
-};
+use lsp_types::TextDocumentContentChangeEvent;
+use lsp_types::Url;
 use ritobin_lsp::line_ends::LineNumbers;
 
 pub struct Document {

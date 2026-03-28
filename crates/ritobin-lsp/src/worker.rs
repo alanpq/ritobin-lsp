@@ -1,17 +1,14 @@
 use std::{
     fmt::Write as _,
-    sync::{Arc, atomic::AtomicI32},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
-use anyhow::bail;
 use lsp_server::RequestId;
 use lsp_types::{
-    CompletionContext, CompletionItem, CompletionItemKind, CompletionResponse, DocumentChanges,
-    DocumentFormattingParams, FormattingOptions, Hover, HoverContents, MarkedString, MarkupContent,
-    MarkupKind, PartialResultParams, Position, Range, SemanticTokens, SemanticTokensParams,
-    SemanticTokensRangeParams, TextDocumentContentChangeEvent, TextEdit, Url,
-    WorkDoneProgressParams,
+    CompletionContext, CompletionItem, CompletionItemKind, CompletionResponse, FormattingOptions,
+    Hover, MarkedString, MarkupContent, MarkupKind, PartialResultParams, Position, Range,
+    SemanticTokens, TextDocumentContentChangeEvent, TextEdit, Url, WorkDoneProgressParams,
 };
 use ltk_hash::fnv1a;
 use ltk_ritobin::{
@@ -24,20 +21,14 @@ use ltk_ritobin::{
     print::PrintConfig,
 };
 use poro_hash::BinHash;
-use ritobin_lsp::{cst_ext::CstExt as _, line_ends::LineNumbers};
-use similar::{DiffOp, TextDiff};
-use tokio::{
-    sync::{mpsc, oneshot},
-    task::JoinHandle,
-};
+use ritobin_lsp::cst_ext::CstExt as _;
+use similar::TextDiff;
+use tokio::{sync::mpsc, task::JoinHandle};
 
 use crate::{
     document::Document,
     lol_meta::schema::U32Hash,
-    lsp::{
-        ext::{HoverParams, PositionOrRange},
-        semantic_tokens::builder::SemanticTokensBuilder,
-    },
+    lsp::{ext::PositionOrRange, semantic_tokens::builder::SemanticTokensBuilder},
     server::Server,
     worker::semantic_tokens::SemanticVisitor,
 };
@@ -219,7 +210,7 @@ impl Worker {
 
     fn complete(&self, req: CompletionRequest) -> anyhow::Result<Option<CompletionResponse>> {
         let doc = &self.document;
-        let Some((cst, bin)) = self.bin.as_ref() else {
+        let Some((cst, _bin)) = self.bin.as_ref() else {
             return Ok(None);
         };
 
@@ -282,7 +273,7 @@ impl Worker {
     ) -> anyhow::Result<Option<Hover>> {
         let pos = position.start();
         let doc = &self.document;
-        let Some((cst, bin)) = self.bin.as_ref() else {
+        let Some((cst, _bin)) = self.bin.as_ref() else {
             return Ok(None);
         };
 
@@ -324,7 +315,7 @@ impl Worker {
                                 None => format!("{txt}: ??"),
                             }
                         }
-                        Some((token, TreeKind::Class)) => match class {
+                        Some((_token, TreeKind::Class)) => match class {
                             Some(class) => {
                                 let mut str = format!(
                                     "[{class_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/) (`0x{:>08x}`)\n\n",
@@ -512,7 +503,7 @@ impl Visitor for ClassFinder {
         if tree.span.end > self.offset {
             return Visit::Stop;
         }
-        if let Some(taken) = self
+        if let Some(_taken) = self
             .class_stack
             .pop_if(|(depth, _)| self.stack.len() == *depth)
         {

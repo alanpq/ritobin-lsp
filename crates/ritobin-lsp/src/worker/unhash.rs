@@ -11,7 +11,7 @@ use poro_hash::{BinHash, FromStrRadix};
 use crate::{server::Hashes, worker::Worker};
 
 impl Worker {
-    pub fn unhash(&self, range: Option<Range>) -> anyhow::Result<Option<Vec<TextEdit>>> {
+    pub fn unhash(&self, _range: Option<Range>) -> anyhow::Result<Option<Vec<TextEdit>>> {
         let Some((cst, _)) = self.bin.as_ref() else {
             return Ok(None);
         };

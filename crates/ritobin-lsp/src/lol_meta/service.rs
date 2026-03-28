@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    io::{self, BufReader},
+    io::BufReader,
     path::{Path, PathBuf},
     sync::{Arc, atomic::AtomicBool},
 };
