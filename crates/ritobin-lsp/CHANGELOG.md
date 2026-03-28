@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.3...ritobin-lsp-v0.1.4) (2026-03-24)
+
+
+### Features
+
+* bump ltk ([adeb368](https://github.com/alanpq/ritobin-lsp/commit/adeb368d7e9eec7e83f007ace48dc64e2e270b5f))
+
 ## [0.1.3](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.2...ritobin-lsp-v0.1.3) (2026-03-19)
 
 
