@@ -313,10 +313,13 @@ impl Worker {
 
 `{txt}`: `{}`
 
+`0x{:>08x}`
+
 *No documentation available.*
 "#,
                                         class_name.to_ascii_lowercase(),
-                                        prop.rito_type()
+                                        prop.rito_type(),
+                                        hash,
                                     )
                                 }
                                 None => format!("{txt}: ??"),
