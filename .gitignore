@@ -5,6 +5,7 @@ target/
 .idea/*
 *.log
 *.iml
+!package.json
 *.json
 .vscode/settings.json
 .DS_Store
