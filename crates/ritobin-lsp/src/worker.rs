@@ -338,7 +338,7 @@ impl Worker {
                                         writeln!(
                                             str,
                                             "{}└─ [{base_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/)\n",
-                                            "  ".repeat(d),
+                                            "\u{00A0}".repeat(d - 1),
                                             base_name.to_ascii_lowercase()
                                         )?;
                                     }
