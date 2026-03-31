@@ -351,7 +351,15 @@ impl Worker {
                             None => format!("*Unknown class `{class_name}`*"),
                         },
                         _ => {
-                            return Ok(None);
+                            match cst
+                                .find_node(doc.line_numbers.byte_index(pos.line, pos.character + 1))
+                            {
+                                Some((node, tok)) => {
+                                    let txt = &doc.text[tok.span.start as _..tok.span.end as _];
+                                    format!("{txt:?} | {node:?} | {:?}", tok.kind)
+                                }
+                                None => "".into(),
+                            }
                         }
                     },
                 }
