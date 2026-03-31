@@ -208,44 +208,10 @@ export class Config {
       onEnterRules = [
         ...onEnterRules,
         {
-          // Doc single-line comment
-          // e.g. ///|
-          beforeText: /^\s*\/{3}.*$/,
-          action: { indentAction, appendText: "/// " },
-        },
-        {
-          // Parent doc single-line comment
-          // e.g. //!|
-          beforeText: /^\s*\/{2}!.*$/,
-          action: { indentAction, appendText: "//! " },
-        },
-        {
-          // Begins an auto-closed multi-line comment (standard or parent doc)
-          // e.g. /** | */ or /*! | */
-          beforeText: /^\s*\/\*(\*|!)(?!\/)([^*]|\*(?!\/))*$/,
-          afterText: /^\s*\*\/$/,
-          action: {
-            indentAction: vscode.IndentAction.IndentOutdent,
-            appendText: " * ",
-          },
-        },
-        {
-          // Begins a multi-line comment (standard or parent doc)
-          // e.g. /** ...| or /*! ...|
-          beforeText: /^\s*\/\*(\*|!)(?!\/)([^*]|\*(?!\/))*$/,
-          action: { indentAction, appendText: " * " },
-        },
-        {
-          // Continues a multi-line comment
-          // e.g.  * ...|
-          beforeText: /^( {2})* \*( ([^*]|\*(?!\/))*)?$/,
-          action: { indentAction, appendText: "* " },
-        },
-        {
-          // Dedents after closing a multi-line comment
-          // e.g.  */|
-          beforeText: /^( {2})* \*\/\s*$/,
-          action: { indentAction, removeText: 1 },
+          // single-line comment
+          // e.g. #|
+          beforeText: /^\s*#.*$/,
+          action: { indentAction, appendText: "# " },
         },
       ];
     }
