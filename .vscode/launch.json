@@ -48,9 +48,9 @@
         "<node_internals>/**/*.js"
       ],
       "env": {
-        "__RB_LSP_SERVER_DEBUG": "${workspaceFolder}/target/debug/ritobin-lsp",
-        "RB_META_DUMP_PATH": "${workspaceFolder}/dump.json",
-        "RB_HASHES_DIR": "/home/alan/Documents/LeagueToolkit/bin_hashtables/"
+        "__RB_LSP_SERVER_DEBUG": "${workspaceFolder}/target/debug/ritobin-lsp"
+        // "RB_META_DUMP_PATH": "${workspaceFolder}/dump.json",
+        // "RB_HASHES_DIR": "/home/alan/Documents/LeagueToolkit/bin_hashtables/"
       }
     },
     {
@@ -72,9 +72,9 @@
         "<node_internals>/**/*.js"
       ],
       "env": {
-        "__RB_LSP_SERVER_DEBUG": "${workspaceFolder}/target/release/ritobin-lsp",
-        "RB_META_DUMP_PATH": "${workspaceFolder}/dump.json",
-        "RB_HASHES_DIR": "/home/alan/Documents/LeagueToolkit/bin_hashtables/"
+        "__RB_LSP_SERVER_DEBUG": "${workspaceFolder}/target/release/ritobin-lsp"
+        // "RB_META_DUMP_PATH": "${workspaceFolder}/dump.json",
+        // "RB_HASHES_DIR": "/home/alan/Documents/LeagueToolkit/bin_hashtables/"
       }
     },
     {
@@ -97,9 +97,9 @@
         "<node_internals>/**/*.js"
       ],
       "env": {
-        "__RB_LSP_SERVER_DEBUG": "${workspaceFolder}/target/release/ritobin-lsp",
-        "RB_META_DUMP_PATH": "${workspaceFolder}/dump.json",
-        "RB_HASHES_DIR": "/home/alan/Documents/LeagueToolkit/bin_hashtables/"
+        "__RB_LSP_SERVER_DEBUG": "${workspaceFolder}/target/release/ritobin-lsp"
+        // "RB_META_DUMP_PATH": "${workspaceFolder}/dump.json",
+        // "RB_HASHES_DIR": "/home/alan/Documents/LeagueToolkit/bin_hashtables/"
       }
     },
     {
