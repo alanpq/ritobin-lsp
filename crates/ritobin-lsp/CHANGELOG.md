@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.1.4](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.3...ritobin-lsp-v0.1.4) (2026-03-31)
+
+
+### Features
+
+* bump ltk ([adeb368](https://github.com/alanpq/ritobin-lsp/commit/adeb368d7e9eec7e83f007ace48dc64e2e270b5f))
+* class entry hover ([2c5fbac](https://github.com/alanpq/ritobin-lsp/commit/2c5fbac1a0941ae03340be7569ba8161fa60fe2f))
+* class token hover ([a4141d2](https://github.com/alanpq/ritobin-lsp/commit/a4141d22210dbc799a6b9a64b06b3470dd3ddba7))
+* diff formatted output ([cd4fb67](https://github.com/alanpq/ritobin-lsp/commit/cd4fb679aed184ba536f56540b3c4390ab212a4b))
+* document worker refactor ([99e4f07](https://github.com/alanpq/ritobin-lsp/commit/99e4f073415201b2fbd4f99b699a2309c8c32e1c))
+* enable incremental document sync ([601e769](https://github.com/alanpq/ritobin-lsp/commit/601e769c2daef40fbaa7923882fcf33141fb8636))
+* lol_meta service ([3494b5c](https://github.com/alanpq/ritobin-lsp/commit/3494b5ce138d6fa5c60bab9f99171558c8c06f08))
+* rough and dirty hash lookups ([590cd78](https://github.com/alanpq/ritobin-lsp/commit/590cd780720601f224a9a0d7e7105f65f0b5bdc0))
+* support UnexpectedContainerItem diagnostic ([6587448](https://github.com/alanpq/ritobin-lsp/commit/6587448ba0907c1ad173d478f456cbfbb933dd19))
+* take paths as lsp config ([67b4ba4](https://github.com/alanpq/ritobin-lsp/commit/67b4ba42265816ac5f650514674b55835944071c))
+* unhash command ([d19f28a](https://github.com/alanpq/ritobin-lsp/commit/d19f28a6768d1e7af32f41e2c4550be15b296b96))
+
+
+### Bug Fixes
+
+* class hierarchy indentation ([29bef45](https://github.com/alanpq/ritobin-lsp/commit/29bef45a9396fb3b46e3b847f5dea2b2995d583a))
+* comment ClassFinder debug logs ([08f1c28](https://github.com/alanpq/ritobin-lsp/commit/08f1c2835fb816d4ddbeb3725c62fe913e209b6f))
+* fallback hover to cst walk ([0089680](https://github.com/alanpq/ritobin-lsp/commit/0089680efa233817e197886ca92b744cf73df45f))
+* more versatile ClassFinder ([94fee59](https://github.com/alanpq/ritobin-lsp/commit/94fee5914fccde6bbe5da90bb54bb43793b40ec5))
+* show class property hash in hover ([743c10f](https://github.com/alanpq/ritobin-lsp/commit/743c10fa53eaa2ff9f451b7f93a4c0cabbd2689e))
+* stop advertising definition provider support ([211cde9](https://github.com/alanpq/ritobin-lsp/commit/211cde97c6710d1e47edd406a13ab490544a8f0b))
+* store built Bin ([8202742](https://github.com/alanpq/ritobin-lsp/commit/820274222e5dec72d08f6065cbc092ffb39ccc88))
+* tweak format diffing ([5d3017c](https://github.com/alanpq/ritobin-lsp/commit/5d3017c027d112f54fc4e187c6c2c7feb2089f50))
+
 ## [0.1.3](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.2...ritobin-lsp-v0.1.3) (2026-03-19)
 
 
