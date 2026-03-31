@@ -776,16 +776,18 @@ dependencies = [
 [[package]]
 name = "ltk_hash"
 version = "0.2.5"
-
-[[package]]
-name = "ltk_hash"
-version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a0081deb694867c5ca11658f3df01425ae4181bdf5c6fbdc5fb1818fa0b52e5"
 
 [[package]]
+name = "ltk_hash"
+version = "0.2.5"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#daa07c3fad20711b8c2a25d0d80087e8610ee9e2"
+
+[[package]]
 name = "ltk_io_ext"
 version = "0.4.1"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#daa07c3fad20711b8c2a25d0d80087e8610ee9e2"
 dependencies = [
  "byteorder",
  "glam",
@@ -796,6 +798,7 @@ dependencies = [
 [[package]]
 name = "ltk_meta"
 version = "0.4.0"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#daa07c3fad20711b8c2a25d0d80087e8610ee9e2"
 dependencies = [
  "byteorder",
  "enum_dispatch",
@@ -814,6 +817,7 @@ dependencies = [
 [[package]]
 name = "ltk_primitives"
 version = "0.3.2"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#daa07c3fad20711b8c2a25d0d80087e8610ee9e2"
 dependencies = [
  "byteorder",
  "glam",
@@ -824,10 +828,11 @@ dependencies = [
 [[package]]
 name = "ltk_ritobin"
 version = "0.2.1"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite#daa07c3fad20711b8c2a25d0d80087e8610ee9e2"
 dependencies = [
  "glam",
  "indexmap 2.13.0",
- "ltk_hash 0.2.5",
+ "ltk_hash 0.2.5 (git+https://github.com/LeagueToolkit/league-toolkit.git?branch=alan%2Fritobin-rewrite)",
  "ltk_meta",
  "ltk_primitives",
  "miette",
