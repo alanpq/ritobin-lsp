@@ -1,9 +1,14 @@
-use std::{fmt, iter, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt, iter,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use itertools::Itertools as _;
 use paths::AbsPathBuf;
 use semver::Version;
-use serde::de::DeserializeOwned;
+use serde::{Deserialize, de::DeserializeOwned};
 
 use crate::lsp::capabilities::ClientCapabilities;
 
@@ -64,6 +69,15 @@ impl fmt::Display for ConfigErrors {
 
 impl std::error::Error for ConfigErrors {}
 
+#[derive(Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct InitOptions {
+    pub hash_path: Option<PathBuf>,
+    pub meta_dump_path: Option<PathBuf>,
+    #[serde(flatten)]
+    pub other: HashMap<String, serde_json::Value>,
+}
+
 #[derive(Clone)]
 pub struct Config {
     caps: ClientCapabilities,
@@ -72,6 +86,7 @@ pub struct Config {
     workspace_roots: Vec<AbsPathBuf>,
     // snippets: Vec<Snippet>,
     client_info: Option<ClientInfo>,
+    pub initialization_options: Option<InitOptions>,
 }
 
 impl Config {
@@ -80,6 +95,7 @@ impl Config {
         caps: lsp_types::ClientCapabilities,
         workspace_roots: Vec<AbsPathBuf>,
         client_info: Option<lsp_types::ClientInfo>,
+        initialization_options: Option<InitOptions>,
     ) -> Self {
         // static DEFAULT_CONFIG_DATA: OnceLock<&'static DefaultConfigData> = OnceLock::new();
 
@@ -96,6 +112,7 @@ impl Config {
                     .map(Version::parse)
                     .and_then(Result::ok),
             }),
+            initialization_options,
             // client_config: (FullConfigInput::default(), ConfigErrors(vec![])),
             // default_config: DEFAULT_CONFIG_DATA.get_or_init(|| Box::leak(Box::default())),
             // user_config: None,

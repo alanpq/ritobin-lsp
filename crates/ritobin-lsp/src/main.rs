@@ -174,11 +174,17 @@ async fn main() -> std::result::Result<(), Box<dyn Error + Sync + Send>> {
         root_uri,
         mut capabilities,
         workspace_folders,
-        initialization_options: _,
+        initialization_options,
         client_info,
         ..
     } = from_json::<lsp_types::InitializeParams>("InitializeParams", &initialize_params)?;
 
+    let initialization_options = initialization_options
+        .as_ref()
+        .map(|o| from_json("InitializationOptions", o))
+        .transpose()?;
+
+    tracing::info!("Initialization options: {:?}", initialization_options);
     // lsp-types has a typo in the `/capabilities/workspace/diagnostics` field, its typoed as `diagnostic`
     if let Some(val) = initialize_params.pointer("/capabilities/workspace/diagnostics")
         && let Ok(diag_caps) = from_json::<lsp_types::DiagnosticWorkspaceClientCapabilities>(
@@ -228,7 +234,13 @@ async fn main() -> std::result::Result<(), Box<dyn Error + Sync + Send>> {
         .filter(|workspaces| !workspaces.is_empty())
         .unwrap_or_else(|| vec![root_path.clone()]);
 
-    let config = Config::new(root_path, capabilities, workspace_roots, client_info);
+    let config = Config::new(
+        root_path,
+        capabilities,
+        workspace_roots,
+        client_info,
+        initialization_options,
+    );
 
     // advertised capabilities
     let server_caps = server_capabilities(&config);

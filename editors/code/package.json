@@ -137,6 +137,14 @@
                         "markdownDescription": "Do not start ritobin-lsp server when the extension is activated.",
                         "default": false,
                         "type": "boolean"
+                    },
+                    "ritobin-lsp.hashPath": {
+                        "description": "Path to hashes folder",
+                        "type": "string"
+                    },
+                    "ritobin-lsp.metaDumpPath": {
+                        "markdownDescription": "Path to meta dump json (download from [https://github.com/LeagueToolkit/lol-meta-classes](https://github.com/LeagueToolkit/lol-meta-classes/tree/main/dumps))",
+                        "type": "string"
                     }
                 }
             },
