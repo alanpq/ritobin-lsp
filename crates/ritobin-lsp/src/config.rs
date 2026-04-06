@@ -8,7 +8,7 @@ use std::{
 use itertools::Itertools as _;
 use paths::AbsPathBuf;
 use semver::Version;
-use serde::{Deserialize, de::DeserializeOwned};
+use serde::{Deserialize, Deserializer, de::DeserializeOwned};
 
 use crate::lsp::capabilities::ClientCapabilities;
 
@@ -72,10 +72,25 @@ impl std::error::Error for ConfigErrors {}
 #[derive(Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct InitOptions {
+    #[serde(deserialize_with = "empty_string_as_none")]
     pub hash_path: Option<PathBuf>,
+    #[serde(deserialize_with = "empty_string_as_none")]
     pub meta_dump_path: Option<PathBuf>,
     #[serde(flatten)]
     pub other: HashMap<String, serde_json::Value>,
+}
+
+fn empty_string_as_none<'de, D>(deserializer: D) -> Result<Option<PathBuf>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: String = String::deserialize(deserializer)?;
+    let s = s.trim();
+    if s.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(PathBuf::from(s)))
+    }
 }
 
 #[derive(Clone)]
