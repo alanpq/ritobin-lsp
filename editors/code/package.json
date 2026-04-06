@@ -143,7 +143,7 @@
                         "type": "string"
                     },
                     "ritobin-lsp.metaDumpPath": {
-                        "markdownDescription": "Path to meta dump json (download from [https://github.com/LeagueToolkit/lol-meta-classes](https://github.com/LeagueToolkit/lol-meta-classes/tree/main/dumps))",
+                        "markdownDescription": "Meta dump file override. If left unset, will automatically fetch the latest release from the [lol-meta-classes repo](https://github.com/LeagueToolkit/lol-meta-classes/releases).",
                         "type": "string"
                     }
                 }
