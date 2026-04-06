@@ -19,19 +19,6 @@ pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result
 
     let mut server = Server::new(connection, config.clone());
 
-    server.meta.load_file(
-        std::env::var("RB_META_DUMP_PATH")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .or_else(|| {
-                config
-                    .initialization_options
-                    .as_ref()
-                    .and_then(|o| o.meta_dump_path.clone())
-            })
-            .unwrap_or_else(|| files.cache_dir().join("dump.json")),
-    );
-
     if let Some(hash_path) = std::env::var("RB_HASHES_DIR")
         .ok()
         .and_then(|v| v.parse::<PathBuf>().ok())
@@ -47,6 +34,45 @@ pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result
     };
 
     let server = Arc::new(server);
+
+    tokio::spawn({
+        let server = server.clone();
+        let meta_override = std::env::var("RB_META_DUMP_PATH")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .or_else(|| {
+                config
+                    .initialization_options
+                    .as_ref()
+                    .and_then(|o| o.meta_dump_path.clone())
+            });
+        async move {
+            match meta_override {
+                Some(meta_override) => {
+                    server.meta.load_file(meta_override).await.unwrap();
+                    tracing::info!(
+                        "Skipping latest meta dump fetching - dump file path has been explicitly specified."
+                    );
+                }
+                None => {
+                    let dir = files.cache_dir();
+                    if let Err(e) = server.meta.load(dir).await {
+                        tracing::error!("Failed to load existing meta - {e:?}");
+                    }
+
+                    match server.meta.fetch_latest(dir).await {
+                        Err(e) => {
+                            tracing::error!("Failed to fetch latest meta dump - {e:?}");
+                        }
+                        Ok(Some(path)) => {
+                            server.meta.load_file(path).await.unwrap();
+                        }
+                        Ok(None) => {}
+                    }
+                }
+            }
+        }
+    });
 
     let not = lsp_server::Notification::new(
         ServerStatusNotification::METHOD.to_owned(),
