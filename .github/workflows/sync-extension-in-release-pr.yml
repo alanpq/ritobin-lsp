@@ -1,0 +1,34 @@
+name: sync-extension-in-release-pr
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  sync:
+    if: contains(github.head_ref, 'release-please')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Extract new LSP version from PR
+        run: |
+          LSP_VERSION=$(grep '^version' crates/ritobin-lsp/Cargo.toml | head -1 | cut -d '"' -f2)
+          echo "LSP_VERSION=$LSP_VERSION" >> $GITHUB_ENV
+
+      - name: Update extension version
+        run: |
+          sed -i "s/BUNDLED_LSP_VERSION = \".*\"/BUNDLED_LSP_VERSION = \"$LSP_VERSION\"/" \
+            editors/code/src/version.ts
+
+      - name: Commit if changed
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+            git commit -am "chore: sync bundled LSP version ($LSP_VERSION)"
+            git push
+          fi
