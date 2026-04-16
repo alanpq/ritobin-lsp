@@ -2,6 +2,9 @@
 
 ritobin-lsp is a language server that provides IDE functionality for editing [ritobin](https://github.com/moonshadow565/ritobin) files, a custom text format to represent League of Legends .bin files. You can use it with any editor that supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) (VS Code, Vim, Emacs, Zed, etc.).
 
+> [!WARNING]
+> ritobin-lsp is still relatively early in development, so there is always a risk of instability/crashes.
+
 # Installation
 
 On the [releases page](https://github.com/alanpq/ritobin-lsp/releases), the binary is available under `ritobin-lsp`, and the VS Code extension is available under `ritobin-lsp-vs`.
@@ -19,8 +22,9 @@ If you're using VS Code, the extension already bundles a copy of the `ritobin-ls
 - [x] Diagnostics
 - [x] File unhash command
 - [ ] Automatic hash updates
-- [x] [lol-meta-classes](https://github.com/LeagueToolkit/lol-meta-classes) integration
+- [ ] [lol-meta-classes](https://github.com/LeagueToolkit/lol-meta-classes) integration
     - [x] Class property auto-complete
+    - [ ] Property value auto-complete
     - [x] Class auto-complete
     - [x] Hover information
     - [x] Automatic meta dump updates
