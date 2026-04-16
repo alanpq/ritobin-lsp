@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.7](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.6...ritobin-lsp-vs-v0.0.7) (2026-04-16)
+
+
+### Features
+
+* better meta dump management + auto fetch latest ([#27](https://github.com/alanpq/ritobin-lsp/issues/27)) ([9b84c3a](https://github.com/alanpq/ritobin-lsp/commit/9b84c3a982df913bcfb1e971e6620c35776d0ed0))
+
 ## [0.0.6](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.5...ritobin-lsp-vs-v0.0.6) (2026-03-31)
 
 
