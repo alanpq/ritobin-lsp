@@ -1,9 +1,4 @@
-use std::{
-    collections::HashMap,
-    fmt, iter,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{collections::HashMap, fmt, iter, path::PathBuf, sync::Arc};
 
 use itertools::Itertools as _;
 use paths::AbsPathBuf;
