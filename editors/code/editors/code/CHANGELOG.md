@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.9](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.8...ritobin-lsp-vs-v0.0.9) (2026-06-14)
+
+
+### Bug Fixes
+
+* update to latest ltk crates + vsc package lock ([9dcaabb](https://github.com/alanpq/ritobin-lsp/commit/9dcaabb864ce6438bf8dec69079594cdfd831bac))
+
 ## [0.0.8](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.7...ritobin-lsp-vs-v0.0.8) (2026-04-16)
 
 
