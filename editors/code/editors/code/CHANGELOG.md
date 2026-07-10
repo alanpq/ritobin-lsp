@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.10](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.9...ritobin-lsp-vs-v0.0.10) (2026-07-10)
+
+
+### Bug Fixes
+
+* **vsc:** bump bundled lsp version ([5864c69](https://github.com/alanpq/ritobin-lsp/commit/5864c69a360aa1453ea136d108b85d0039b98143))
+
 ## [0.0.9](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.8...ritobin-lsp-vs-v0.0.9) (2026-06-14)
 
 

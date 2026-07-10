@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.7](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.6...ritobin-lsp-v0.1.7) (2026-07-10)
+
+
+### Features
+
+* better format diffing ([9de2846](https://github.com/alanpq/ritobin-lsp/commit/9de2846c1aa92c5292e031ce968562b12a9d6c0d))
+* human readable ParseNumericError ([ee08d17](https://github.com/alanpq/ritobin-lsp/commit/ee08d17eb6d63c80efa44da70c517ac6c5749f14))
+* update to latest ltk ([ecf2ecd](https://github.com/alanpq/ritobin-lsp/commit/ecf2ecd5d5d51500f20182b30a06b19a68256f36))
+
 ## [0.1.6](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.5...ritobin-lsp-v0.1.6) (2026-06-14)
 
 
