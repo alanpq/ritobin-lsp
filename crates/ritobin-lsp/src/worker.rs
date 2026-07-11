@@ -8,6 +8,7 @@ use lsp_types::{
     SemanticTokens, TextDocumentContentChangeEvent, TextEdit, Url, WorkDoneProgressParams,
 };
 use ltk_hash::fnv1a;
+use ltk_mimir_cache::Table;
 use ltk_ritobin::{
     Cst,
     cst::{
@@ -18,7 +19,6 @@ use ltk_ritobin::{
     print::PrintConfig,
     typecheck::visitor::DiagnosticWithSpan,
 };
-use poro_hash::BinHash;
 use ritobin_lsp::cst_ext::CstExt as _;
 use tokio::{sync::mpsc, task::JoinHandle};
 
@@ -252,21 +252,30 @@ impl Worker {
 
         tracing::debug!("-> {name}");
 
-        let hashes = self.server.hashes.fields.as_ref();
-        if hashes.is_none() {
+        let bin_fields = self
+            .server
+            .hashes
+            .as_ref()
+            .and_then(|h| h.table(Table::BinFields));
+        if bin_fields.is_none() {
             tracing::error!("NO HASHES");
         }
 
         let properties = class.properties.iter().map(|(k, prop)| {
-            let label = hashes.and_then(|h| h.hashes.get(&BinHash(**k)).cloned());
+            let label = bin_fields.as_ref().and_then(|h| h.get((**k).into()));
             let type_part = format!(": {}", prop.rito_type());
             CompletionItem {
-                sort_text: Some(label.clone().unwrap_or_else(|| format!("XXX{:x}", **k))),
                 insert_text: Some(format!(
                     "{}{type_part} = ",
-                    label.clone().unwrap_or_else(|| k.to_string())
+                    label.clone().unwrap_or_else(|| k.to_string().into())
                 )),
-                label: label.unwrap_or_else(|| k.to_string()),
+                sort_text: Some(
+                    label
+                        .clone()
+                        .unwrap_or_else(|| format!("XXX{:x}", **k).into())
+                        .into(),
+                ),
+                label: label.unwrap_or_else(|| k.to_string().into()).into(),
                 label_details: Some(lsp_types::CompletionItemLabelDetails {
                     detail: Some(type_part),
                     description: None,
@@ -337,16 +346,17 @@ impl Worker {
 
                                 let mut base = Some((U32Hash(class_hash), class));
                                 let mut d = 0;
+                                let bin_types = self
+                                    .server
+                                    .hashes
+                                    .as_ref()
+                                    .and_then(|hashes| hashes.table(Table::BinTypes));
                                 while let Some((hash, class)) = base {
                                     if d > 0 {
-                                        let base_name = self
-                                            .server
-                                            .hashes
-                                            .types
+                                        let base_name = bin_types
                                             .as_ref()
-                                            .and_then(|h| h.hashes.get(&BinHash(*hash)))
-                                            .map(|s: &String| s.as_str())
-                                            .unwrap_or("??");
+                                            .and_then(|h| h.get((*hash).into()))
+                                            .unwrap_or_else(|| hash.to_string().into());
                                         writeln!(
                                             str,
                                             "{}└─ [{base_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/)\n",

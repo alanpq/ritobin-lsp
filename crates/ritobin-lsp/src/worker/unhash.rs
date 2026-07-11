@@ -1,4 +1,5 @@
 use lsp_types::{Range, TextEdit};
+use ltk_mimir_cache::Table;
 use ltk_ritobin::{
     cst::{
         NodeId, TokenId, Visitor,
@@ -16,7 +17,12 @@ impl Worker {
             return Ok(None);
         };
 
-        let unhasher = Unhasher::new(&self.server.hashes, &self.document.text).walk(&data.cst);
+        let Some(hashes) = self.server.hashes.as_ref() else {
+            // TODO: propagate this err to client
+            return Ok(None);
+        };
+
+        let unhasher = Unhasher::new(hashes, &self.document.text).walk(&data.cst);
 
         Ok(Some(
             unhasher
@@ -24,7 +30,7 @@ impl Worker {
                 .into_iter()
                 .map(|e| TextEdit {
                     range: self.document.line_numbers.from_span(e.0),
-                    new_text: e.1.to_string(),
+                    new_text: e.1,
                 })
                 .collect(),
         ))
@@ -34,7 +40,7 @@ impl Worker {
 struct Unhasher<'a> {
     hashes: &'a Hashes,
     txt: &'a str,
-    edits: Vec<(Span, &'a str)>,
+    edits: Vec<(Span, String)>,
 }
 
 impl<'a> Unhasher<'a> {
@@ -61,24 +67,27 @@ impl<'a> Visitor for Unhasher<'a> {
             return Visit::Continue;
         };
 
+        let bin_fields = self.hashes.table(Table::BinFields);
+        let bin_types = self.hashes.table(Table::BinTypes);
+
         let unhashed = match parent.kind {
             ltk_ritobin::cst::Kind::EntryKey => {
                 let Some(k) = BinHash::from_str_radix(txt, 16).ok() else {
                     return Visit::Continue;
                 };
-                self.hashes.fields.as_ref().and_then(|h| h.hashes.get(&k))
+                bin_fields.as_ref().and_then(|h| h.get((*k).into()))
             }
             ltk_ritobin::cst::Kind::Class => {
                 let Some(k) = BinHash::from_str_radix(txt, 16).ok() else {
                     return Visit::Continue;
                 };
-                self.hashes.types.as_ref().and_then(|h| h.hashes.get(&k))
+                bin_types.as_ref().and_then(|h| h.get((*k).into()))
             }
             _ => return Visit::Continue,
         };
 
-        if let Some(unhashed) = unhashed {
-            self.edits.push((token.span, unhashed.as_str()));
+        if let Some(unhashed) = unhashed.as_ref() {
+            self.edits.push((token.span, unhashed.to_string()));
         }
         eprintln!("[unhash] -> {unhashed:?}");
 

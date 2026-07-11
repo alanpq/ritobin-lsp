@@ -1,6 +1,7 @@
 use lsp_server::{Connection, Message};
 use lsp_types::notification::Notification as _;
 use lsp_types::request::Request as _;
+use ltk_mimir_cache::UpdateOutcome;
 use std::{path::PathBuf, sync::Arc};
 
 use crate::{
@@ -10,29 +11,38 @@ use crate::{
         self,
         ext::{ServerStatusNotification, ServerStatusParams},
     },
-    server::Server,
+    server::{Hashes, Server},
 };
 
 pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
     let files = directories_next::ProjectDirs::from("com", "alanpq", "ritobin-lsp")
         .expect("invalid app id for dirs");
 
-    let mut server = Server::new(connection, config.clone());
-
-    if let Some(hash_path) = std::env::var("RB_HASHES_DIR")
-        .ok()
-        .and_then(|v| v.parse::<PathBuf>().ok())
-        .or_else(|| {
-            config
-                .initialization_options
-                .as_ref()
-                .and_then(|o| o.hash_path.clone())
+    let hashes = Hashes::new()
+        .inspect_err(|e| {
+            tracing::error!("Failed to resolve hashtable directory: {e}");
+            tracing::warn!("No hashes will be loaded.");
         })
-        && let Err(e) = server.hashes.load_from_directory(&hash_path)
-    {
-        tracing::error!("Failed to load hashes from {hash_path:?} - {e:?}");
-    };
+        .ok();
+    if let Some(hashes) = hashes.clone() {
+        tokio::spawn(async move {
+            tracing::info!("Checking for new hashes...");
+            match hashes.update().await {
+                Ok(UpdateOutcome::Completed(report)) => {
+                    tracing::info!("Updated {} tables.", report.installed.len());
+                }
+                Ok(UpdateOutcome::Locked) => {
+                    tracing::info!("Another application is updating hashes. Doing nothing.");
+                }
+                Err(e) => {
+                    tracing::error!("Failed to update hashtables: {e}");
+                }
+            }
+            hashes.load();
+        });
+    }
 
+    let server = Server::new(connection, config.clone(), hashes);
     let server = Arc::new(server);
 
     tokio::spawn({
