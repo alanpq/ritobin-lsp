@@ -1,4 +1,5 @@
 use lsp_types::{Range, TextEdit};
+use ltk_hash::BinHash;
 use ltk_mimir_cache::Table;
 use ltk_ritobin::{
     cst::{
@@ -7,7 +8,6 @@ use ltk_ritobin::{
     },
     parse::{Span, TokenKind},
 };
-use poro_hash::{BinHash, FromStrRadix};
 
 use crate::{server::Hashes, worker::Worker};
 

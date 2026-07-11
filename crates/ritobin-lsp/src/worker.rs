@@ -7,7 +7,7 @@ use lsp_types::{
     Hover, MarkedString, MarkupContent, MarkupKind, PartialResultParams, Position, Range,
     SemanticTokens, TextDocumentContentChangeEvent, TextEdit, Url, WorkDoneProgressParams,
 };
-use ltk_hash::fnv1a;
+use ltk_hash::{BinHash, Hash};
 use ltk_mimir_cache::Table;
 use ltk_ritobin::{
     Cst,
@@ -242,7 +242,7 @@ impl Worker {
             .map(|(_, class)| {
                 (
                     &doc.text.as_str()[class],
-                    fnv1a::hash_lower(&doc.text.as_str()[class]),
+                    BinHash::hash_str(&doc.text.as_str()[class]),
                 )
             })
             .and_then(|(name, hash)| Some((name, classes.get(hash)?)))
@@ -304,7 +304,7 @@ impl Worker {
         let class_name = finder
             .class_stack
             .last()
-            .map(|(_, class)| (class, fnv1a::hash_lower(&doc.text.as_str()[class])));
+            .map(|(_, class)| (class, BinHash::hash_str(&doc.text.as_str()[class])));
 
         let markup = match class_name {
             Some((class_name_span, class_hash)) => {
@@ -316,7 +316,7 @@ impl Worker {
                     value: match finder.found_token {
                         Some((token, TreeKind::EntryKey)) => {
                             let txt = &doc.text.as_str()[token.span];
-                            let hash = fnv1a::hash_lower(txt);
+                            let hash = BinHash::hash_str(txt);
                             match classes.find_property(class_hash, hash) {
                                 Some(prop) => {
                                     format!(
@@ -344,7 +344,7 @@ impl Worker {
                                     class_hash,
                                 );
 
-                                let mut base = Some((U32Hash(class_hash), class));
+                                let mut base = Some((U32Hash::from(class_hash), class));
                                 let mut d = 0;
                                 let bin_types = self
                                     .server

@@ -1,3 +1,4 @@
+use ltk_hash::BinHash;
 use ltk_meta::PropertyKind;
 use ltk_ritobin::RitoType;
 use serde::{Deserialize, Serialize};
@@ -17,6 +18,12 @@ pub struct U32Hash(pub u32);
 impl From<u32> for U32Hash {
     fn from(value: u32) -> Self {
         Self(value)
+    }
+}
+
+impl From<BinHash> for U32Hash {
+    fn from(value: BinHash) -> Self {
+        Self(*value)
     }
 }
 
