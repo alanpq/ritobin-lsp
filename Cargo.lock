@@ -1258,9 +1258,9 @@ dependencies = [
 
 [[package]]
 name = "ltk_hash"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e083c3c9f859736f07749024a8881029ba02ef012052f98c12e8186fbfbaa8d"
+checksum = "ada44666d233f89786fdfd6784346a140ddfc7c31d31ac23dfa7b066f9fbe41b"
 dependencies = [
  "byteorder",
  "xxhash-rust",
@@ -1268,8 +1268,8 @@ dependencies = [
 
 [[package]]
 name = "ltk_hash"
-version = "0.3.0"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git#a5e523f309716db54d3aef756b05d08d683a4759"
+version = "0.4.0"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git#f440ec24f3a7a93da984d36d3cc17160ea4ef862"
 dependencies = [
  "byteorder",
  "serde",
@@ -1290,8 +1290,8 @@ dependencies = [
 
 [[package]]
 name = "ltk_io_ext"
-version = "0.4.3"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git#a5e523f309716db54d3aef756b05d08d683a4759"
+version = "0.4.4"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git#f440ec24f3a7a93da984d36d3cc17160ea4ef862"
 dependencies = [
  "byteorder",
  "glam",
@@ -1301,15 +1301,15 @@ dependencies = [
 
 [[package]]
 name = "ltk_meta"
-version = "0.6.0"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git#a5e523f309716db54d3aef756b05d08d683a4759"
+version = "0.6.1"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git#f440ec24f3a7a93da984d36d3cc17160ea4ef862"
 dependencies = [
  "byteorder",
  "enum_dispatch",
  "glam",
  "indexmap 2.14.0",
  "log",
- "ltk_hash 0.3.0 (git+https://github.com/LeagueToolkit/league-toolkit.git)",
+ "ltk_hash 0.4.0 (git+https://github.com/LeagueToolkit/league-toolkit.git)",
  "ltk_io_ext",
  "ltk_primitives",
  "miette",
@@ -1335,8 +1335,8 @@ dependencies = [
 
 [[package]]
 name = "ltk_primitives"
-version = "0.3.4"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git#a5e523f309716db54d3aef756b05d08d683a4759"
+version = "0.3.5"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git#f440ec24f3a7a93da984d36d3cc17160ea4ef862"
 dependencies = [
  "byteorder",
  "glam",
@@ -1346,12 +1346,12 @@ dependencies = [
 
 [[package]]
 name = "ltk_ritobin"
-version = "0.4.0"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git#a5e523f309716db54d3aef756b05d08d683a4759"
+version = "0.5.0"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git#f440ec24f3a7a93da984d36d3cc17160ea4ef862"
 dependencies = [
  "glam",
  "indexmap 2.14.0",
- "ltk_hash 0.3.0 (git+https://github.com/LeagueToolkit/league-toolkit.git)",
+ "ltk_hash 0.4.0 (git+https://github.com/LeagueToolkit/league-toolkit.git)",
  "ltk_meta",
  "ltk_primitives",
  "miette",
@@ -1851,7 +1851,7 @@ dependencies = [
  "log",
  "lsp-server",
  "lsp-types",
- "ltk_hash 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ltk_hash 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ltk_hashdb",
  "ltk_meta",
  "ltk_mimir_cache",

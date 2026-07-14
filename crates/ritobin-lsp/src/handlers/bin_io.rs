@@ -14,7 +14,7 @@ use std::{
 use ltk_ritobin::{
     Cst,
     print::{Print as _, PrintError},
-    typecheck::visitor::Diagnostic,
+    typecheck::diagnostics::Diagnostic,
 };
 
 use crate::{fs_ext, lsp::ext::DeserializeBinResult};
@@ -75,15 +75,16 @@ pub fn deserialize_bin(bin_path: &Path) -> Result<DeserializeBinResult, Deserial
         path: path.clone(),
         source,
     })?;
-    let bin = ltk_meta::Bin::from_reader(&mut BufReader::new(file)).map_err(|source| match source {
-        ltk_meta::Error::InvalidFileSignature => {
-            DeserializeError::InvalidSignature { path: path.clone() }
-        }
-        source => DeserializeError::Read {
-            path: path.clone(),
-            source,
-        },
-    })?;
+    let bin =
+        ltk_meta::Bin::from_reader(&mut BufReader::new(file)).map_err(|source| match source {
+            ltk_meta::Error::InvalidFileSignature => {
+                DeserializeError::InvalidSignature { path: path.clone() }
+            }
+            source => DeserializeError::Read {
+                path: path.clone(),
+                source,
+            },
+        })?;
 
     // Default print config renders all hashes as hex; hashtable-backed naming
     // can be layered in later via a PrintConfig hash provider.
@@ -160,7 +161,10 @@ mod tests {
         fs::write(&path, b"JUNKJUNKJUNKJUNK").unwrap();
 
         let err = deserialize_bin(&path).unwrap_err();
-        assert!(matches!(err, DeserializeError::InvalidSignature { .. }), "{err}");
+        assert!(
+            matches!(err, DeserializeError::InvalidSignature { .. }),
+            "{err}"
+        );
         let _ = fs::remove_file(&path);
     }
 

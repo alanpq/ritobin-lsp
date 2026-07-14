@@ -17,7 +17,7 @@ use ltk_ritobin::{
     },
     parse::{Span, Token},
     print::PrintConfig,
-    typecheck::visitor::DiagnosticWithSpan,
+    typecheck::diagnostics::DiagnosticWithSpan,
 };
 use ritobin_lsp::cst_ext::CstExt as _;
 use tokio::{sync::mpsc, task::JoinHandle};

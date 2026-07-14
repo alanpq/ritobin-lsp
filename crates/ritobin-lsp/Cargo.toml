@@ -15,7 +15,7 @@ lsp-types = { version = "=0.95.0", features = ["proposed"] }
 
 ltk_ritobin = { git = "https://github.com/LeagueToolkit/league-toolkit.git", features = ["serde"] }
 ltk_meta = { git = "https://github.com/LeagueToolkit/league-toolkit.git", features = ["serde"] }
-ltk_hash = "0.3"
+ltk_hash = "0.4"
 
 rustc-hash = "2.1.1"
 serde = { version = "1.0.228", features = ["derive"] }

@@ -2,25 +2,27 @@ use std::num::IntErrorKind;
 
 use itertools::Itertools as _;
 use lsp_types::{
-    Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity, Location,
+    Diagnostic as LspDiag, DiagnosticRelatedInformation, DiagnosticSeverity, Location,
     PublishDiagnosticsParams,
     notification::{Notification as _, PublishDiagnostics},
 };
 use ltk_ritobin::{
-    Cst, RitoType, cst::FlatErrors, parse::ErrorKind, typecheck::visitor::DiagnosticWithSpan,
+    Cst, RitoType,
+    parse::ErrorKind,
+    typecheck::diagnostics::{Diagnostic, DiagnosticWithSpan},
 };
 
 use crate::worker::Worker;
 
 impl Worker {
-    fn convert_diagnostic(&self, d: DiagnosticWithSpan) -> Diagnostic {
+    fn convert_diagnostic(&self, d: DiagnosticWithSpan) -> LspDiag {
         match d.diagnostic {
             ltk_ritobin::typecheck::visitor::Diagnostic::TypeMismatch {
                 span,
                 expected,
                 expected_span,
                 got,
-            } => Diagnostic {
+            } => LspDiag {
                 range: self.document.line_numbers.from_span(span),
                 severity: Some(DiagnosticSeverity::ERROR),
                 related_information: expected_span.map(|span| {
@@ -35,7 +37,7 @@ impl Worker {
                 message: format!("Type mismatch - expected {expected}, got {got}"),
                 ..Default::default()
             },
-            ltk_ritobin::typecheck::visitor::Diagnostic::ParseNumericError {
+            Diagnostic::ParseNumericError {
                 expected,
                 error,
                 span,
@@ -49,42 +51,38 @@ impl Worker {
                     Some(IntErrorKind::Zero) => "number would be zero",
                     _ => "invalid literal",
                 };
-                Diagnostic {
+                LspDiag {
                     range: self.document.line_numbers.from_span(span),
                     severity: Some(DiagnosticSeverity::ERROR),
                     message: format!("Could not parse {expected} - {error}"),
                     ..Default::default()
                 }
             }
-            ltk_ritobin::typecheck::visitor::Diagnostic::ShadowedEntry { shadowee, shadower } => {
-                Diagnostic {
-                    range: self.document.line_numbers.from_span(d.span),
-                    severity: Some(DiagnosticSeverity::WARNING),
+            Diagnostic::ShadowedEntry { shadowee, shadower } => LspDiag {
+                range: self.document.line_numbers.from_span(d.span),
+                severity: Some(DiagnosticSeverity::WARNING),
 
-                    related_information: Some(vec![DiagnosticRelatedInformation {
-                        location: Location {
-                            uri: self.document.uri.clone(),
-                            range: self.document.line_numbers.from_span(shadowee),
-                        },
-                        message: "Shadowed here".into(),
-                    }]),
+                related_information: Some(vec![DiagnosticRelatedInformation {
+                    location: Location {
+                        uri: self.document.uri.clone(),
+                        range: self.document.line_numbers.from_span(shadowee),
+                    },
+                    message: "Shadowed here".into(),
+                }]),
 
-                    message: format!(
-                        "Entry '{}' shadows previous entry",
-                        &self.document.text.as_str()[shadower]
-                    ),
-                    ..Default::default()
-                }
-            }
-            ltk_ritobin::typecheck::visitor::Diagnostic::RootNonEntry => Diagnostic {
+                message: format!(
+                    "Entry '{}' shadows previous entry",
+                    &self.document.text.as_str()[shadower]
+                ),
+                ..Default::default()
+            },
+            Diagnostic::RootNonEntry => LspDiag {
                 range: self.document.line_numbers.from_span(d.span),
                 severity: Some(DiagnosticSeverity::ERROR),
                 message: "Top-level bin entries must be of form 'name: type = ..'".into(),
                 ..Default::default()
             },
-            ltk_ritobin::typecheck::visitor::Diagnostic::UnexpectedSubtypes {
-                base_type, ..
-            } => Diagnostic {
+            Diagnostic::UnexpectedSubtypes { base_type, .. } => LspDiag {
                 range: self.document.line_numbers.from_span(d.span),
                 severity: Some(DiagnosticSeverity::ERROR),
                 message: format!(
@@ -93,14 +91,14 @@ impl Worker {
                 ),
                 ..Default::default()
             },
-            ltk_ritobin::typecheck::visitor::Diagnostic::UnexpectedContainerItem {
+            Diagnostic::UnexpectedContainerItem {
                 span,
                 expected,
                 expected_span: _,
             } => {
                 let mut expected = expected.to_string();
                 make_ascii_titlecase(&mut expected);
-                Diagnostic {
+                LspDiag {
                     range: self.document.line_numbers.from_span(span),
                     severity: Some(DiagnosticSeverity::ERROR),
                     message: format!(
@@ -109,7 +107,7 @@ impl Worker {
                     ..Default::default()
                 }
             }
-            inner => Diagnostic {
+            inner => LspDiag {
                 range: self.document.line_numbers.from_span(d.span),
 
                 severity: Some(DiagnosticSeverity::ERROR),
@@ -135,7 +133,7 @@ impl Worker {
         // let mut parse_errors = FlatErrors::new();
         // cst.walk(&mut parse_errors);
 
-        diagnostics.extend(cst.errors.iter().map(|err| Diagnostic {
+        diagnostics.extend(cst.errors.iter().map(|err| LspDiag {
             range: self.document.line_numbers.from_span(err.span),
             severity: Some(DiagnosticSeverity::ERROR),
             code: None,
