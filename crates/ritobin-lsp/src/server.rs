@@ -17,24 +17,26 @@ pub struct Hashes {
 }
 
 impl Hashes {
-    pub async fn update(&self) -> Result<UpdateOutcome, ltk_mimir_cache::Error> {
+    pub async fn update(
+        &self,
+    ) -> Result<UpdateOutcome, ltk_mimir_cache::UpdateError<reqwest::Error>> {
         let store = self.store.clone();
-        let outcome = tokio::task::spawn_blocking(move || {
-            let fetch =
-                |filename: &str| -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
-                    let url = format!(
-                        "https://github.com/LeagueToolkit/mimir/releases/latest/download/{filename}"
-                    );
-                    Ok(reqwest::blocking::get(&url)?
-                        .error_for_status()?
-                        .bytes()?
-                        .to_vec())
-                };
 
-            store.update(&fetch, UpdateOptions::default())
-        })
-        .await
-        .unwrap();
+        let fetch = |filename: &str| {
+            let url = format!(
+                "https://github.com/LeagueToolkit/mimir/releases/latest/download/{filename}"
+            );
+            async move {
+                Ok(reqwest::get(&url)
+                    .await?
+                    .error_for_status()?
+                    .bytes()
+                    .await?
+                    .to_vec())
+            }
+        };
+
+        let outcome = store.update_async(&fetch, UpdateOptions::default()).await;
 
         if let Ok(UpdateOutcome::Completed(_)) = &outcome {
             self.load();
@@ -73,7 +75,7 @@ impl Hashes {
         ));
     }
 
-    pub fn new() -> Result<Self, ltk_mimir_cache::Error> {
+    pub fn new() -> Result<Self, ltk_mimir_cache::NoCacheDirError> {
         let store = HashStore::discover()?;
         Ok(Self {
             tables: Default::default(),
