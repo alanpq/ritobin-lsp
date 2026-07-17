@@ -17,7 +17,14 @@ use crate::worker::Worker;
 impl Worker {
     fn convert_diagnostic(&self, d: DiagnosticWithSpan) -> LspDiag {
         match d.diagnostic {
-            ltk_ritobin::typecheck::visitor::Diagnostic::TypeMismatch {
+            Diagnostic::CustomSpan(msg, span) => LspDiag {
+                range: self.document.line_numbers.from_span(span),
+
+                severity: Some(DiagnosticSeverity::ERROR),
+                message: msg.to_string(),
+                ..Default::default()
+            },
+            Diagnostic::TypeMismatch {
                 span,
                 expected,
                 expected_span,
