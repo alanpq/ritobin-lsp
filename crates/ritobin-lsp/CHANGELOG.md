@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.1.8](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.7...ritobin-lsp-v0.1.8) (2026-07-17)
+
+
+### Features
+
+* add explorer integration and vfs scheme for .bin files ([9217b8e](https://github.com/alanpq/ritobin-lsp/commit/9217b8e06619d0aa8fabd0140dff0f69d5b9e05e))
+* fmt CustomSpan ([3a8dc49](https://github.com/alanpq/ritobin-lsp/commit/3a8dc4936213fca7525ea0b0b9f455f007d5b95f))
+* human readable NotEnoughItems ([c3f4f00](https://github.com/alanpq/ritobin-lsp/commit/c3f4f00e091056d63ed600687dfaba25e3773354))
+* initial linter w/ unknown field lint ([350e24f](https://github.com/alanpq/ritobin-lsp/commit/350e24f12d11df8897e90a6e8b0f6369263b6833))
+* switch to mimir, hash auto update ([8e453ad](https://github.com/alanpq/ritobin-lsp/commit/8e453ad8449170823fb376bb86967eb8c3bdecb1))
+* update ltk ([cb3c584](https://github.com/alanpq/ritobin-lsp/commit/cb3c584bde57416dd09b3179632fe7f284952e25))
+* update mimir ([30bfc64](https://github.com/alanpq/ritobin-lsp/commit/30bfc644ea3403dd56a16591b103b51e178b5172))
+
+
+### Bug Fixes
+
+* remove debug logs ([432b16c](https://github.com/alanpq/ritobin-lsp/commit/432b16ca8a10924b276f1b1ab6ac7d8a101cd3ed))
+* replace poro_hash with latest ltk_hash ([8156c06](https://github.com/alanpq/ritobin-lsp/commit/8156c06dc0701c35a460f8b5e6615df6235b6e7a))
+
 ## [0.1.7](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.6...ritobin-lsp-v0.1.7) (2026-07-10)
 
 
