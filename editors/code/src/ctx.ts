@@ -32,7 +32,7 @@ import type { RustAnalyzerExtensionApi } from "./main";
 // only those are in use. We use "Empty" to represent these scenarios
 // (r-a still somewhat works with Live Share, because commands are tunneled to the host)
 
-const BUNDLED_LSP_VERSION = "0.1.7"; //#[__auto(VSCODE_LSP_BUNDLED_VERSION)]
+const BUNDLED_LSP_VERSION = "0.1.8"; //#[__auto(VSCODE_LSP_BUNDLED_VERSION)]
 
 export type Workspace =
   | { kind: "Empty" }
