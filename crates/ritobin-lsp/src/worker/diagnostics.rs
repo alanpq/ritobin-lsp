@@ -24,6 +24,20 @@ impl Worker {
                 message: msg.to_string(),
                 ..Default::default()
             },
+            Diagnostic::NotEnoughItems {
+                span,
+                got,
+                expected,
+            } => LspDiag {
+                range: self.document.line_numbers.from_span(span),
+                severity: Some(DiagnosticSeverity::ERROR),
+                message: format!(
+                    "{expected} needs {} items - got {got}.",
+                    expected.needed_children()
+                ),
+
+                ..Default::default()
+            },
             Diagnostic::TypeMismatch {
                 span,
                 expected,
