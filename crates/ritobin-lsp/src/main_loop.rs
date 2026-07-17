@@ -2,7 +2,7 @@ use lsp_server::{Connection, Message};
 use lsp_types::notification::Notification as _;
 use lsp_types::request::Request as _;
 use ltk_mimir_cache::UpdateOutcome;
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
 use crate::{
     config::Config,

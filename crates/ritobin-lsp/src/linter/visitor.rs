@@ -118,7 +118,7 @@ impl Visitor for Linter<'_> {
                     });
                 }
             }
-            kind => {
+            _kind => {
                 // eprintln!("{kind:?} -> {}", &self.document.text[tree.span]);
             }
         }
@@ -136,7 +136,7 @@ impl Visitor for Linter<'_> {
             _ => {}
         }
 
-        if let Some(taken) = self.class_stack.pop_if(|class| self.depth == class.depth) {
+        if let Some(_taken) = self.class_stack.pop_if(|class| self.depth == class.depth) {
             // eprintln!(
             //     "<- s:{}: {:?} ({}) (d:{})",
             //     self.stack.len(),

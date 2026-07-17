@@ -1,10 +1,10 @@
 use lsp_types::{Position, Range};
 use ltk_ritobin::{
     cst::{
-        Cst, NodeId, TokenId, TreeKind, Visitor,
+        NodeId, TokenId, TreeKind, Visitor,
         visitor::{Visit, VisitCtx},
     },
-    parse::{Span, Token, TokenKind},
+    parse::{Span, TokenKind},
 };
 use ritobin_lsp::line_ends::LineNumbers;
 
@@ -41,7 +41,7 @@ impl Visitor for SemanticVisitor<'_> {
         self.stack.pop();
         Visit::Continue
     }
-    fn visit_token(&mut self, ctx: &VisitCtx, token: TokenId, parent: NodeId) -> Visit {
+    fn visit_token(&mut self, ctx: &VisitCtx, token: TokenId, _parent: NodeId) -> Visit {
         let token = ctx.cst.token(token).unwrap();
 
         if let Some(range) = self.range

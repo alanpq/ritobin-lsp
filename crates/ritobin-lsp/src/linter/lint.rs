@@ -1,7 +1,7 @@
-use lsp_types::{Diagnostic as LspDiag, DiagnosticSeverity, Url};
+use lsp_types::{Diagnostic as LspDiag, DiagnosticSeverity};
 use ltk_ritobin::parse::Span;
 
-use crate::{document::Document, lol_meta::schema::U32Hash};
+use crate::document::Document;
 
 pub enum Lint {
     /// Field doesn't exist in known meta class
@@ -11,7 +11,7 @@ pub enum Lint {
 impl Lint {
     pub fn into_lsp_diagnostic(self, document: &Document) -> LspDiag {
         match self {
-            Lint::UnknownField { span, class } => LspDiag {
+            Lint::UnknownField { span, class: _ } => LspDiag {
                 range: document.line_numbers.from_span(span),
                 message: format!("Unknown field '{}'", &document.text[span]),
                 severity: Some(DiagnosticSeverity::WARNING),
