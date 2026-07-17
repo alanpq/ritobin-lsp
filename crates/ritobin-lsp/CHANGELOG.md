@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.10](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.9...ritobin-lsp-v0.1.10) (2026-07-17)
+
+
+### Bug Fixes
+
+* raise max diags -&gt; 1000 + push lint warns after cst/bin errors ([#37](https://github.com/alanpq/ritobin-lsp/issues/37)) ([59a1730](https://github.com/alanpq/ritobin-lsp/commit/59a173015c60a12486df09d571c2a223848022e2))
+
 ## [0.1.9](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.8...ritobin-lsp-v0.1.9) (2026-07-17)
 
 
