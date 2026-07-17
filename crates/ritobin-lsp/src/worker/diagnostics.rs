@@ -154,17 +154,6 @@ impl Worker {
         // let mut parse_errors = FlatErrors::new();
         // cst.walk(&mut parse_errors);
 
-        let classes = self.server.meta.classes.read();
-        let mut linter = Linter::new(&self.document, &classes);
-        cst.walk(&mut linter);
-
-        diagnostics.extend(
-            linter
-                .lints
-                .into_iter()
-                .map(|l| l.into_lsp_diagnostic(&self.document)),
-        );
-
         diagnostics.extend(cst.errors.iter().map(|err| LspDiag {
             range: self.document.line_numbers.from_span(err.span),
             severity: Some(DiagnosticSeverity::ERROR),
@@ -185,7 +174,19 @@ impl Worker {
             data: None,
         }));
 
-        diagnostics.truncate(20);
+        let classes = self.server.meta.classes.read();
+        let mut linter = Linter::new(&self.document, &classes);
+        cst.walk(&mut linter);
+
+        diagnostics.extend(
+            linter
+                .lints
+                .into_iter()
+                .map(|l| l.into_lsp_diagnostic(&self.document)),
+        );
+
+        diagnostics.truncate(1000);
+
         let params = PublishDiagnosticsParams {
             uri: self.document.uri.clone(),
             diagnostics,
