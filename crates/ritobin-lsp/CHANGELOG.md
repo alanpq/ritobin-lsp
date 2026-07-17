@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.8...ritobin-lsp-v0.1.9) (2026-07-17)
+
+
+### Features
+
+* use hash provider when direct opening bins ([092e66a](https://github.com/alanpq/ritobin-lsp/commit/092e66a6ce10130f221741d025fa3dc7ff6d6f84))
+
 ## [0.1.8](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.7...ritobin-lsp-v0.1.8) (2026-07-17)
 
 

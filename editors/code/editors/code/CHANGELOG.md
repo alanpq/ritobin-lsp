@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.12](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.11...ritobin-lsp-vs-v0.0.12) (2026-07-17)
+
+
+### Bug Fixes
+
+* use .rito instead of .ritobin + be normal in stat when not a .bin in vfs ([2c14f3a](https://github.com/alanpq/ritobin-lsp/commit/2c14f3aa336b677a138c9f62ae3a50ff9993d1f4))
+
 ## [0.0.11](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.10...ritobin-lsp-vs-v0.0.11) (2026-07-17)
 
 
