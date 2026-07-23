@@ -1,4 +1,4 @@
 {
-    "crates/ritobin-lsp": "0.1.10",
-    "editors/code": "0.0.12"
+    "crates/ritobin-lsp": "0.1.11",
+    "editors/code": "0.0.13"
 }

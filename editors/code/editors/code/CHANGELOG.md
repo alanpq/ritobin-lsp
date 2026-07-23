@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.13](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.12...ritobin-lsp-vs-v0.0.13) (2026-07-23)
+
+
+### Features
+
+* configurable diagnostic limit + tweak err ordering ([e27a29f](https://github.com/alanpq/ritobin-lsp/commit/e27a29f41639de9d59f6c375fe74377aa69e520d))
+
 ## [0.0.12](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.11...ritobin-lsp-vs-v0.0.12) (2026-07-17)
 
 
