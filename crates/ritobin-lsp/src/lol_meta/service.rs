@@ -13,17 +13,57 @@ use std::{
 use anyhow::Context;
 use dashmap::RwLock;
 use futures::StreamExt as _;
-use itertools::Itertools;
+use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
 use tokio::task::JoinError;
 
 use crate::lol_meta::schema::{Class, DumpFile, Property, U32Hash};
 
 #[derive(Debug, Default)]
-pub struct Classes(HashMap<U32Hash, Class>);
+pub struct Classes {
+    classes: HashMap<U32Hash, Class>,
+    children: FxHashMap<U32Hash, Vec<U32Hash>>,
+}
 impl Classes {
+    pub fn new(classes: HashMap<U32Hash, Class>) -> Self {
+        let mut children: FxHashMap<U32Hash, Vec<U32Hash>> = FxHashMap::default();
+        for (hash, class) in &classes {
+            if let Some(base) = class.base {
+                children.entry(base).or_default().push(*hash);
+            }
+        }
+        Self { classes, children }
+    }
+
+    /// Every class assignable to `root` — `root` itself plus its transitive subclasses — paired with
+    /// its distance from `root`. Interfaces are descended through but never yielded; they cannot be
+    /// written as a value.
+    pub fn concrete_descendants(&self, root: impl Into<U32Hash>) -> Vec<(u32, U32Hash)> {
+        let mut out = Vec::new();
+        let mut seen = FxHashSet::default();
+        let mut stack = vec![(0, root.into())];
+
+        while let Some((depth, hash)) = stack.pop() {
+            let Some(class) = self.get(hash).filter(|_| seen.insert(hash)) else {
+                continue;
+            };
+            if !class.is.interface {
+                out.push((depth, hash));
+            }
+            stack.extend(
+                self.children
+                    .get(&hash)
+                    .into_iter()
+                    .flatten()
+                    .map(|&child| (depth + 1, child)),
+            );
+        }
+
+        out
+    }
+
     pub fn get(&self, hash: impl Into<U32Hash>) -> Option<&Class> {
-        self.0.get(&hash.into())
+        self.classes.get(&hash.into())
     }
     pub fn find_property(
         &self,
@@ -67,7 +107,7 @@ impl MetaService {
         let count = dump.classes.len();
         let version = version.or_else(|| dump.version.parse().ok());
         *self.version.write() = version;
-        *self.classes.write() = Classes(dump.classes);
+        *self.classes.write() = Classes::new(dump.classes);
         self.loaded
             .store(true, std::sync::atomic::Ordering::Relaxed);
 
@@ -263,4 +303,88 @@ struct GhReleaseAsset {
 struct GhReleases {
     tag_name: String,
     assets: Vec<GhReleaseAsset>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lol_meta::schema::ClassFlags;
+
+    fn class(base: Option<u32>, interface: bool) -> Class {
+        Class {
+            base: base.map(U32Hash),
+            is: ClassFlags {
+                interface,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    fn classes(entries: impl IntoIterator<Item = (u32, Class)>) -> Classes {
+        Classes::new(
+            entries
+                .into_iter()
+                .map(|(hash, class)| (U32Hash(hash), class))
+                .collect(),
+        )
+    }
+
+    fn descendants(classes: &Classes, root: u32) -> Vec<(u32, u32)> {
+        let mut out: Vec<_> = classes
+            .concrete_descendants(U32Hash(root))
+            .into_iter()
+            .map(|(depth, hash)| (depth, hash.0))
+            .collect();
+        out.sort_unstable();
+        out
+    }
+
+    #[test]
+    fn a_leaf_class_yields_only_itself() {
+        let classes = classes([(1, class(None, false))]);
+        assert_eq!(descendants(&classes, 1), vec![(0, 1)]);
+    }
+
+    #[test]
+    fn subclasses_are_yielded_with_their_distance_from_the_root() {
+        let classes = classes([
+            (1, class(None, false)),
+            (2, class(Some(1), false)),
+            (3, class(Some(2), false)),
+        ]);
+        assert_eq!(descendants(&classes, 1), vec![(0, 1), (1, 2), (2, 3)]);
+    }
+
+    #[test]
+    fn interfaces_are_descended_through_but_never_yielded() {
+        let classes = classes([
+            (1, class(None, true)),
+            (2, class(Some(1), true)),
+            (3, class(Some(2), false)),
+        ]);
+        assert_eq!(descendants(&classes, 1), vec![(2, 3)]);
+    }
+
+    #[test]
+    fn unrelated_classes_are_excluded() {
+        let classes = classes([
+            (1, class(None, false)),
+            (2, class(Some(1), false)),
+            (9, class(None, false)),
+        ]);
+        assert_eq!(descendants(&classes, 1), vec![(0, 1), (1, 2)]);
+    }
+
+    #[test]
+    fn a_base_cycle_terminates() {
+        let classes = classes([(1, class(Some(2), false)), (2, class(Some(1), false))]);
+        assert_eq!(descendants(&classes, 1), vec![(0, 1), (1, 2)]);
+    }
+
+    #[test]
+    fn an_unknown_root_yields_nothing() {
+        let classes = classes([(1, class(None, false))]);
+        assert_eq!(descendants(&classes, 7), vec![]);
+    }
 }

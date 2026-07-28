@@ -168,7 +168,11 @@ pub fn server_capabilities(config: &Config) -> ServerCapabilities {
         //     },
         // )),
         // inline_completion_provider: None,
-        completion_provider: Some(CompletionOptions::default()),
+        completion_provider: Some(CompletionOptions {
+            trigger_characters: Some(vec![":".to_owned(), "=".to_owned(), "{".to_owned()]),
+            completion_item: config.caps().completion_item(),
+            ..Default::default()
+        }),
         definition_provider: Some(OneOf::Left(false)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         document_formatting_provider: Some(OneOf::Left(true)),

@@ -12,7 +12,7 @@ use std::{
 pub type Map<K, V> = HashMap<K, V>;
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct U32Hash(pub u32);
 
 impl From<u32> for U32Hash {
@@ -82,7 +82,7 @@ pub struct DumpFile {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct PropertyContainer {
     pub vtable: U32Hash,
     pub value_type: BinType,
@@ -91,7 +91,7 @@ pub struct PropertyContainer {
     pub storage: Option<ContainerStorage>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct PropertyMap {
     pub vtable: U32Hash,
     pub key_type: BinType,
@@ -100,7 +100,7 @@ pub struct PropertyMap {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Property {
     pub other_class: Option<U32Hash>,
     pub offset: u32,
@@ -130,7 +130,7 @@ impl Property {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ClassFunctions {
     pub upcast_secondary: Option<U32Hash>,
     pub constructor: Option<U32Hash>,
@@ -140,7 +140,7 @@ pub struct ClassFunctions {
     pub register: Option<U32Hash>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ClassFlags {
     pub interface: bool,
     pub value: bool,
@@ -149,7 +149,7 @@ pub struct ClassFlags {
 }
 
 #[skip_serializing_none]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Class {
     pub base: Option<U32Hash>,
     pub secondary_bases: Map<U32Hash, u32>,
@@ -163,9 +163,10 @@ pub struct Class {
     pub defaults: Option<Map<U32Hash, serde_json::Value>>,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum BinType {
+    #[default]
     None = 0,
     Bool = 1,
     I8 = 2,
@@ -239,9 +240,10 @@ pub enum ContainerStorage {
     RitoVector,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 #[repr(C)]
 pub enum MapStorage {
+    #[default]
     UnknownMap,
     StdMap,
     StdUnorderedMap,

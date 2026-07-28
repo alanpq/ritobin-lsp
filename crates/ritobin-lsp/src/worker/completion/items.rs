@@ -1,0 +1,545 @@
+use std::borrow::Cow;
+
+use lsp_types::{
+    CompletionItem, CompletionItemKind, CompletionItemLabelDetails, Documentation, InsertTextFormat,
+    MarkupContent, MarkupKind,
+};
+use ltk_hash::BinHash;
+use ltk_meta::PropertyKind;
+use rustc_hash::FxHashSet;
+
+use crate::lol_meta::{
+    schema::{Property, U32Hash},
+    service::Classes,
+};
+
+pub type Name<'a> = Cow<'a, str>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ValueSlot {
+    pub kind: PropertyKind,
+    pub other_class: Option<U32Hash>,
+}
+
+/// The type a value must have at this position. `element` selects a container's item type or a
+/// map's value type over the property's own type.
+pub fn value_slot(
+    classes: &Classes,
+    class: BinHash,
+    property: BinHash,
+    element: bool,
+) -> Option<ValueSlot> {
+    let property = classes.find_property(class, property)?;
+
+    let kind = match (element, &property.container, &property.map) {
+        (false, ..) => property.value_type,
+        (true, Some(container), _) => container.value_type,
+        (true, _, Some(map)) => map.value_type,
+        (true, None, None) => return None,
+    };
+
+    Some(ValueSlot {
+        kind: kind.into(),
+        other_class: property.other_class,
+    })
+}
+
+pub fn value_items<'a>(
+    classes: &Classes,
+    slot: ValueSlot,
+    name_of: impl Fn(U32Hash) -> Option<Name<'a>>,
+    snippets: bool,
+) -> Vec<CompletionItem> {
+    use PropertyKind as K;
+
+    match slot.kind {
+        K::Bool | K::BitBool => ["true", "false"].into_iter().map(literal_item).collect(),
+        K::Struct | K::Embedded => slot
+            .other_class
+            .map(|root| class_items(classes, root, name_of, snippets))
+            .unwrap_or_default(),
+        K::Container | K::UnorderedContainer | K::Optional | K::Map => vec![block_item(snippets)],
+        _ => Vec::new(),
+    }
+}
+
+pub fn property_items<'a>(
+    classes: &Classes,
+    class: BinHash,
+    name_of: impl Fn(U32Hash) -> Option<Name<'a>>,
+) -> Vec<CompletionItem> {
+    inherited_properties(classes, class)
+        .into_iter()
+        .map(|(hash, property)| {
+            let label = name_of(hash).unwrap_or_else(|| hash_label(hash).into());
+            let ty = property.rito_type().to_string();
+
+            CompletionItem {
+                insert_text: Some(format!("{label}: {ty} = ")),
+                sort_text: Some(sort_key(0, &label, name_of(hash).is_some(), hash)),
+                label_details: Some(CompletionItemLabelDetails {
+                    detail: Some(format!(": {ty}")),
+                    description: None,
+                }),
+                kind: Some(CompletionItemKind::PROPERTY),
+                label: label.into_owned(),
+                ..Default::default()
+            }
+        })
+        .collect()
+}
+
+pub fn type_item(classes: &Classes, class: BinHash, property: BinHash) -> Option<CompletionItem> {
+    let ty = classes.find_property(class, property)?.rito_type().to_string();
+
+    Some(CompletionItem {
+        insert_text: Some(ty.clone()),
+        kind: Some(CompletionItemKind::TYPE_PARAMETER),
+        preselect: Some(true),
+        label: ty,
+        ..Default::default()
+    })
+}
+
+fn class_items<'a>(
+    classes: &Classes,
+    root: U32Hash,
+    name_of: impl Fn(U32Hash) -> Option<Name<'a>>,
+    snippets: bool,
+) -> Vec<CompletionItem> {
+    let mut found: Vec<_> = classes
+        .concrete_descendants(root)
+        .into_iter()
+        .map(|(depth, hash)| {
+            let name = name_of(hash);
+            (depth, hash, name.is_some(), name.unwrap_or_else(|| hash_label(hash).into()))
+        })
+        .collect();
+
+    found.sort_unstable_by(|(a_depth, _, a_named, a_label), (b_depth, _, b_named, b_label)| {
+        a_depth
+            .cmp(b_depth)
+            .then_with(|| b_named.cmp(a_named))
+            .then_with(|| a_label.cmp(b_label))
+    });
+
+    found
+        .into_iter()
+        .map(|(depth, hash, named, label)| {
+            let base = classes
+                .get(hash)
+                .and_then(|class| class.base)
+                .and_then(&name_of);
+
+            CompletionItem {
+                insert_text: Some(match snippets {
+                    true => format!("{label} {{\n\t$0\n}}"),
+                    false => format!("{label} {{\n}}"),
+                }),
+                insert_text_format: snippets.then_some(InsertTextFormat::SNIPPET),
+                sort_text: Some(sort_key(depth, &label, named, hash)),
+                label_details: base.map(|base| CompletionItemLabelDetails {
+                    detail: Some(format!(": {base}")),
+                    description: None,
+                }),
+                documentation: named.then(|| wiki_link(&label)),
+                kind: Some(CompletionItemKind::CLASS),
+                label: label.into_owned(),
+                ..Default::default()
+            }
+        })
+        .collect()
+}
+
+/// A class's own properties plus everything it inherits, nearest declaration winning. The visited
+/// set keeps a malformed dump with a cyclic base chain from looping forever.
+fn inherited_properties(classes: &Classes, class: BinHash) -> Vec<(U32Hash, &Property)> {
+    let mut out = Vec::new();
+    let mut seen_classes = FxHashSet::default();
+    let mut seen_properties = FxHashSet::default();
+    let mut search = Some(U32Hash::from(class));
+
+    while let Some(hash) = search.filter(|hash| seen_classes.insert(*hash)) {
+        let Some(class) = classes.get(hash) else {
+            break;
+        };
+        out.extend(
+            class
+                .properties
+                .iter()
+                .filter(|(hash, _)| seen_properties.insert(**hash))
+                .map(|(hash, property)| (*hash, property)),
+        );
+        search = class.base;
+    }
+
+    out
+}
+
+fn literal_item(text: &str) -> CompletionItem {
+    CompletionItem {
+        label: text.to_owned(),
+        kind: Some(CompletionItemKind::VALUE),
+        ..Default::default()
+    }
+}
+
+fn block_item(snippets: bool) -> CompletionItem {
+    CompletionItem {
+        label: "{}".to_owned(),
+        insert_text: Some(match snippets {
+            true => "{\n\t$0\n}".to_owned(),
+            false => "{\n}".to_owned(),
+        }),
+        insert_text_format: snippets.then_some(InsertTextFormat::SNIPPET),
+        kind: Some(CompletionItemKind::STRUCT),
+        ..Default::default()
+    }
+}
+
+fn wiki_link(name: &str) -> Documentation {
+    Documentation::MarkupContent(MarkupContent {
+        kind: MarkupKind::Markdown,
+        value: format!(
+            "[{name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/)",
+            name.to_ascii_lowercase()
+        ),
+    })
+}
+
+fn hash_label(hash: U32Hash) -> String {
+    format!("0x{:08x}", hash.0)
+}
+
+/// Nearest subclasses first, named before unnamed at the same distance, then alphabetical. `~`
+/// sorts after every alphanumeric, which is what pushes the hash-only entries to the back.
+fn sort_key(depth: u32, label: &str, named: bool, hash: U32Hash) -> String {
+    match named {
+        true => format!("{depth:02}{label}"),
+        false => format!("{depth:02}~{:08x}", hash.0),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::lol_meta::schema::{
+        BinType, Class, ClassFlags, Property, PropertyContainer, PropertyMap,
+    };
+    use std::collections::HashMap;
+
+    fn class(base: Option<u32>, interface: bool, properties: Vec<(u32, Property)>) -> Class {
+        Class {
+            base: base.map(U32Hash),
+            is: ClassFlags {
+                interface,
+                ..Default::default()
+            },
+            properties: properties
+                .into_iter()
+                .map(|(hash, prop)| (U32Hash(hash), prop))
+                .collect(),
+            ..Default::default()
+        }
+    }
+
+    fn classes(entries: impl IntoIterator<Item = (u32, Class)>) -> Classes {
+        Classes::new(
+            entries
+                .into_iter()
+                .map(|(hash, class)| (U32Hash(hash), class))
+                .collect::<HashMap<_, _>>(),
+        )
+    }
+
+    fn pointer_to(other: u32) -> Property {
+        Property {
+            value_type: BinType::Pointer,
+            other_class: Some(U32Hash(other)),
+            ..Default::default()
+        }
+    }
+
+    fn list_of(value_type: BinType, other: u32) -> Property {
+        Property {
+            value_type: BinType::List,
+            other_class: Some(U32Hash(other)),
+            container: Some(PropertyContainer {
+                value_type,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
+
+    fn map_of(value_type: BinType, other: u32) -> Property {
+        Property {
+            value_type: BinType::Map,
+            other_class: Some(U32Hash(other)),
+            map: Some(PropertyMap {
+                key_type: BinType::Hash,
+                value_type,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    }
+
+    fn named(names: &[(u32, &'static str)]) -> impl Fn(U32Hash) -> Option<Name<'static>> {
+        let names: HashMap<u32, &'static str> = names.iter().copied().collect();
+        move |hash: U32Hash| names.get(&hash.0).map(|n| Cow::Borrowed(*n))
+    }
+
+    fn labels(items: &[CompletionItem]) -> Vec<&str> {
+        items.iter().map(|i| i.label.as_str()).collect()
+    }
+
+    #[test]
+    fn value_slot_reads_the_properties_own_kind() {
+        let classes = classes([(1, class(None, false, vec![(10, pointer_to(2))]))]);
+        assert_eq!(
+            value_slot(&classes, BinHash(1), BinHash(10), false),
+            Some(ValueSlot {
+                kind: PropertyKind::Struct,
+                other_class: Some(U32Hash(2)),
+            })
+        );
+    }
+
+    #[test]
+    fn value_slot_reads_the_container_element_kind() {
+        let classes = classes([(
+            1,
+            class(None, false, vec![(10, list_of(BinType::Embed, 2))]),
+        )]);
+        assert_eq!(
+            value_slot(&classes, BinHash(1), BinHash(10), true),
+            Some(ValueSlot {
+                kind: PropertyKind::Embedded,
+                other_class: Some(U32Hash(2)),
+            })
+        );
+    }
+
+    #[test]
+    fn value_slot_reads_the_map_value_kind() {
+        let classes = classes([(
+            1,
+            class(None, false, vec![(10, map_of(BinType::Pointer, 2))]),
+        )]);
+        assert_eq!(
+            value_slot(&classes, BinHash(1), BinHash(10), true),
+            Some(ValueSlot {
+                kind: PropertyKind::Struct,
+                other_class: Some(U32Hash(2)),
+            })
+        );
+    }
+
+    #[test]
+    fn value_slot_finds_properties_inherited_from_a_base() {
+        let classes = classes([
+            (1, class(None, false, vec![(10, pointer_to(2))])),
+            (5, class(Some(1), false, vec![])),
+        ]);
+        assert_eq!(
+            value_slot(&classes, BinHash(5), BinHash(10), false),
+            Some(ValueSlot {
+                kind: PropertyKind::Struct,
+                other_class: Some(U32Hash(2)),
+            })
+        );
+    }
+
+    #[test]
+    fn value_slot_is_none_for_an_unknown_property() {
+        let classes = classes([(1, class(None, false, vec![]))]);
+        assert_eq!(value_slot(&classes, BinHash(1), BinHash(10), false), None);
+    }
+
+    #[test]
+    fn a_bool_slot_offers_true_and_false() {
+        let classes = classes([]);
+        let items = value_items(
+            &classes,
+            ValueSlot {
+                kind: PropertyKind::Bool,
+                other_class: None,
+            },
+            named(&[]),
+            true,
+        );
+        assert_eq!(labels(&items), vec!["true", "false"]);
+    }
+
+    #[test]
+    fn a_bitbool_slot_offers_true_and_false() {
+        let classes = classes([]);
+        let items = value_items(
+            &classes,
+            ValueSlot {
+                kind: PropertyKind::BitBool,
+                other_class: None,
+            },
+            named(&[]),
+            true,
+        );
+        assert_eq!(labels(&items), vec!["true", "false"]);
+    }
+
+    #[test]
+    fn a_pointer_slot_offers_concrete_subclasses_nearest_first() {
+        let classes = classes([
+            (2, class(None, true, vec![])),
+            (3, class(Some(2), false, vec![])),
+            (4, class(Some(2), false, vec![])),
+            (5, class(Some(3), false, vec![])),
+        ]);
+        let items = value_items(
+            &classes,
+            ValueSlot {
+                kind: PropertyKind::Struct,
+                other_class: Some(U32Hash(2)),
+            },
+            named(&[(2, "Base"), (3, "Beta"), (4, "Alpha"), (5, "Deep")]),
+            true,
+        );
+        assert_eq!(labels(&items), vec!["Alpha", "Beta", "Deep"]);
+    }
+
+    #[test]
+    fn unnamed_classes_fall_back_to_hex_and_sort_after_named_peers() {
+        let classes = classes([
+            (2, class(None, false, vec![])),
+            (3, class(Some(2), false, vec![])),
+        ]);
+        let items = value_items(
+            &classes,
+            ValueSlot {
+                kind: PropertyKind::Struct,
+                other_class: Some(U32Hash(2)),
+            },
+            named(&[(2, "Root")]),
+            true,
+        );
+        assert_eq!(labels(&items), vec!["Root", "0x00000003"]);
+    }
+
+    #[test]
+    fn a_class_item_inserts_a_snippet_body_when_snippets_are_supported() {
+        let classes = classes([(2, class(None, false, vec![]))]);
+        let items = value_items(
+            &classes,
+            ValueSlot {
+                kind: PropertyKind::Struct,
+                other_class: Some(U32Hash(2)),
+            },
+            named(&[(2, "Root")]),
+            true,
+        );
+        assert_eq!(items[0].insert_text.as_deref(), Some("Root {\n\t$0\n}"));
+        assert_eq!(items[0].insert_text_format, Some(InsertTextFormat::SNIPPET));
+    }
+
+    #[test]
+    fn a_class_item_inserts_a_plain_body_without_snippet_support() {
+        let classes = classes([(2, class(None, false, vec![]))]);
+        let items = value_items(
+            &classes,
+            ValueSlot {
+                kind: PropertyKind::Struct,
+                other_class: Some(U32Hash(2)),
+            },
+            named(&[(2, "Root")]),
+            false,
+        );
+        assert_eq!(items[0].insert_text.as_deref(), Some("Root {\n}"));
+        assert_eq!(items[0].insert_text_format, None);
+    }
+
+    #[test]
+    fn a_container_slot_offers_a_block() {
+        let classes = classes([]);
+        let items = value_items(
+            &classes,
+            ValueSlot {
+                kind: PropertyKind::Container,
+                other_class: None,
+            },
+            named(&[]),
+            true,
+        );
+        assert_eq!(labels(&items), vec!["{}"]);
+        assert_eq!(items[0].insert_text.as_deref(), Some("{\n\t$0\n}"));
+    }
+
+    #[test]
+    fn a_string_slot_offers_nothing() {
+        let classes = classes([]);
+        let items = value_items(
+            &classes,
+            ValueSlot {
+                kind: PropertyKind::String,
+                other_class: None,
+            },
+            named(&[]),
+            true,
+        );
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn a_pointer_slot_without_a_target_class_offers_nothing() {
+        let classes = classes([]);
+        let items = value_items(
+            &classes,
+            ValueSlot {
+                kind: PropertyKind::Struct,
+                other_class: None,
+            },
+            named(&[]),
+            true,
+        );
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn property_items_list_the_classes_own_and_inherited_properties() {
+        let classes = classes([
+            (1, class(None, false, vec![(10, pointer_to(2))])),
+            (5, class(Some(1), false, vec![(11, pointer_to(2))])),
+        ]);
+        let found = property_items(&classes, BinHash(5), named(&[(10, "fromBase"), (11, "ownProp")]));
+        let mut items = labels(&found);
+        items.sort_unstable();
+        assert_eq!(items, vec!["fromBase", "ownProp"]);
+    }
+
+    #[test]
+    fn a_property_item_inserts_the_key_type_and_equals() {
+        let classes = classes([(1, class(None, false, vec![(10, pointer_to(2))]))]);
+        let items = property_items(&classes, BinHash(1), named(&[(10, "primitive")]));
+        assert_eq!(
+            items[0].insert_text.as_deref(),
+            Some("primitive: pointer = ")
+        );
+    }
+
+    #[test]
+    fn the_type_item_is_the_type_the_meta_declares() {
+        let classes = classes([(
+            1,
+            class(None, false, vec![(10, list_of(BinType::Embed, 2))]),
+        )]);
+        assert_eq!(
+            type_item(&classes, BinHash(1), BinHash(10)).map(|i| i.label),
+            Some("list[embed]".to_owned())
+        );
+    }
+
+    #[test]
+    fn the_type_item_is_none_for_an_unknown_property() {
+        let classes = classes([(1, class(None, false, vec![]))]);
+        assert!(type_item(&classes, BinHash(1), BinHash(10)).is_none());
+    }
+}
