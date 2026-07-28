@@ -3,9 +3,9 @@ use std::{fmt::Write as _, sync::Arc};
 use imara_diff::{Algorithm, Diff, InternedInput};
 use lsp_server::RequestId;
 use lsp_types::{
-    CompletionContext, CompletionItem, CompletionItemKind, CompletionResponse, FormattingOptions,
-    Hover, MarkedString, MarkupContent, MarkupKind, PartialResultParams, Position, Range,
-    SemanticTokens, TextDocumentContentChangeEvent, TextEdit, Url, WorkDoneProgressParams,
+    CompletionContext, CompletionResponse, FormattingOptions, Hover, MarkedString, MarkupContent,
+    MarkupKind, PartialResultParams, Position, Range, SemanticTokens,
+    TextDocumentContentChangeEvent, TextEdit, Url, WorkDoneProgressParams,
 };
 use ltk_hash::{BinHash, Hash};
 use ltk_mimir_cache::Table;
@@ -30,6 +30,7 @@ use crate::{
     worker::semantic_tokens::SemanticVisitor,
 };
 
+pub mod completion;
 pub mod diagnostics;
 pub mod semantic_tokens;
 pub mod unhash;
@@ -219,73 +220,6 @@ impl Worker {
         .walk(&data.cst);
 
         Ok(Some(visitor.builder.build()))
-    }
-
-    fn complete(&self, req: CompletionRequest) -> anyhow::Result<Option<CompletionResponse>> {
-        let doc = &self.document;
-        let Some(data) = self.data.as_ref() else {
-            return Ok(None);
-        };
-
-        let class = ClassFinder::new(
-            doc.line_numbers.from_position(&Position::new(
-                req.position.line,
-                req.position.character + 1,
-            )),
-            doc.text.clone(),
-        )
-        .walk(&data.cst);
-
-        let classes = self.server.meta.classes.read();
-        let Some((name, class)) = class
-            .class_stack
-            .last()
-            .map(|(_, class)| {
-                (
-                    &doc.text.as_str()[class],
-                    BinHash::hash_str(&doc.text.as_str()[class]),
-                )
-            })
-            .and_then(|(name, hash)| Some((name, classes.get(hash)?)))
-        else {
-            return Ok(None);
-        };
-
-        tracing::debug!("-> {name}");
-
-        let bin_fields = self
-            .server
-            .hashes
-            .as_ref()
-            .and_then(|h| h.table(Table::BinFields));
-        if bin_fields.is_none() {
-            tracing::error!("NO HASHES");
-        }
-
-        let properties = class.properties.iter().map(|(k, prop)| {
-            let label = bin_fields.as_ref().and_then(|h| h.get((**k).into()));
-            let type_part = format!(": {}", prop.rito_type());
-            CompletionItem {
-                insert_text: Some(format!(
-                    "{}{type_part} = ",
-                    label.clone().unwrap_or_else(|| k.to_string().into())
-                )),
-                sort_text: Some(
-                    label
-                        .clone()
-                        .unwrap_or_else(|| format!("XXX{:x}", **k).into())
-                        .into(),
-                ),
-                label: label.unwrap_or_else(|| k.to_string().into()).into(),
-                label_details: Some(lsp_types::CompletionItemLabelDetails {
-                    detail: Some(type_part),
-                    description: None,
-                }),
-                kind: Some(CompletionItemKind::PROPERTY),
-                ..Default::default()
-            }
-        });
-        Ok(Some(CompletionResponse::Array(properties.collect())))
     }
 
     fn hover(

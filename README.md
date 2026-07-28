@@ -59,7 +59,7 @@ Configure it as you would for any other language server :)
 - [x] Automatic hashtable updates (with [Mimir](https://github.com/LeagueToolkit/Mimir))
 - [ ] [lol-meta-classes](https://github.com/LeagueToolkit/lol-meta-classes) integration
     - [x] Class property auto-complete
-    - [ ] Property value auto-complete
+    - [x] Property value auto-complete
     - [x] Class auto-complete
     - [x] Hover information
     - [x] Automatic meta dump updates
