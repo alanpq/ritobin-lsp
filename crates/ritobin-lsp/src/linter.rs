@@ -3,4 +3,4 @@ pub use lint::Lint;
 
 mod visitor;
 
-pub use visitor::{Class, Linter};
+pub use visitor::Linter;

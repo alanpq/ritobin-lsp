@@ -1,12 +1,13 @@
-use ltk_hash::{BinHash, Hash as _};
+use ltk_hash::BinHash;
 use ltk_ritobin::{
     Cst,
     cst::{
         Kind as TreeKind, Node, NodeId, Visitor,
         visitor::{Visit, VisitCtx, VisitorExt as _},
     },
-    parse::{Token, TokenKind},
+    parse::TokenKind,
 };
+use ritobin_lsp::scope::TokenExt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CursorContext {
@@ -180,19 +181,11 @@ fn entry_key(cst: &Cst, text: &str, entry: &Node) -> Option<BinHash> {
         (node.kind == TreeKind::EntryKey).then_some(node)
     })?;
 
-    hash_token(text, key.children.get(cst).first()?.token(cst)?)
+    key.children.get(cst).first()?.token(cst)?.as_bin_hash(text)
 }
 
 fn class_hash(cst: &Cst, text: &str, class: &Node) -> Option<BinHash> {
-    hash_token(text, class.children.get(cst).first()?.token(cst)?)
-}
-
-fn hash_token(text: &str, token: &Token) -> Option<BinHash> {
-    match token.kind {
-        TokenKind::Name => Some(BinHash::hash_str(&text[token.span])),
-        TokenKind::HexLit => BinHash::from_str_radix(text[token.span].trim_start_matches("0x"), 16).ok(),
-        _ => None,
-    }
+    class.children.get(cst).first()?.token(cst)?.as_bin_hash(text)
 }
 
 #[cfg(test)]

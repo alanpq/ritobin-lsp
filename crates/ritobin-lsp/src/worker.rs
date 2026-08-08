@@ -7,19 +7,14 @@ use lsp_types::{
     MarkupKind, PartialResultParams, Position, Range, SemanticTokens,
     TextDocumentContentChangeEvent, TextEdit, Url, WorkDoneProgressParams,
 };
-use ltk_hash::{BinHash, Hash};
 use ltk_mimir_cache::Table;
 use ltk_ritobin::{
     Cst,
-    cst::{
-        Kind as TreeKind, NodeId, TokenId, Visitor,
-        visitor::{Visit, VisitCtx, VisitorExt as _},
-    },
-    parse::{Span, Token},
+    cst::{Kind as TreeKind, visitor::VisitorExt as _},
     print::PrintConfig,
     typecheck::diagnostics::DiagnosticWithSpan,
 };
-use ritobin_lsp::cst_ext::CstExt as _;
+use ritobin_lsp::{cst_ext::CstExt as _, scope::{self, ClassContextExt as _, CstExt, TokenExt}};
 use tokio::{sync::mpsc, task::JoinHandle};
 
 use crate::{
@@ -233,27 +228,34 @@ impl Worker {
             return Ok(None);
         };
 
-        let finder =
-            ClassFinder::new(doc.line_numbers.from_position(pos), doc.text.clone()).walk(&data.cst);
-        let classes = self.server.meta.classes.read();
-        let class_name = finder
-            .class_stack
-            .last()
-            .map(|(_, class)| (class, BinHash::hash_str(&doc.text.as_str()[class])));
+        let offset = doc.line_numbers.from_position(pos);
+        let scope = data.cst.class_context_at(offset, &doc.text)
+            .current()
+            .copied();
+        let found_token = data
+            .cst
+            .find_node(offset)
+            .and_then(|(kinds, token)| Some((token, *kinds.last()?)));
 
-        let markup = match class_name {
-            Some((class_name_span, class_hash)) => {
-                let class_name = &doc.text.as_str()[*class_name_span];
+        let classes = self.server.meta.classes.read();
+
+        let markup = match scope.zip(scope.and_then(|s| s.hash)) {
+            Some((scope, class_hash)) => {
+                let class_name_span = scope.token.span;
+                let class_name = &doc.text[class_name_span];
                 let class = classes.get(class_hash);
 
                 MarkupContent {
                     kind: MarkupKind::Markdown,
-                    value: match finder.found_token {
+                    value: match found_token {
                         Some((token, TreeKind::EntryKey)) => {
                             let txt = &doc.text.as_str()[token.span];
-                            let hash = BinHash::hash_str(txt);
-                            match classes.find_property(class_hash, hash) {
-                                Some(prop) => {
+                            match token.as_bin_hash(&doc.text)
+                                .and_then(|hash| {
+                                    Some((hash, classes.find_property(class_hash, hash)?))
+                                })
+                            {
+                                Some((hash, prop)) => {
                                     format!(
                                         r#"### [{class_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/)
 
@@ -308,10 +310,7 @@ impl Worker {
                             None => format!("*Unknown class `{class_name}`*"),
                         },
                         _ => {
-                            match data
-                                .cst
-                                .find_node(doc.line_numbers.byte_index(pos.line, pos.character + 1))
-                            {
+                            match data.cst.find_node(offset) {
                                 Some((node, tok)) => {
                                     let txt = &doc.text[tok.span.start as _..tok.span.end as _];
                                     format!("{txt:?} | {node:?} | {:?}", tok.kind)
@@ -324,10 +323,7 @@ impl Worker {
             }
             None => MarkupContent {
                 kind: lsp_types::MarkupKind::PlainText,
-                value: match data
-                    .cst
-                    .find_node(doc.line_numbers.byte_index(pos.line, pos.character + 1))
-                {
+                value: match data.cst.find_node(offset) {
                     Some((node, tok)) => {
                         let txt = &doc.text[tok.span.start as _..tok.span.end as _];
                         format!("{txt:?} | {node:?} | {:?}", tok.kind)
@@ -337,13 +333,6 @@ impl Worker {
             },
         };
 
-        // let txt = match cst.find_node(doc.line_numbers.byte_index(pos.line, pos.character + 1)) {
-        //     Some((node, tok)) => {
-        //         let txt = &doc.text[tok.span.start as _..tok.span.end as _];
-        //         format!("{txt:?} | {node:?} | {:?}", tok.kind)
-        //     }
-        //     None => "".into(),
-        // };
         Ok(Some(Hover {
             contents: lsp_types::HoverContents::Markup(markup),
             range: None,
@@ -398,71 +387,4 @@ fn diff_to_textedits(original: &str, formatted: &str) -> Vec<TextEdit> {
                 .collect(),
         })
         .collect()
-}
-
-struct ClassFinder {
-    stack: Vec<TreeKind>,
-    offset: u32,
-    text: String,
-    pub found_token: Option<(Token, TreeKind)>,
-    pub class_stack: Vec<(usize, Span)>,
-}
-
-impl ClassFinder {
-    pub fn new(offset: u32, text: String) -> Self {
-        Self {
-            stack: Vec::new(),
-            text,
-            offset,
-            found_token: None,
-            class_stack: vec![],
-        }
-    }
-}
-
-impl Visitor for ClassFinder {
-    fn visit_token(&mut self, ctx: &VisitCtx, token: TokenId, parent: NodeId) -> Visit {
-        let token = ctx.cst.token(token).unwrap();
-        if token.span.contains(self.offset) {
-            let parent = ctx.node(parent).unwrap();
-            self.found_token.replace((*token, parent.kind));
-            return Visit::Stop;
-        }
-
-        Visit::Continue
-    }
-
-    fn enter_tree(&mut self, ctx: &VisitCtx, node: NodeId) -> Visit {
-        let tree = ctx.node(node).unwrap();
-        if tree.span.start > self.offset {
-            return Visit::Stop;
-        }
-        if tree.kind == TreeKind::Class
-            && let Some(c) = tree.children.get(ctx.cst).first().map(|c| c.span(ctx.cst))
-        {
-            self.class_stack.push((self.stack.len(), c));
-            // eprintln!("-> {}: {:?}", self.stack.len(), &self.text.as_str()[c]);
-        }
-        self.stack.push(tree.kind);
-        Visit::Continue
-    }
-    fn exit_tree(&mut self, ctx: &VisitCtx, node: NodeId) -> Visit {
-        let tree = ctx.node(node).unwrap();
-        if tree.span.end > self.offset {
-            return Visit::Stop;
-        }
-        if let Some(_taken) = self
-            .class_stack
-            .pop_if(|(depth, _)| self.stack.len() == *depth)
-        {
-            // eprintln!(
-            //     "<- {}: {:?} ({})",
-            //     self.stack.len(),
-            //     &self.text.as_str()[taken.1],
-            //     tree.kind
-            // );
-        }
-        self.stack.pop();
-        Visit::Continue
-    }
 }

@@ -1,4 +1,5 @@
 use super::*;
+use ltk_hash::Hash as _;
 
 fn resolve_at(src: &str) -> Option<CursorContext> {
     let offset = src.find('|').expect("fixture needs a | cursor marker") as u32;
