@@ -2,6 +2,7 @@ use serde::de::DeserializeOwned;
 
 pub mod cst_ext;
 pub mod line_ends;
+pub mod scope;
 
 pub fn from_json<T: DeserializeOwned>(
     what: &'static str,
