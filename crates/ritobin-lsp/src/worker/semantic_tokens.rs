@@ -30,6 +30,15 @@ impl SemanticVisitor<'_> {
     fn in_typed_entry(&self) -> bool {
         self.entry_typed.last().copied().unwrap_or(false)
     }
+
+    /// [`Visit::Skip`] if nothing within `span` can be part of a ranged request, so the whole
+    /// subtree is stepped over instead of walked token by token.
+    fn prune(&self, span: Span) -> Visit {
+        match self.range {
+            Some(range) if span.end <= range.start => Visit::Skip,
+            _ => Visit::Continue,
+        }
+    }
 }
 
 /// Whether an [`TreeKind::Entry`] node has an explicit type expression (`name: type = value`).
@@ -47,13 +56,13 @@ impl Visitor for SemanticVisitor<'_> {
         let tree = ctx.cst.node(node).unwrap();
 
         if matches!(tree.kind, TreeKind::ErrorTree) {
-            return Visit::Continue;
+            return self.prune(tree.span);
         }
         if matches!(tree.kind, TreeKind::Entry) {
             self.entry_typed.push(has_type_expr(ctx, tree));
         }
         self.stack.push(tree.kind);
-        Visit::Continue
+        self.prune(tree.span)
     }
 
     fn exit_tree(&mut self, ctx: &VisitCtx, node: NodeId) -> Visit {
@@ -71,10 +80,13 @@ impl Visitor for SemanticVisitor<'_> {
     fn visit_token(&mut self, ctx: &VisitCtx, token: TokenId, _parent: NodeId) -> Visit {
         let token = ctx.cst.token(token).unwrap();
 
-        if let Some(range) = self.range
-            && !token.span.intersects(&range)
-        {
-            return Visit::Continue;
+        if let Some(range) = self.range {
+            if token.span.start >= range.end {
+                return Visit::Stop;
+            }
+            if !token.span.intersects(&range) {
+                return Visit::Continue;
+            }
         }
         let last_tree = self.stack.last().unwrap();
         // tracing::debug!(
@@ -135,6 +147,22 @@ mod tests {
 
     /// Highlight `src`, returning a `"<lexeme> -> <token type>"` line per emitted token.
     fn highlight(src: &str) -> Vec<String> {
+        highlight_range(src, None)
+    }
+
+    /// [`highlight`], restricted to `range` as a `textDocument/semanticTokens/range` request would.
+    fn highlight_range(src: &str, range: Option<Range>) -> Vec<String> {
+        decode(src, range)
+            .into_iter()
+            .map(|(span, ty)| format!("{} -> {ty}", &src[span]))
+            .collect()
+    }
+
+    /// Run the visitor and undo the relative encoding, giving `(span, token type)` per token.
+    ///
+    /// Assumes no token spans a line break (only an unterminated string can), so that one
+    /// emitted token is one source token.
+    fn decode(src: &str, range: Option<Range>) -> Vec<(Span, &'static str)> {
         let line_nums = LineNumbers::new(src);
         let cst = Cst::parse(src);
         let visitor = SemanticVisitor {
@@ -143,7 +171,7 @@ mod tests {
             builder: SemanticTokensBuilder::new("test".to_owned()),
             stack: Vec::new(),
             entry_typed: Vec::new(),
-            range: None,
+            range: range.as_ref().map(|range| line_nums.from_range(range)),
         }
         .walk(&cst);
 
@@ -161,25 +189,33 @@ mod tests {
                     start + token.delta_start
                 };
 
-                let from = line_nums.byte_index(line, start) as usize;
+                let from = line_nums.byte_index(line, start);
                 let ty = SUPPORTED_TYPES[token.token_type as usize].as_str();
-                format!("{} -> {ty}", &src[from..from + token.length as usize])
+                (Span::new(from, from + token.length), ty)
             })
             .collect()
     }
 
+    /// 0: entries: map[hash, embed] = {
+    /// 1:     0x18563f21 = VfxSystemDefinitionData {
+    /// 2:         particleName: string = "sparks"
+    /// 3:         isSingleParticle: flag = true
+    /// 4:         objectPath: hash = 0x18563f21
+    /// 5:         0x6d6b7c10: f32 = 0.5
+    /// 6:     }
+    /// 7: }
+    const SRC: &str = "entries: map[hash, embed] = {\n    \
+                           0x18563f21 = VfxSystemDefinitionData {\n        \
+                               particleName: string = \"sparks\"\n        \
+                               isSingleParticle: flag = true\n        \
+                               objectPath: hash = 0x18563f21\n        \
+                               0x6d6b7c10: f32 = 0.5\n    \
+                           }\n\
+                       }\n";
+
     #[test]
     fn highlights_fields_types_and_classes() {
-        let tokens = highlight(
-            "entries: map[hash, embed] = {\n    \
-                 0x18563f21 = VfxSystemDefinitionData {\n        \
-                     particleName: string = \"sparks\"\n        \
-                     isSingleParticle: flag = true\n        \
-                     objectPath: hash = 0x18563f21\n        \
-                     0x6d6b7c10: f32 = 0.5\n    \
-                 }\n\
-             }\n",
-        );
+        let tokens = highlight(SRC);
 
         assert_eq!(
             tokens,
@@ -226,5 +262,97 @@ mod tests {
                 "} -> bracket",
             ]
         );
+    }
+
+    #[test]
+    fn range_request_yields_only_tokens_in_range() {
+        let tokens = highlight_range(
+            SRC,
+            Some(Range::new(Position::new(3, 0), Position::new(5, 0))),
+        );
+
+        assert_eq!(
+            tokens,
+            [
+                "isSingleParticle -> property",
+                ": -> punctuation",
+                "flag -> builtinType",
+                "= -> punctuation",
+                "true -> boolean",
+                "objectPath -> property",
+                ": -> punctuation",
+                "hash -> builtinType",
+                "= -> punctuation",
+                "0x18563f21 -> number",
+            ]
+        );
+
+        // the pruned walk must agree with the unpruned one on what it does emit
+        let full = highlight(SRC);
+        assert!(
+            full.windows(tokens.len()).any(|w| w == tokens),
+            "ranged tokens are not a contiguous slice of the full tokens"
+        );
+    }
+
+    /// A ranged request must return exactly the tokens a full request would, filtered to the
+    /// range - the subtree pruning in `enter_tree` must never drop one.
+    ///
+    /// This is load bearing: a tree's `span.start` can sit *after* tokens the tree contains, so
+    /// the obvious `!span.intersects(range)` prune silently loses tokens (a `Block` whose start
+    /// is anchored at its closing brace drops its opening one). Sources below cover the shapes
+    /// that provoke it - lists of classes, comments, and error recovery.
+    #[test]
+    fn ranged_requests_match_the_full_walk() {
+        const SAMPLES: &[&str] = &[
+            SRC,
+            // nested blocks + a list of classes - the shape with mis-anchored `Block` spans
+            "entries: map[hash, embed] = {\n    0x1 = A {\n        l: list[pointer] = {\n            \
+                 B { a: f32 = 1 }\n            C { b: f32 = 2 }\n            D { }\n        }\n        \
+                 after: u8 = 9\n    }\n    0x2 = E { }\n}\n",
+            // comments, including the ones the parser re-opens trees around
+            "# leading\ntype: string = \"PROP\" # trailing\n# between\nentries: map[hash, embed] = {\n    \
+                 # inside\n    0xaa = A {\n        # deep\n        x: f32 = 1 # after value\n    }\n}\n",
+            // error recovery - junk, a bare `0x`, a missing type
+            "type: string = \"PROP\"\nentries: map[hash, embed] = {\n    0x = Broken {\n        \
+                 oops: = 3\n        name string = \"x\"\n        trailing: f32 = 1 !!! junk\n    }\n}\n\
+             dangling\n{ }\n: = ,\n",
+            "\n\n\n",
+            "",
+        ];
+
+        // `Span` isn't `PartialEq`, so compare on the raw offsets
+        fn cmp(tokens: Vec<(Span, &'static str)>) -> Vec<(u32, u32, &'static str)> {
+            tokens
+                .into_iter()
+                .map(|(span, ty)| (span.start, span.end, ty))
+                .collect()
+        }
+
+        for src in SAMPLES {
+            let full = decode(src, None);
+            let lines = src.lines().count() as u32;
+
+            for start in 0..=lines + 1 {
+                for end in start..=lines + 1 {
+                    for (sc, ec) in [(0, 0), (3, 7), (0, 999)] {
+                        let range = Range::new(Position::new(start, sc), Position::new(end, ec));
+                        let span = LineNumbers::new(src).from_range(&range);
+
+                        let expected: Vec<_> = full
+                            .iter()
+                            .copied()
+                            .filter(|(tok, _)| tok.intersects(&span))
+                            .collect();
+
+                        assert_eq!(
+                            cmp(decode(src, Some(range))),
+                            cmp(expected),
+                            "range {start}:{sc}..{end}:{ec} of {src:?}"
+                        );
+                    }
+                }
+            }
+        }
     }
 }
