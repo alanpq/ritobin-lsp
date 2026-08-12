@@ -1,6 +1,4 @@
-use lsp_types::{Range, SemanticToken, SemanticTokenType, SemanticTokens};
-
-use crate::lsp::semantic_tokens::types::SUPPORTED_TYPES;
+use lsp_types::{Range, SemanticToken, SemanticTokens};
 
 /// Tokens are encoded relative to each other.
 ///
@@ -58,10 +56,6 @@ impl SemanticTokensBuilder {
             data: self.data,
         }
     }
-}
-
-pub(crate) fn type_index(ty: &SemanticTokenType) -> u32 {
-    SUPPORTED_TYPES.iter().position(|it| it == ty).unwrap() as u32
 }
 
 #[cfg(test)]

@@ -1,5 +1,17 @@
 #![allow(unused)]
 
+/// Gives each name its position in the list as a `u32` constant.
+macro_rules! define_type_indices {
+    ($($name:ident),*$(,)?) => {
+        define_type_indices!(@step 0u32, $($name,)*);
+    };
+    (@step $index:expr,) => {};
+    (@step $index:expr, $head:ident, $($tail:ident,)*) => {
+        pub(crate) const $head: u32 = $index;
+        define_type_indices!(@step $index + 1u32, $($tail,)*);
+    };
+}
+
 macro_rules! define_semantic_token_types {
     (
         standard {
@@ -20,6 +32,22 @@ macro_rules! define_semantic_token_types {
             $(self::$standard,)*
             $(self::$custom),*
         ];
+
+        /// Position of each type in [`super::SUPPORTED_TYPES`], carried by an encoded token.
+        pub(crate) mod idx {
+            define_type_indices!($($standard,)* $($custom,)*);
+        }
+
+        #[cfg(test)]
+        mod idx_tests {
+            use super::*;
+
+            #[test]
+            fn indices_match_the_legend() {
+                $(assert_eq!(SUPPORTED_TYPES[idx::$standard as usize], $standard);)*
+                $(assert_eq!(SUPPORTED_TYPES[idx::$custom as usize], $custom);)*
+            }
+        }
 
         pub(crate) fn standard_fallback_type(token: SemanticTokenType) -> Option<SemanticTokenType> {
             use self::*;

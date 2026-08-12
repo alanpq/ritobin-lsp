@@ -8,10 +8,7 @@ use ltk_ritobin::{
 };
 use ritobin_lsp::line_ends::LineNumbers;
 
-use crate::lsp::semantic_tokens::{
-    self,
-    builder::{SemanticTokensBuilder, type_index},
-};
+use crate::lsp::semantic_tokens::{self, builder::SemanticTokensBuilder, types::idx};
 
 pub struct SemanticVisitor<'a> {
     pub text: &'a str,
@@ -96,29 +93,29 @@ impl Visitor for SemanticVisitor<'_> {
         // );
 
         use TokenKind::*;
-        let token_kind = match (last_tree, token.kind) {
-            (_, Comment) => semantic_tokens::types::COMMENT,
-            (_, Colon | Comma | Eq) => semantic_tokens::types::PUNCTUATION,
-            (_, RCurly | LCurly | RBrack | LBrack) => semantic_tokens::types::BRACKET,
+        let token_type = match (last_tree, token.kind) {
+            (_, Comment) => idx::COMMENT,
+            (_, Colon | Comma | Eq) => idx::PUNCTUATION,
+            (_, RCurly | LCurly | RBrack | LBrack) => idx::BRACKET,
 
             // built-in bin types - `string`, `f32`, `hash`, and the args of `list[..]`/`map[..]`
             (TreeKind::TypeExpr | TreeKind::TypeArg | TreeKind::TypeArgList, _) => {
-                semantic_tokens::types::BUILTIN_TYPE
-            }
-            // meta class names - `VfxSystemDefinitionData { .. }`
-            (TreeKind::Class, _) => semantic_tokens::types::CLASS,
-            // field names - `particleName: string = ".."`. Keys of untyped entries are map keys
-            // rather than fields, so those keep their literal highlighting.
-            (TreeKind::EntryKey, Name) => semantic_tokens::types::PROPERTY,
-            (TreeKind::EntryKey, HexLit) if self.in_typed_entry() => {
-                semantic_tokens::types::PROPERTY
+                idx::BUILTIN_TYPE
             }
 
-            (_, True) | (_, False) => semantic_tokens::types::BOOLEAN,
-            (_, Null) => semantic_tokens::types::KEYWORD,
-            (_, Name) => semantic_tokens::types::KEYWORD,
-            (_, Quote) | (_, String) | (_, UnterminatedString) => semantic_tokens::types::STRING,
-            (_, Number) | (_, HexLit) => semantic_tokens::types::NUMBER,
+            // meta class names - `VfxSystemDefinitionData { .. }`
+            (TreeKind::Class, _) => idx::CLASS,
+
+            // field names - `particleName: string = ".."`. Keys of untyped entries are map keys
+            // rather than fields, so those keep their literal highlighting.
+            (TreeKind::EntryKey, Name) => idx::PROPERTY,
+            (TreeKind::EntryKey, HexLit) if self.in_typed_entry() => idx::PROPERTY,
+
+            (_, True) | (_, False) => idx::BOOLEAN,
+            (_, Null) => idx::KEYWORD,
+            (_, Name) => idx::KEYWORD,
+            (_, Quote) | (_, String) | (_, UnterminatedString) => idx::STRING,
+            (_, Number) | (_, HexLit) => idx::NUMBER,
             _ => {
                 return Visit::Continue;
             }
@@ -130,7 +127,7 @@ impl Visitor for SemanticVisitor<'_> {
                     Position::new((line) as _, *range.start()),
                     Position::new((line) as _, *range.end()),
                 ),
-                type_index(&token_kind),
+                token_type,
                 semantic_tokens::modifier_set::ModifierSet::default().0,
             );
         }
