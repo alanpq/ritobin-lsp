@@ -18,7 +18,7 @@ fn classes() -> Classes {
             .into_iter()
             .map(|name| (U32Hash::from(BinHash::hash_str(name)), prop()))
             .collect(),
-        is: ClassFlags::default(),
+        flags: ClassFlags::default(),
         ..Default::default()
     };
 

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 fn class(base: Option<u32>, interface: bool, properties: Vec<(u32, Property)>) -> Class {
     Class {
         base: base.map(U32Hash),
-        is: ClassFlags {
+        flags: ClassFlags {
             interface,
             ..Default::default()
         },

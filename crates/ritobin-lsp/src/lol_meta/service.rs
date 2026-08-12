@@ -47,7 +47,7 @@ impl Classes {
             let Some(class) = self.get(hash).filter(|_| seen.insert(hash)) else {
                 continue;
             };
-            if !class.is.interface {
+            if !class.flags.interface {
                 out.push((depth, hash));
             }
             stack.extend(
@@ -313,7 +313,7 @@ mod tests {
     fn class(base: Option<u32>, interface: bool) -> Class {
         Class {
             base: base.map(U32Hash),
-            is: ClassFlags {
+            flags: ClassFlags {
                 interface,
                 ..Default::default()
             },
