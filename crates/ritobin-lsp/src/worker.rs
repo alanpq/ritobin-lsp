@@ -210,6 +210,7 @@ impl Worker {
             text: &doc.text,
             line_nums: &doc.line_numbers,
             stack: Vec::new(),
+            entry_typed: Vec::new(),
             range: range
                 .as_ref()
                 .map(|range| doc.line_numbers.from_range(range)),

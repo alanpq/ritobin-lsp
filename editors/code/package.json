@@ -383,7 +383,12 @@
                         "constant.language.boolean.ritobin"
                     ],
                     "builtinType": [
-                        "support.type.primitive.ritobin"
+                        "storage.type.primitive.ritobin",
+                        "support.type.primitive.ritobin",
+                        "keyword.type.ritobin"
+                    ],
+                    "class": [
+                        "entity.name.type.class.ritobin"
                     ],
                     "constParameter": [
                         "constant.other.caps.ritobin"
@@ -414,6 +419,10 @@
                     ],
                     "method": [
                         "entity.name.function.ritobin"
+                    ],
+                    "property": [
+                        "variable.other.property.ritobin",
+                        "variable.other.ritobin"
                     ],
                     "struct": [
                         "entity.name.type.struct.ritobin"
