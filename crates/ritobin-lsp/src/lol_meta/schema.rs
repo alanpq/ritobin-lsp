@@ -74,40 +74,66 @@ impl Serialize for U32Hash {
     }
 }
 
+/// Latest version we know about
+pub const FORMAT_VERSION: u32 = 2;
+/// Version of dumps written before the field existed.
+pub const FORMAT_VERSION_UNVERSIONED: u32 = 0;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DumpFile {
-    /// League version ("unknown" if not known)
+    /// Schema version of this file. Absent in every dump written before the
+    /// field was introduced, which reads back as [`FORMAT_VERSION_UNVERSIONED`].
+    #[serde(rename = "formatVersion", default)]
+    pub format_version: u32,
+    /// Game version string (e.g., "14.24.6442327").
     pub version: String,
+    /// Map of class hash (hex string) to class definition.
     pub classes: Map<U32Hash, Class>,
 }
 
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PropertyContainer {
+    /// Vtable offset (TODO: don't use U32Hash type here)
     pub vtable: U32Hash,
+    /// Type of values in the container.
     pub value_type: BinType,
+    /// Size of each value in bytes.
     pub value_size: usize,
+    /// Fixed size for fixed-length arrays, if applicable.
     pub fixed_size: Option<usize>,
+    /// Storage type, if known.
     pub storage: Option<ContainerStorage>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PropertyMap {
+    /// Vtable offset (TODO: don't use U32Hash type here)
     pub vtable: U32Hash,
+    /// Type of keys in the map.
     pub key_type: BinType,
+    /// Type of values in the map.
     pub value_type: BinType,
+    /// Storage type.
     pub storage: MapStorage,
 }
 
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Property {
+    /// Other class hash for Link/Pointer/Embed types.
     pub other_class: Option<U32Hash>,
+    /// Byte offset within the class.
     pub offset: u32,
+    /// Bitmask for Flag types.
     pub bitmask: u8,
+    /// The property's value type.
     pub value_type: BinType,
+    /// Container info for List/Option types.
     pub container: Option<PropertyContainer>,
+    /// Map info for Map types.
     pub map: Option<PropertyMap>,
+    /// Unknown pointer (always "0x0").
     pub unkptr: U32Hash,
 }
 impl Property {
@@ -132,34 +158,61 @@ impl Property {
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ClassFunctions {
+    /// Upcast to secondary base function.
     pub upcast_secondary: Option<U32Hash>,
+    /// Constructor function.
     pub constructor: Option<U32Hash>,
+    /// Destructor function.
     pub destructor: Option<U32Hash>,
+    /// In-place constructor function.
     pub inplace_constructor: Option<U32Hash>,
+    /// In-place destructor function.
     pub inplace_destructor: Option<U32Hash>,
+    /// Register function.
     pub register: Option<U32Hash>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ClassFlags {
+    /// True if this is an interface (no constructor).
     pub interface: bool,
+    /// True if this is a value type.
     pub value: bool,
+    /// True if this is a secondary base class.
     pub secondary_base: bool,
-    pub unk5: bool,
+    /// An "already processed" marker - the metaclass registry sets it when it finalises an entry.
+    ///
+    /// Written as `unk5` before format version 2, which is what every dump up to
+    /// 16.14 carries
+    #[serde(alias = "unk5")]
+    pub finalized: bool,
 }
 
 #[skip_serializing_none]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Class {
+    /// Base class hash, if any.
     pub base: Option<U32Hash>,
+    /// Secondary base classes with their offsets.
     pub secondary_bases: Map<U32Hash, u32>,
+    /// Secondary child classes with their offsets.
     pub secondary_children: Map<U32Hash, u32>,
+    /// Size of the class in bytes.
     pub size: u32,
+    /// Alignment requirement.
     pub alignment: u32,
-    pub is: ClassFlags,
+
+    /// Class flags.
+    #[serde(rename = "is")]
+    pub flags: ClassFlags,
+
+    /// Class function pointers.
     #[serde(rename = "fn")]
     pub functions: ClassFunctions,
+
+    /// Map of property hash to property definition.
     pub properties: Map<U32Hash, Property>,
+    /// Default values for properties (None for interfaces).
     pub defaults: Option<Map<U32Hash, serde_json::Value>>,
 }
 
