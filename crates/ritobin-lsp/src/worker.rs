@@ -130,7 +130,18 @@ impl Worker {
 
     pub async fn service(mut self) -> anyhow::Result<()> {
         tracing::debug!("[worker] '{}' started", self.document.uri);
-        while let Some(req) = self.rx.recv().await {
+
+        // Continually drain any queued changes
+        let mut pending: Option<Message> = None;
+        loop {
+            let req = match pending.take() {
+                Some(req) => req,
+                None => match self.rx.recv().await {
+                    Some(req) => req,
+                    None => break,
+                },
+            };
+
             // TODO: propagate err to lsp client instead of killing worker
             match req {
                 Message::UnhashRequest { id, range } => {
@@ -186,6 +197,7 @@ impl Worker {
                 }
                 Message::DocumentChange { version, changes } => {
                     self.document.update(version, changes);
+                    pending = drain_changes(&mut self.rx, &mut self.document);
                     self.update();
                 }
             }
@@ -368,6 +380,18 @@ impl Worker {
     }
 }
 
+/// Drains the channel of all [`Message::DocumentChange`] messages, applying them to the document in a batch
+/// Returns the first non-change message
+fn drain_changes(rx: &mut mpsc::Receiver<Message>, document: &mut Document) -> Option<Message> {
+    loop {
+        match rx.try_recv() {
+            Ok(Message::DocumentChange { version, changes }) => document.update(version, changes),
+            Ok(msg) => return Some(msg),
+            Err(_) => return None,
+        }
+    }
+}
+
 fn diff_to_textedits(original: &str, formatted: &str) -> Vec<TextEdit> {
     if original == formatted {
         return Vec::new();
@@ -388,4 +412,74 @@ fn diff_to_textedits(original: &str, formatted: &str) -> Vec<TextEdit> {
                 .collect(),
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn document(text: &str) -> Document {
+        Document::new(Url::parse("file:///test.rito").unwrap(), 0, text.to_owned())
+    }
+
+    fn keystroke(version: i32, line: u32, character: u32, text: &str) -> Message {
+        Message::DocumentChange {
+            version,
+            changes: vec![TextDocumentContentChangeEvent {
+                range: Some(Range::new(
+                    Position::new(line, character),
+                    Position::new(line, character),
+                )),
+                range_length: None,
+                text: text.to_owned(),
+            }],
+        }
+    }
+
+    #[test]
+    fn a_run_of_changes_drains_in_order() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let mut doc = document("");
+        for (i, text) in ["a", "b", "c"].into_iter().enumerate() {
+            tx.try_send(keystroke(i as i32 + 1, 0, i as u32, text))
+                .unwrap();
+        }
+
+        assert!(drain_changes(&mut rx, &mut doc).is_none());
+        assert_eq!(doc.text, "abc");
+        assert_eq!(doc.version, 3);
+    }
+
+    #[test]
+    fn draining_stops_at_a_request_and_hands_it_back() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let mut doc = document("");
+        tx.try_send(keystroke(1, 0, 0, "a")).unwrap();
+        tx.try_send(Message::UnhashRequest {
+            id: 1.into(),
+            range: None,
+        })
+        .unwrap();
+        tx.try_send(keystroke(2, 0, 1, "b")).unwrap();
+
+        let pending = drain_changes(&mut rx, &mut doc);
+
+        assert!(matches!(pending, Some(Message::UnhashRequest { .. })));
+        // the text that preceded it
+        assert_eq!(doc.text, "a");
+        // the change behind it is still queued
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(Message::DocumentChange { version: 2, .. })
+        ));
+    }
+
+    #[test]
+    fn draining_an_empty_channel_is_a_no_op() {
+        let (_tx, mut rx) = mpsc::channel(8);
+        let mut doc = document("x");
+
+        assert!(drain_changes(&mut rx, &mut doc).is_none());
+        assert_eq!(doc.text, "x");
+    }
 }
