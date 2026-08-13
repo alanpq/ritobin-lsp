@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.14](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.13...ritobin-lsp-vs-v0.0.14) (2026-08-13)
+
+
+### Features
+
+* better semantic tokens ([884e0ba](https://github.com/alanpq/ritobin-lsp/commit/884e0ba9aa5607248d8a513ac2a020dcb22ba1fd))
+
 ## [0.0.13](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.12...ritobin-lsp-vs-v0.0.13) (2026-07-23)
 
 

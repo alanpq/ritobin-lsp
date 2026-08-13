@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.1.12](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.11...ritobin-lsp-v0.1.12) (2026-08-13)
+
+
+### Features
+
+* better semantic tokens ([884e0ba](https://github.com/alanpq/ritobin-lsp/commit/884e0ba9aa5607248d8a513ac2a020dcb22ba1fd))
+* **lsp:** batch document changes ([fa90df2](https://github.com/alanpq/ritobin-lsp/commit/fa90df2a62ec3e53e0ebe6d7e1d26e58a2b29c4e))
+* **lsp:** implement wide character support ([106cfc1](https://github.com/alanpq/ritobin-lsp/commit/106cfc198dba557b96d00bf5b481c409863fcde5))
+* **lsp:** semantic token deltas ([cbfe4e1](https://github.com/alanpq/ritobin-lsp/commit/cbfe4e107de9b4e7c9d45e77a39e8e59f21d96c7))
+* **lsp:** static type indices ([4518f3f](https://github.com/alanpq/ritobin-lsp/commit/4518f3fb83acac632aaec20d7fd6cc36e6195611))
+* property value auto-complete ([3f3d7a1](https://github.com/alanpq/ritobin-lsp/commit/3f3d7a1a17e711ddeb33f7cf0c0d15ecf8595318))
+
+
+### Bug Fixes
+
+* account for EntryTerminator in completion context resolution ([f232dda](https://github.com/alanpq/ritobin-lsp/commit/f232dda494e72388c0ecc5a7c448f4070ea4bee7))
+* lol_meta schema change ([7622f6b](https://github.com/alanpq/ritobin-lsp/commit/7622f6b31630b07110d49d7f243c266a3d45b691))
+* **lsp:** handle parser and typechecker panics ([4dc17c0](https://github.com/alanpq/ritobin-lsp/commit/4dc17c0802862b9847e8c20b12d57d3c3763eaad))
+* **lsp:** worker cleanup on document close ([8b5c6ba](https://github.com/alanpq/ritobin-lsp/commit/8b5c6ba8cf59412a4a88c47f5eaefe9b30f59269))
+* update lol-meta schema ([#45](https://github.com/alanpq/ritobin-lsp/issues/45)) ([2684b09](https://github.com/alanpq/ritobin-lsp/commit/2684b0946e97421840c9081260be064cff5eb67e))
+
+
+### Performance Improvements
+
+* **lsp:** debounce and split diagnostics from parsing ([bf1536c](https://github.com/alanpq/ritobin-lsp/commit/bf1536cc949503b1f0954d35540d125097499a29))
+* **lsp:** line index splicing ([bbf4770](https://github.com/alanpq/ritobin-lsp/commit/bbf4770d29684f734f42343fc3967c24ee7b8b83))
+* **lsp:** start diag debounce before parsing ([cd779fc](https://github.com/alanpq/ritobin-lsp/commit/cd779fc26dd5fb558add96c6697c091d20671bdd))
+* prune out-of-range subtrees in semanticTokens/range ([840d9fc](https://github.com/alanpq/ritobin-lsp/commit/840d9fcbbda18031b0073cbe06075f7bdf550a9e))
+
 ## [0.1.11](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.10...ritobin-lsp-v0.1.11) (2026-07-23)
 
 
