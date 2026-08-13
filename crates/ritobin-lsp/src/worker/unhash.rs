@@ -13,7 +13,7 @@ use crate::{server::Hashes, worker::Worker};
 
 impl Worker {
     pub fn unhash(&self, _range: Option<Range>) -> anyhow::Result<Option<Vec<TextEdit>>> {
-        let Some(data) = self.data.as_ref() else {
+        let Some(cst) = self.cst.as_ref() else {
             return Ok(None);
         };
 
@@ -22,7 +22,7 @@ impl Worker {
             return Ok(None);
         };
 
-        let unhasher = Unhasher::new(hashes, &self.document.text).walk(&data.cst);
+        let unhasher = Unhasher::new(hashes, &self.document.text).walk(cst);
 
         Ok(Some(
             unhasher

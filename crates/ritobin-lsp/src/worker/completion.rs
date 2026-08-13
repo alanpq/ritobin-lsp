@@ -18,12 +18,12 @@ use crate::{
 impl Worker {
     pub fn complete(&self, req: CompletionRequest) -> anyhow::Result<Option<CompletionResponse>> {
         let doc = &self.document;
-        let Some(data) = self.data.as_ref() else {
+        let Some(cst) = self.cst.as_ref() else {
             return Ok(None);
         };
 
         let offset = doc.line_numbers.from_position(&req.position);
-        let Some(context) = context::resolve(&data.cst, &doc.text, offset) else {
+        let Some(context) = context::resolve(cst, &doc.text, offset) else {
             return Ok(None);
         };
 

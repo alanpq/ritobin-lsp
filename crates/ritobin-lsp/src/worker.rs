@@ -2,6 +2,7 @@ use std::{
     fmt::Write as _,
     panic::{AssertUnwindSafe, catch_unwind},
     sync::Arc,
+    time::Duration,
 };
 
 use imara_diff::{Algorithm, Diff, InternedInput};
@@ -22,7 +23,11 @@ use ritobin_lsp::{
     cst_ext::CstExt as _,
     scope::{self, ClassContextExt as _, CstExt, TokenExt},
 };
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{
+    sync::mpsc,
+    task::JoinHandle,
+    time::{Instant, sleep_until},
+};
 
 use crate::{
     document::Document,
@@ -87,32 +92,30 @@ pub struct WorkerHandle {
     handle: JoinHandle<()>,
 }
 
-struct ParseData {
-    cst: Cst,
-    /// `None` when the typechecker panicked on this revision.
-    errors: Option<Vec<DiagnosticWithSpan>>,
+// TODO: Make this configurable ?
+/// How long the document has to go quiet before we typecheck and lint it.
+const DIAGNOSTICS_DEBOUNCE: Duration = Duration::from_millis(250);
+
+/// `None` when the parser itself panicked.
+fn parse_cst(text: &str) -> Option<Cst> {
+    catch_unwind(AssertUnwindSafe(|| Cst::parse(text))).ok()
 }
 
-impl ParseData {
-    pub fn parse(text: &str) -> Option<Self> {
-        let cst = catch_unwind(AssertUnwindSafe(|| Cst::parse(text))).ok()?;
-
-        // The typechecker unwraps its way through malformed trees and panics on some of them.
-        // This is a temporary workaround until the typechecker can run separately or in a safer way.
-        let errors = catch_unwind(AssertUnwindSafe(|| cst.build_bin(text)))
-            .ok()
-            .map(|(_bin, errors)| errors);
-
-        Some(Self { cst, errors })
-    }
+/// `None` when the typechecker panicked on this revision.
+fn typecheck(cst: &Cst, text: &str) -> Option<Vec<DiagnosticWithSpan>> {
+    catch_unwind(AssertUnwindSafe(|| cst.build_bin(text)))
+        .ok()
+        .map(|(_bin, errors)| errors)
 }
 
 pub struct Worker {
     rx: mpsc::Receiver<Message>,
     document: Document,
-    data: Option<ParseData>,
+    cst: Option<Cst>,
     server: Arc<Server>,
     tokens: TokenCache,
+    /// Deadline for the next diagnostics pass. `None` when diagnostics are up to date.
+    diagnostics_due: Option<Instant>,
 }
 
 impl Worker {
@@ -125,11 +128,12 @@ impl Worker {
                 let mut worker = Self {
                     rx,
                     document: Document::new(uri, version, text),
-                    data: None,
+                    cst: None,
                     server,
                     tokens: TokenCache::default(),
+                    diagnostics_due: None,
                 };
-                worker.update();
+                worker.refresh_cst();
 
                 if let Err(e) = worker.service().await {
                     tracing::error!("document worker error: {e:?}");
@@ -138,17 +142,31 @@ impl Worker {
         }
     }
 
-    fn update(&mut self) {
-        tracing::debug!("[worker] '{}' update", self.document.uri);
+    /// Reparses the tree.
+    fn refresh_cst(&mut self) {
+        tracing::debug!("[worker] '{}' reparse", self.document.uri);
 
-        let Some(mut data) = ParseData::parse(&self.document.text) else {
+        self.cst = parse_cst(&self.document.text);
+        if self.cst.is_none() {
             tracing::error!("[worker] '{}' parser panicked", self.document.uri);
-            self.data = None;
+        }
+
+        self.diagnostics_due = Some(Instant::now() + DIAGNOSTICS_DEBOUNCE);
+    }
+
+    /// Typechecks and lints the current tree
+    fn refresh_diagnostics(&mut self) {
+        self.diagnostics_due = None;
+
+        let Some(cst) = self.cst.as_ref() else {
             return;
         };
 
-        let _ = self.publish_parse_errors(&data.cst, data.errors.take());
-        self.data.replace(data);
+        tracing::debug!("[worker] '{}' diagnostics", self.document.uri);
+        let errors = typecheck(cst, &self.document.text);
+        if let Err(e) = self.publish_parse_errors(cst, errors) {
+            tracing::error!("[worker] '{}' publish failed: {e:?}", self.document.uri);
+        }
     }
 
     pub async fn service(mut self) -> anyhow::Result<()> {
@@ -159,9 +177,13 @@ impl Worker {
         loop {
             let req = match pending.take() {
                 Some(req) => req,
-                None => match self.rx.recv().await {
-                    Some(req) => req,
-                    None => break,
+                None => match wake(&mut self.rx, self.diagnostics_due).await {
+                    Wake::Message(req) => req,
+                    Wake::Quiet => {
+                        self.refresh_diagnostics();
+                        continue;
+                    }
+                    Wake::Closed => break,
                 },
             };
 
@@ -228,7 +250,7 @@ impl Worker {
             Message::DocumentChange { version, changes } => {
                 self.document.update(version, changes);
                 let pending = drain_changes(&mut self.rx, &mut self.document);
-                self.update();
+                self.refresh_cst();
                 return Ok(pending);
             }
         }
@@ -253,7 +275,7 @@ impl Worker {
 
     fn collect_tokens(&self, range: Option<&Range>) -> Vec<SemanticToken> {
         let doc = &self.document;
-        let Some(data) = self.data.as_ref() else {
+        let Some(cst) = self.cst.as_ref() else {
             return Vec::new();
         };
 
@@ -265,7 +287,7 @@ impl Worker {
             range: range.map(|range| doc.line_numbers.from_range(range)),
             builder: SemanticTokensBuilder::default(),
         }
-        .walk(&data.cst);
+        .walk(cst);
 
         visitor.builder.build()
     }
@@ -277,18 +299,13 @@ impl Worker {
     ) -> anyhow::Result<Option<Hover>> {
         let pos = position.start();
         let doc = &self.document;
-        let Some(data) = self.data.as_ref() else {
+        let Some(cst) = self.cst.as_ref() else {
             return Ok(None);
         };
 
         let offset = doc.line_numbers.from_position(pos);
-        let scope = data
-            .cst
-            .class_context_at(offset, &doc.text)
-            .current()
-            .copied();
-        let found_token = data
-            .cst
+        let scope = cst.class_context_at(offset, &doc.text).current().copied();
+        let found_token = cst
             .find_node(offset)
             .and_then(|(kinds, token)| Some((token, *kinds.last()?)));
 
@@ -362,7 +379,7 @@ impl Worker {
                             }
                             None => format!("*Unknown class `{class_name}`*"),
                         },
-                        _ => match data.cst.find_node(offset) {
+                        _ => match cst.find_node(offset) {
                             Some((node, tok)) => {
                                 let txt = &doc.text[tok.span.start as _..tok.span.end as _];
                                 format!("{txt:?} | {node:?} | {:?}", tok.kind)
@@ -374,7 +391,7 @@ impl Worker {
             }
             None => MarkupContent {
                 kind: lsp_types::MarkupKind::PlainText,
-                value: match data.cst.find_node(offset) {
+                value: match cst.find_node(offset) {
                     Some((node, tok)) => {
                         let txt = &doc.text[tok.span.start as _..tok.span.end as _];
                         format!("{txt:?} | {node:?} | {:?}", tok.kind)
@@ -406,15 +423,44 @@ impl Worker {
             tracing::error!("file too big to format!");
             return Ok(None);
         }
-        let Some(data) = self.data.as_ref() else {
+        let Some(cst) = self.cst.as_ref() else {
             return Ok(None);
         };
         let mut formatted = String::new();
         ltk_ritobin::print::CstPrinter::new(&doc.text, &mut formatted, PrintConfig::default())
-            .print(&data.cst)
+            .print(cst)
             .unwrap();
 
         Ok(Some(diff_to_textedits(&doc.text, &formatted)))
+    }
+}
+
+enum Wake {
+    Message(Message),
+    /// The deadline passed with no message - signals to run the diagnostics pass.
+    Quiet,
+    /// The client is gone.
+    Closed,
+}
+
+async fn recv(rx: &mut mpsc::Receiver<Message>) -> Wake {
+    match rx.recv().await {
+        Some(msg) => Wake::Message(msg),
+        None => Wake::Closed,
+    }
+}
+
+/// Waits for the next message, or for the debounce deadline if diagnostics are due.
+async fn wake(rx: &mut mpsc::Receiver<Message>, due: Option<Instant>) -> Wake {
+    let Some(due) = due else {
+        return recv(rx).await;
+    };
+
+    // Process any queues request before we run the diagnostics pass.
+    tokio::select! {
+        biased;
+        wake = recv(rx) => wake,
+        _ = sleep_until(due) => Wake::Quiet,
     }
 }
 
@@ -559,15 +605,62 @@ entries: map[hash,embed] = {
 
         let hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(|_| {}));
-        let parsed: Vec<_> = BROKEN.iter().map(|text| ParseData::parse(text)).collect();
+        let parsed: Vec<_> = BROKEN
+            .iter()
+            .map(|text| {
+                let cst = parse_cst(text).expect("the parser itself must survive");
+                let errors = typecheck(&cst, text);
+                (cst, errors)
+            })
+            .collect();
         std::panic::set_hook(hook);
 
-        for (text, data) in BROKEN.iter().zip(parsed) {
-            let data = data.expect("the parser itself must survive");
+        for (text, (cst, errors)) in BROKEN.iter().zip(parsed) {
             // no diagnostics at all means the typechecker went down - that is the case under
             // test, and the tree has to come back anyway
-            assert!(data.errors.is_none(), "no longer panics on:\n{text}");
-            assert!(!data.cst.errors.is_empty(), "should report a syntax error");
+            assert!(errors.is_none(), "no longer panics on:\n{text}");
+            assert!(!cst.errors.is_empty(), "should report a syntax error");
         }
+    }
+
+    #[tokio::test]
+    async fn a_quiet_document_wakes_for_diagnostics() {
+        let (_tx, mut rx) = mpsc::channel(8);
+        let due = Instant::now() + Duration::from_millis(10);
+
+        assert!(matches!(wake(&mut rx, Some(due)).await, Wake::Quiet));
+    }
+
+    #[tokio::test]
+    async fn a_queued_message_beats_a_due_deadline() {
+        let (tx, mut rx) = mpsc::channel(8);
+        let due = Instant::now();
+        // both arms are ready by now, so `biased` is what keeps the request from queueing
+        // behind the diagnostics pass
+        tokio::time::sleep(Duration::from_millis(5)).await;
+        tx.try_send(keystroke(1, 0, 0, "a")).unwrap();
+
+        assert!(matches!(wake(&mut rx, Some(due)).await, Wake::Message(_)));
+    }
+
+    #[tokio::test]
+    async fn an_idle_worker_never_wakes_on_its_own() {
+        let (_tx, mut rx) = mpsc::channel::<Message>(8);
+
+        // no deadline armed means diagnostics are already caught up - waking here would
+        // retypecheck an unchanged document, forever. Has to outlast the debounce to catch a
+        // `None` that quietly defaults to one.
+        let idle = tokio::time::timeout(DIAGNOSTICS_DEBOUNCE * 2, wake(&mut rx, None));
+        assert!(idle.await.is_err());
+    }
+
+    #[tokio::test]
+    async fn a_closed_channel_ends_the_loop() {
+        let (tx, mut rx) = mpsc::channel::<Message>(8);
+        drop(tx);
+
+        assert!(matches!(wake(&mut rx, None).await, Wake::Closed));
+        let due = Instant::now() + Duration::from_secs(60);
+        assert!(matches!(wake(&mut rx, Some(due)).await, Wake::Closed));
     }
 }
