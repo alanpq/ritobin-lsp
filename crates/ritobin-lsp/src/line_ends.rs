@@ -4,7 +4,7 @@ use lsp_types::{Position, Range};
 use ltk_ritobin::parse::Span;
 
 /// A non-ASCII character, as byte offsets from the start of its line.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 struct NonAsciiChar {
     start: u32,
     end: u32,
@@ -20,7 +20,7 @@ impl NonAsciiChar {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct LineNumbers {
     line_starts: Vec<u32>,
     length: u32,
@@ -59,6 +59,41 @@ impl LineNumbers {
             line_starts,
             non_ascii_chars,
         }
+    }
+
+    /// Re-indexes after `span` was replaced with `text`.
+    ///
+    /// `span` is in pre-edit offsets, so capture it before replacing the text.
+    ///
+    /// Returns:
+    /// - `true` if the splice was successful and the index is now valid for the new text.
+    /// - `false` if the splice bailed and a re-scan is needed to rebuild the index.
+    #[must_use]
+    pub fn splice(&mut self, span: Span, text: &str) -> bool {
+        // splicing `non_ascii_chars` would rekey every line after the edit
+        if !self.non_ascii_chars.is_empty() || !text.is_ascii() {
+            return false;
+        }
+
+        let first = self.line_number(span.start) as usize;
+        let last = self.line_number(span.end) as usize;
+        let delta = text.len() as i64 - (span.end - span.start) as i64;
+
+        let starts = text
+            .match_indices('\n')
+            .map(|(i, _)| span.start + i as u32 + 1)
+            .collect::<Vec<_>>();
+
+        // exclusive: an edit inside one line has `first == last` and replaces no line at all
+        let tail = first + 1 + starts.len();
+        self.line_starts.splice(first + 1..last + 1, starts);
+
+        for start in &mut self.line_starts[tail..] {
+            *start = (*start as i64 + delta) as u32;
+        }
+        self.length = (self.length as i64 + delta) as u32;
+
+        true
     }
 
     /// Get the line number for a byte index
@@ -271,6 +306,91 @@ fn positions_round_trip_to_byte_offsets() {
             );
         }
     }
+}
+
+/// Applies the edit to `src` and asserts the spliced index is the one a rescan would build.
+#[cfg(test)]
+#[track_caller]
+fn splice_matches_rescan(src: &str, span: (u32, u32), text: &str) -> String {
+    let span = Span::new(span.0, span.1);
+    let mut spliced = LineNumbers::new(src);
+
+    let mut edited = src.to_owned();
+    edited.replace_range(span.start as usize..span.end as usize, text);
+
+    assert!(
+        spliced.splice(span, text),
+        "{src:?} {span:?} {text:?} should have taken the fast path"
+    );
+    assert_eq!(
+        spliced,
+        LineNumbers::new(&edited),
+        "{src:?} {span:?} += {text:?} -> {edited:?}"
+    );
+
+    edited
+}
+
+#[test]
+fn an_edit_inside_one_line_keeps_the_lines_around_it() {
+    // the case that gets the splice range wrong: nothing is replaced, so an inclusive range
+    // would swallow the line below
+    splice_matches_rescan("ab\ncd\nef\n", (3, 3), "X");
+    splice_matches_rescan("ab\ncd\nef\n", (3, 5), "");
+    splice_matches_rescan("ab\ncd\nef\n", (3, 5), "XYZ");
+}
+
+#[test]
+fn an_edit_can_add_and_remove_lines() {
+    splice_matches_rescan("ab\ncd\nef\n", (3, 3), "1\n2\n3");
+    // deleting across a line break joins the two lines
+    splice_matches_rescan("ab\ncd\nef\n", (1, 4), "");
+    // and replacing a whole run of them
+    splice_matches_rescan("ab\ncd\nef\n", (0, 9), "one line");
+}
+
+#[test]
+fn an_edit_at_either_end_of_the_document() {
+    splice_matches_rescan("ab\ncd\n", (0, 0), "X\n");
+    splice_matches_rescan("ab\ncd\n", (6, 6), "X");
+    splice_matches_rescan("ab\ncd\n", (6, 6), "\n");
+    splice_matches_rescan("", (0, 0), "x\ny");
+    splice_matches_rescan("ab\ncd\n", (0, 6), "");
+}
+
+/// Every edit in a long sequence has to leave the index exactly where a rescan would, because
+/// the next edit resolves its positions against it - one bad splice corrupts everything after.
+#[test]
+fn a_sequence_of_edits_never_drifts_from_a_rescan() {
+    const INSERTS: [&str; 6] = ["x", "", "\n", "a\nb", "hello", "\n\n\n"];
+
+    let mut text = "alpha\nbeta\ngamma\ndelta\n".to_owned();
+    // a deterministic walk over the edit space - a seeded LCG, so a failure is reproducible
+    let mut seed = 0x2545_F491u32;
+    let mut rand = move |n: u32| {
+        seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        if n == 0 { 0 } else { (seed >> 16) % n }
+    };
+
+    for _ in 0..500 {
+        let len = text.len() as u32;
+        let a = rand(len + 1);
+        let b = rand(len + 1);
+        let insert = INSERTS[rand(INSERTS.len() as u32) as usize];
+
+        text = splice_matches_rescan(&text, (a.min(b), a.max(b)), insert);
+        // keep it from collapsing to nothing or running away
+        if text.len() > 4096 {
+            text.truncate(2048);
+        }
+    }
+}
+
+#[test]
+fn non_ascii_falls_back_to_a_rescan() {
+    assert!(!LineNumbers::new("aé b\n").splice(Span::new(0, 0), "x"));
+    // including when the edit is what introduces it
+    assert!(!LineNumbers::new("ab\n").splice(Span::new(0, 0), "é"));
 }
 
 #[test]

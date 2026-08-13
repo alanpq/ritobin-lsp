@@ -48,6 +48,10 @@ impl Document {
                     let span = self.line_numbers.from_range(&range);
                     self.text
                         .replace_range(span.start as usize..span.end as usize, &change.text);
+
+                    if self.line_numbers.splice(span, &change.text) {
+                        continue;
+                    }
                 }
             }
 
