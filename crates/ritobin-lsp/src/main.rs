@@ -109,7 +109,9 @@ fn setup_logging(log_file_flag: Option<PathBuf>) -> anyhow::Result<()> {
 
     // Deliberately enable all `warn` logs if the user has not set RB_LOG, as there is usually
     // useful information in there for debugging.
-    let targets_filter = env::var("RB_LOG").ok().unwrap_or_else(|| "warn".to_owned());
+    let targets_filter = env::var("RB_LOG")
+        .ok()
+        .unwrap_or_else(|| "warn,ritobin_lsp=info".to_owned());
     let targets_filter: Targets = targets_filter
         .parse()
         .with_context(|| format!("invalid log filter: `{}`", targets_filter))?;
@@ -154,8 +156,7 @@ async fn main() -> std::result::Result<(), Box<dyn Error + Sync + Send>> {
     if let Err(e) = setup_logging(cli.log_file.clone()) {
         eprintln!("Failed to setup logging: {e:#}");
     }
-    tracing::error!("starting minimal_lsp");
-    tracing::debug!("test");
+    tracing::info!("starting ritobin-lsp {}", env!("CARGO_PKG_VERSION"));
 
     let _subcommand = cli.command.take().unwrap_or_default();
 
