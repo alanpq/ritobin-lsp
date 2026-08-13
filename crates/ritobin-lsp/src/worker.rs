@@ -1,4 +1,8 @@
-use std::{fmt::Write as _, sync::Arc};
+use std::{
+    fmt::Write as _,
+    panic::{AssertUnwindSafe, catch_unwind},
+    sync::Arc,
+};
 
 use imara_diff::{Algorithm, Diff, InternedInput};
 use lsp_server::RequestId;
@@ -85,15 +89,21 @@ pub struct WorkerHandle {
 
 struct ParseData {
     cst: Cst,
-    bin: ltk_meta::Bin,
-    errors: Vec<DiagnosticWithSpan>,
+    /// `None` when the typechecker panicked on this revision.
+    errors: Option<Vec<DiagnosticWithSpan>>,
 }
 
 impl ParseData {
-    pub fn parse(text: &str) -> Self {
-        let cst = Cst::parse(text);
-        let (bin, errors) = cst.build_bin(text);
-        Self { cst, bin, errors }
+    pub fn parse(text: &str) -> Option<Self> {
+        let cst = catch_unwind(AssertUnwindSafe(|| Cst::parse(text))).ok()?;
+
+        // The typechecker unwraps its way through malformed trees and panics on some of them.
+        // This is a temporary workaround until the typechecker can run separately or in a safer way.
+        let errors = catch_unwind(AssertUnwindSafe(|| cst.build_bin(text)))
+            .ok()
+            .map(|(_bin, errors)| errors);
+
+        Some(Self { cst, errors })
     }
 }
 
@@ -130,8 +140,14 @@ impl Worker {
 
     fn update(&mut self) {
         tracing::debug!("[worker] '{}' update", self.document.uri);
-        let mut data = ParseData::parse(&self.document.text);
-        let _ = self.publish_parse_errors(&data.cst, data.errors.drain(..));
+
+        let Some(mut data) = ParseData::parse(&self.document.text) else {
+            tracing::error!("[worker] '{}' parser panicked", self.document.uri);
+            self.data = None;
+            return;
+        };
+
+        let _ = self.publish_parse_errors(&data.cst, data.errors.take());
         self.data.replace(data);
     }
 
@@ -149,71 +165,82 @@ impl Worker {
                 },
             };
 
-            // TODO: propagate err to lsp client instead of killing worker
-            match req {
-                Message::UnhashRequest { id, range } => {
-                    let _ = self
-                        .server
-                        .send_ok(id, &self.unhash(range)?.unwrap_or_default());
-                }
-                Message::HoverRequest {
-                    id,
-                    position,
-                    work_done_progress_params,
-                } => {
-                    let res = self
-                        .hover(position, work_done_progress_params)?
-                        .unwrap_or_else(|| Hover {
-                            contents: lsp_types::HoverContents::Scalar(MarkedString::String(
-                                String::new(),
-                            )),
-                            range: None,
-                        });
-                    let _ = self.server.send_ok(id, &res);
-                }
-                Message::CompletionRequest(req) => {
-                    let _ = self.server.send_ok(
-                        req.id.clone(),
-                        &self
-                            .complete(req)?
-                            .unwrap_or_else(|| CompletionResponse::Array(vec![])),
-                    );
-                }
-                Message::FormatRequest {
-                    id,
-                    options,
-                    work_done_progress_params,
-                } => {
-                    if let Some(res) = self.format(options, work_done_progress_params)? {
-                        let _ = self.server.send_ok(id, &res);
-                    }
-                }
-                Message::SemanticTokens {
-                    id,
-                    range,
-                    previous_result_id,
-                    ..
-                } => {
-                    if let Some(res) = self.semantic_tokens(range, previous_result_id) {
-                        let _ = self.server.send_ok(id, &res);
-                    }
-                }
-                Message::DocumentChange { version, changes } => {
-                    self.document.update(version, changes);
-                    pending = drain_changes(&mut self.rx, &mut self.document);
-                    self.update();
+            match self.respond(req) {
+                Ok(next) => pending = next,
+                Err(e) => {
+                    tracing::error!("[worker] '{}' request failed: {e:?}", self.document.uri)
                 }
             }
         }
         Ok(())
     }
 
+    /// Handles one message, returning the request that interrupted a run of document changes.
+    fn respond(&mut self, req: Message) -> anyhow::Result<Option<Message>> {
+        // TODO: propagate err to lsp client instead of swallowing it
+        match req {
+            Message::UnhashRequest { id, range } => {
+                let _ = self
+                    .server
+                    .send_ok(id, &self.unhash(range)?.unwrap_or_default());
+            }
+            Message::HoverRequest {
+                id,
+                position,
+                work_done_progress_params,
+            } => {
+                let res = self
+                    .hover(position, work_done_progress_params)?
+                    .unwrap_or_else(|| Hover {
+                        contents: lsp_types::HoverContents::Scalar(MarkedString::String(
+                            String::new(),
+                        )),
+                        range: None,
+                    });
+                let _ = self.server.send_ok(id, &res);
+            }
+            Message::CompletionRequest(req) => {
+                let _ = self.server.send_ok(
+                    req.id.clone(),
+                    &self
+                        .complete(req)?
+                        .unwrap_or_else(|| CompletionResponse::Array(vec![])),
+                );
+            }
+            Message::FormatRequest {
+                id,
+                options,
+                work_done_progress_params,
+            } => {
+                if let Some(res) = self.format(options, work_done_progress_params)? {
+                    let _ = self.server.send_ok(id, &res);
+                }
+            }
+            Message::SemanticTokens {
+                id,
+                range,
+                previous_result_id,
+                ..
+            } => {
+                let res = self.semantic_tokens(range, previous_result_id);
+                let _ = self.server.send_ok(id, &res);
+            }
+            Message::DocumentChange { version, changes } => {
+                self.document.update(version, changes);
+                let pending = drain_changes(&mut self.rx, &mut self.document);
+                self.update();
+                return Ok(pending);
+            }
+        }
+        Ok(None)
+    }
+
     fn semantic_tokens(
         &mut self,
         range: Option<Range>,
         previous_result_id: Option<String>,
-    ) -> Option<SemanticTokensFullDeltaResult> {
-        let tokens = self.collect_tokens(range.as_ref())?;
+    ) -> SemanticTokensFullDeltaResult {
+        let tokens = self.collect_tokens(range.as_ref());
 
         let request = match (&range, &previous_result_id) {
             (Some(_), _) => TokenRequest::Range,
@@ -221,12 +248,14 @@ impl Worker {
             (None, None) => TokenRequest::Full,
         };
 
-        Some(self.tokens.respond(request, tokens))
+        self.tokens.respond(request, tokens)
     }
 
-    fn collect_tokens(&self, range: Option<&Range>) -> Option<Vec<SemanticToken>> {
+    fn collect_tokens(&self, range: Option<&Range>) -> Vec<SemanticToken> {
         let doc = &self.document;
-        let data = self.data.as_ref()?;
+        let Some(data) = self.data.as_ref() else {
+            return Vec::new();
+        };
 
         let visitor = SemanticVisitor {
             text: &doc.text,
@@ -238,7 +267,7 @@ impl Worker {
         }
         .walk(&data.cst);
 
-        Some(visitor.builder.build())
+        visitor.builder.build()
     }
 
     fn hover(
@@ -490,5 +519,55 @@ mod tests {
 
         assert!(drain_changes(&mut rx, &mut doc).is_none());
         assert_eq!(doc.text, "x");
+    }
+
+    /// The typechecker unwraps a `Literal`'s first child as a token, so recovery trees that put a
+    /// subtree there panic it. Half-typed and half-deleted strings reach that state constantly, and
+    /// a panic here used to kill the worker - and with it the document's highlighting.
+    #[test]
+    fn a_typechecker_panic_still_yields_a_tree() {
+        const BROKEN: &[&str] = &[
+            // a string left unterminated mid-entry
+            r#"#PROP_text
+entries: map[hash,embed] = {
+    "0x1" = Def {
+        name: string = "TRA
+        Group: string = "Transition Effect"
+    }
+}
+"#,
+            // ... and one that swallows the brace closing its entry
+            r#"#PROP_text
+entries: map[hash,embed] = {
+    "0x1" = Def {
+        name: string = "TRA
+    }
+    "0x2" = Def {
+        on: bool = false
+    }
+}
+"#,
+            // the quote on its own, as it exists for one keystroke
+            r#"#PROP_text
+entries: map[hash,embed] = {
+    "0x1" = Def {
+        name: string = "
+    }
+}
+"#,
+        ];
+
+        let hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
+        let parsed: Vec<_> = BROKEN.iter().map(|text| ParseData::parse(text)).collect();
+        std::panic::set_hook(hook);
+
+        for (text, data) in BROKEN.iter().zip(parsed) {
+            let data = data.expect("the parser itself must survive");
+            // no diagnostics at all means the typechecker went down - that is the case under
+            // test, and the tree has to come back anyway
+            assert!(data.errors.is_none(), "no longer panics on:\n{text}");
+            assert!(!data.cst.errors.is_empty(), "should report a syntax error");
+        }
     }
 }

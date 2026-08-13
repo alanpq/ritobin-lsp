@@ -136,8 +136,13 @@ pub async fn request(server: &Arc<Server>, req: ServerRequest) -> Result<()> {
     let workers = server.workers.read().await;
     match workers.get(&uri) {
         Some(worker) => {
-            // tracing::debug!(?uri, "found worker.");
-            worker.tx.send(msg).await.unwrap();
+            if worker.tx.send(msg).await.is_err() {
+                server.send_err(
+                    req.id,
+                    lsp_server::ErrorCode::InternalError,
+                    "document worker is no longer running",
+                )?;
+            }
         }
         None => {
             server.send_err(

@@ -3,7 +3,7 @@ use std::num::IntErrorKind;
 use itertools::Itertools as _;
 use lsp_types::{
     Diagnostic as LspDiag, DiagnosticRelatedInformation, DiagnosticSeverity, Location,
-    PublishDiagnosticsParams,
+    PublishDiagnosticsParams, Range,
     notification::{Notification as _, PublishDiagnostics},
 };
 use ltk_ritobin::{
@@ -138,10 +138,11 @@ impl Worker {
         }
     }
 
+    /// `typecheck` is `None` when the typechecker panicked on this tree.
     pub fn publish_parse_errors(
         &self,
         cst: &Cst,
-        bin_errors: impl IntoIterator<Item = DiagnosticWithSpan>,
+        typecheck: Option<Vec<DiagnosticWithSpan>>,
     ) -> anyhow::Result<()> {
         let mut diagnostics = cst
             .errors
@@ -170,14 +171,26 @@ impl Worker {
         // let mut parse_errors = FlatErrors::new();
         // cst.walk(&mut parse_errors);
 
-        diagnostics.extend(
-            bin_errors
-                .into_iter()
-                .map(|d| self.convert_diagnostic(d))
-                .update(|d| {
-                    d.source.replace("ritobin-lsp".into());
-                }),
-        );
+        match typecheck {
+            Some(errors) => diagnostics.extend(
+                errors
+                    .into_iter()
+                    .map(|d| self.convert_diagnostic(d))
+                    .update(|d| {
+                        d.source.replace("ritobin-lsp".into());
+                    }),
+            ),
+            // Say so rather than silently dropping to syntax-only diagnostics.
+            None => diagnostics.push(LspDiag {
+                range: Range::default(),
+                severity: Some(DiagnosticSeverity::WARNING),
+                source: Some("ritobin-lsp".into()),
+                message: "Type checking crashed - only syntax errors are \
+                          reported until the file parses cleanly."
+                    .into(),
+                ..Default::default()
+            }),
+        }
 
         let classes = self.server.meta.classes.read();
         let mut linter = Linter::new(&self.document, &classes);
