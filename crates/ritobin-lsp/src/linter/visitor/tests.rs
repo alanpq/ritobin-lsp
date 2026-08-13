@@ -139,6 +139,23 @@ fn an_unknown_class_is_not_checked() {
 }
 
 #[test]
+fn a_hash_too_wide_for_a_binhash_is_skipped() {
+    let text = format!(
+        "entries: map[hash,embed] = {{
+    0xdeadbeefdeadbeef = 0xcafebabecafebabe {{
+        0x1234567890: u32 = 1
+    }}
+    \"0x2\" = {SKIN} {{
+        0xfeedfacefeedface: u32 = 2
+        notARealField: u32 = 3
+    }}
+}}
+"
+    );
+    assert_eq!(unknown_fields(&text), vec!["notARealField".to_owned()]);
+}
+
+#[test]
 fn a_hex_class_name_resolves_to_its_hash() {
     let text = "entries: map[hash,embed] = {
     \"0x1\" = 0x1234abcd {

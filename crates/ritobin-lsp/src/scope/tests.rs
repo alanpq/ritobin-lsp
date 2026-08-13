@@ -148,3 +148,15 @@ fn hash_token_hashes_names_and_parses_hex() {
     assert_eq!(name.as_bin_hash(text), Some(h("Foo")));
     assert_eq!(hex.as_bin_hash(text), Some(BinHash(0xdeadbeef)));
 }
+
+#[test]
+fn a_hex_literal_we_cannot_fit_has_no_hash() {
+    let text = "0xdeadbeefdeadbeef 0x";
+    let hex = |span| Token {
+        kind: TokenKind::HexLit,
+        span,
+    };
+
+    assert_eq!(hex(Span::new(0, 18)).as_bin_hash(text), None);
+    assert_eq!(hex(Span::new(19, 21)).as_bin_hash(text), None);
+}
