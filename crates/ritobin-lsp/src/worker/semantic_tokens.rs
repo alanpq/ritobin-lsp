@@ -165,7 +165,7 @@ mod tests {
         let visitor = SemanticVisitor {
             text: src,
             line_nums: &line_nums,
-            builder: SemanticTokensBuilder::new("test".to_owned()),
+            builder: SemanticTokensBuilder::default(),
             stack: Vec::new(),
             entry_typed: Vec::new(),
             range: range.as_ref().map(|range| line_nums.from_range(range)),
@@ -176,7 +176,6 @@ mod tests {
         visitor
             .builder
             .build()
-            .data
             .into_iter()
             .map(|token| {
                 line += token.delta_line;

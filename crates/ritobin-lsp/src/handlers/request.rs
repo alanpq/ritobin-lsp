@@ -7,9 +7,11 @@ use lsp_server::Request as ServerRequest;
 use lsp_types::CompletionParams;
 use lsp_types::request::Request;
 use lsp_types::{
-    DocumentFormattingParams, SemanticTokensParams, SemanticTokensRangeParams,
+    DocumentFormattingParams, SemanticTokensDeltaParams, SemanticTokensParams,
+    SemanticTokensRangeParams,
     request::{
-        Completion, Formatting, HoverRequest, SemanticTokensFullRequest, SemanticTokensRangeRequest,
+        Completion, Formatting, HoverRequest, SemanticTokensFullDeltaRequest,
+        SemanticTokensFullRequest, SemanticTokensRangeRequest,
     },
 };
 
@@ -90,6 +92,7 @@ pub async fn request(server: &Arc<Server>, req: ServerRequest) -> Result<()> {
                         work_done_progress_params: p.work_done_progress_params,
                         partial_result_params: p.partial_result_params,
                         range: Some(p.range),
+                        previous_result_id: None,
                     },
                 )
             }
@@ -102,6 +105,20 @@ pub async fn request(server: &Arc<Server>, req: ServerRequest) -> Result<()> {
                         work_done_progress_params: p.work_done_progress_params,
                         partial_result_params: p.partial_result_params,
                         range: None,
+                        previous_result_id: None,
+                    },
+                )
+            }
+            SemanticTokensFullDeltaRequest::METHOD => {
+                let p: SemanticTokensDeltaParams = serde_json::from_value(req.params.clone())?;
+                (
+                    p.text_document.uri.clone(),
+                    worker::Message::SemanticTokens {
+                        id,
+                        work_done_progress_params: p.work_done_progress_params,
+                        partial_result_params: p.partial_result_params,
+                        range: None,
+                        previous_result_id: Some(p.previous_result_id),
                     },
                 )
             }

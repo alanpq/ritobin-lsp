@@ -1,25 +1,16 @@
-use lsp_types::{Range, SemanticToken, SemanticTokens};
+use lsp_types::{Range, SemanticToken};
 
 /// Tokens are encoded relative to each other.
 ///
 /// This is a direct port of <https://github.com/microsoft/vscode-languageserver-node/blob/f425af9de46a0187adb78ec8a46b9b2ce80c5412/server/src/sematicTokens.proposed.ts#L45>
+#[derive(Default)]
 pub(crate) struct SemanticTokensBuilder {
-    id: String,
     prev_line: u32,
     prev_char: u32,
     data: Vec<SemanticToken>,
 }
 
 impl SemanticTokensBuilder {
-    pub(crate) fn new(id: String) -> Self {
-        SemanticTokensBuilder {
-            id,
-            prev_line: 0,
-            prev_char: 0,
-            data: Default::default(),
-        }
-    }
-
     /// Push a new token onto the builder
     pub(crate) fn push(&mut self, range: Range, token_index: u32, modifier_bitset: u32) {
         let mut push_line = range.start.line;
@@ -50,11 +41,8 @@ impl SemanticTokensBuilder {
         self.prev_char = range.start.character;
     }
 
-    pub(crate) fn build(self) -> SemanticTokens {
-        SemanticTokens {
-            result_id: Some(self.id),
-            data: self.data,
-        }
+    pub(crate) fn build(self) -> Vec<SemanticToken> {
+        self.data
     }
 }
 

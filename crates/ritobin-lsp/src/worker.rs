@@ -4,7 +4,7 @@ use imara_diff::{Algorithm, Diff, InternedInput};
 use lsp_server::RequestId;
 use lsp_types::{
     CompletionContext, CompletionResponse, FormattingOptions, Hover, MarkedString, MarkupContent,
-    MarkupKind, PartialResultParams, Position, Range, SemanticTokens,
+    MarkupKind, PartialResultParams, Position, Range, SemanticToken, SemanticTokensFullDeltaResult,
     TextDocumentContentChangeEvent, TextEdit, Url, WorkDoneProgressParams,
 };
 use ltk_mimir_cache::Table;
@@ -23,7 +23,10 @@ use tokio::{sync::mpsc, task::JoinHandle};
 use crate::{
     document::Document,
     lol_meta::schema::U32Hash,
-    lsp::{ext::PositionOrRange, semantic_tokens::builder::SemanticTokensBuilder},
+    lsp::{
+        ext::PositionOrRange,
+        semantic_tokens::{TokenCache, TokenRequest, builder::SemanticTokensBuilder},
+    },
     server::Server,
     worker::semantic_tokens::SemanticVisitor,
 };
@@ -65,6 +68,8 @@ pub enum Message {
         work_done_progress_params: WorkDoneProgressParams,
         partial_result_params: PartialResultParams,
         range: Option<Range>,
+        /// The `result_id` of the last response the client holds, if it is asking for a delta.
+        previous_result_id: Option<String>,
     },
 
     DocumentChange {
@@ -97,6 +102,7 @@ pub struct Worker {
     document: Document,
     data: Option<ParseData>,
     server: Arc<Server>,
+    tokens: TokenCache,
 }
 
 impl Worker {
@@ -111,6 +117,7 @@ impl Worker {
                     document: Document::new(uri, version, text),
                     data: None,
                     server,
+                    tokens: TokenCache::default(),
                 };
                 worker.update();
 
@@ -183,15 +190,11 @@ impl Worker {
                 }
                 Message::SemanticTokens {
                     id,
-                    work_done_progress_params,
-                    partial_result_params,
                     range,
+                    previous_result_id,
+                    ..
                 } => {
-                    if let Some(res) = self.semantic_tokens(
-                        work_done_progress_params,
-                        partial_result_params,
-                        range,
-                    )? {
+                    if let Some(res) = self.semantic_tokens(range, previous_result_id) {
                         let _ = self.server.send_ok(id, &res);
                     }
                 }
@@ -206,30 +209,36 @@ impl Worker {
     }
 
     fn semantic_tokens(
-        &self,
-        _work_done_progress_params: WorkDoneProgressParams,
-        _partial_result_params: PartialResultParams,
+        &mut self,
         range: Option<Range>,
-    ) -> anyhow::Result<Option<SemanticTokens>> {
-        let doc = &self.document;
-        let Some(data) = self.data.as_ref() else {
-            return Ok(None);
+        previous_result_id: Option<String>,
+    ) -> Option<SemanticTokensFullDeltaResult> {
+        let tokens = self.collect_tokens(range.as_ref())?;
+
+        let request = match (&range, &previous_result_id) {
+            (Some(_), _) => TokenRequest::Range,
+            (None, Some(cited)) => TokenRequest::Delta(cited),
+            (None, None) => TokenRequest::Full,
         };
 
-        let builder = SemanticTokensBuilder::new(doc.uri.to_string());
+        Some(self.tokens.respond(request, tokens))
+    }
+
+    fn collect_tokens(&self, range: Option<&Range>) -> Option<Vec<SemanticToken>> {
+        let doc = &self.document;
+        let data = self.data.as_ref()?;
+
         let visitor = SemanticVisitor {
             text: &doc.text,
             line_nums: &doc.line_numbers,
             stack: Vec::new(),
             entry_typed: Vec::new(),
-            range: range
-                .as_ref()
-                .map(|range| doc.line_numbers.from_range(range)),
-            builder,
+            range: range.map(|range| doc.line_numbers.from_range(range)),
+            builder: SemanticTokensBuilder::default(),
         }
         .walk(&data.cst);
 
-        Ok(Some(visitor.builder.build()))
+        Some(visitor.builder.build())
     }
 
     fn hover(

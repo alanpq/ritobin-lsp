@@ -137,7 +137,7 @@ pub fn server_capabilities(config: &Config) -> ServerCapabilities {
                     token_modifiers: semantic_tokens::types::SUPPORTED_MODIFIERS.to_vec(),
                 },
 
-                full: Some(SemanticTokensFullOptions::Bool(true)),
+                full: Some(SemanticTokensFullOptions::Delta { delta: Some(true) }),
                 range: Some(true),
                 work_done_progress_options: Default::default(),
             }
