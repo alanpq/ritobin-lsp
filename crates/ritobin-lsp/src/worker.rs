@@ -92,6 +92,13 @@ pub struct WorkerHandle {
     handle: JoinHandle<()>,
 }
 
+impl WorkerHandle {
+    /// Ends the worker.
+    pub fn shutdown(self) -> JoinHandle<()> {
+        self.handle
+    }
+}
+
 // TODO: Make this configurable ?
 /// How long the document has to go quiet before we typecheck and lint it.
 const DIAGNOSTICS_DEBOUNCE: Duration = Duration::from_millis(250);

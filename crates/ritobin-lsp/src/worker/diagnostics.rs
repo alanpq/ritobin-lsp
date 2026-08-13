@@ -2,9 +2,7 @@ use std::num::IntErrorKind;
 
 use itertools::Itertools as _;
 use lsp_types::{
-    Diagnostic as LspDiag, DiagnosticRelatedInformation, DiagnosticSeverity, Location,
-    PublishDiagnosticsParams, Range,
-    notification::{Notification as _, PublishDiagnostics},
+    Diagnostic as LspDiag, DiagnosticRelatedInformation, DiagnosticSeverity, Location, Range,
 };
 use ltk_ritobin::{
     Cst, RitoType,
@@ -212,18 +210,8 @@ impl Worker {
                 .unwrap_or(1000),
         );
 
-        let params = PublishDiagnosticsParams {
-            uri: self.document.uri.clone(),
-            diagnostics,
-            version: None,
-        };
         self.server
-            .conn
-            .sender
-            .send(lsp_server::Message::Notification(
-                lsp_server::Notification::new(PublishDiagnostics::METHOD.to_owned(), params),
-            ))?;
-        Ok(())
+            .publish_diagnostics(self.document.uri.clone(), diagnostics)
     }
 }
 

@@ -2,7 +2,10 @@ use std::{collections::HashMap, sync::Arc};
 
 use arc_swap::ArcSwap;
 use lsp_server::{Connection, Message, RequestId, Response};
-use lsp_types::Url;
+use lsp_types::{
+    Diagnostic, PublishDiagnosticsParams, Url,
+    notification::{Notification as _, PublishDiagnostics},
+};
 use ltk_hash::BinHash;
 use ltk_hashdb::HashDb;
 use ltk_mimir_cache::{HashStore, Table, UpdateOptions, UpdateOutcome};
@@ -165,6 +168,28 @@ impl Server {
             }),
         };
         self.conn.sender.send(Message::Response(resp))?;
+        Ok(())
+    }
+
+    /// Replaces the document's whole diagnostic set. An empty `diagnostics` clears it.
+    pub fn publish_diagnostics(
+        &self,
+        uri: Url,
+        diagnostics: Vec<Diagnostic>,
+    ) -> anyhow::Result<()> {
+        let params = PublishDiagnosticsParams {
+            uri,
+            diagnostics,
+            version: None,
+        };
+
+        self.conn
+            .sender
+            .send(Message::Notification(lsp_server::Notification::new(
+                PublishDiagnostics::METHOD.to_owned(),
+                params,
+            )))?;
+
         Ok(())
     }
 
