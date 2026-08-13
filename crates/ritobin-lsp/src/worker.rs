@@ -146,12 +146,12 @@ impl Worker {
     fn refresh_cst(&mut self) {
         tracing::debug!("[worker] '{}' reparse", self.document.uri);
 
+        self.diagnostics_due = Some(Instant::now() + DIAGNOSTICS_DEBOUNCE);
+
         self.cst = parse_cst(&self.document.text);
         if self.cst.is_none() {
             tracing::error!("[worker] '{}' parser panicked", self.document.uri);
         }
-
-        self.diagnostics_due = Some(Instant::now() + DIAGNOSTICS_DEBOUNCE);
     }
 
     /// Typechecks and lints the current tree
