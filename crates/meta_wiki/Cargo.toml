@@ -27,5 +27,8 @@ ltk_hash.workspace = true
 ltk_meta.workspace = true
 ltk_ritobin.workspace = true
 
+chrono = { version = "0.4", features = ["serde"] }
+regress = "0.4.1"
+
 [lints]
 workspace = true
