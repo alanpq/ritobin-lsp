@@ -29,7 +29,6 @@ pub mod document;
 pub mod fs_ext;
 pub mod handlers;
 pub mod linter;
-pub mod lol_meta;
 pub mod lsp;
 pub mod main_loop;
 pub mod server;

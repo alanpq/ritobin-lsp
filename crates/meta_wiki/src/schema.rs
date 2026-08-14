@@ -12,8 +12,7 @@ use std::{
 pub type Map<K, V> = HashMap<K, V>;
 use std::str::FromStr;
 
-#[cfg_attr(test, derive(Default))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct U32Hash(pub u32);
 
 impl From<u32> for U32Hash {
@@ -93,8 +92,7 @@ pub struct DumpFile {
 }
 
 #[skip_serializing_none]
-#[cfg_attr(test, derive(Default))]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct PropertyContainer {
     /// Vtable offset (TODO: don't use U32Hash type here)
     pub vtable: U32Hash,
@@ -108,7 +106,6 @@ pub struct PropertyContainer {
     pub storage: Option<ContainerStorage>,
 }
 
-#[cfg_attr(test, derive(Default))]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PropertyMap {
     /// Vtable offset (TODO: don't use U32Hash type here)
@@ -122,8 +119,7 @@ pub struct PropertyMap {
 }
 
 #[skip_serializing_none]
-#[cfg_attr(test, derive(Default))]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Property {
     /// Other class hash for Link/Pointer/Embed types.
     pub other_class: Option<U32Hash>,
@@ -160,8 +156,7 @@ impl Property {
 }
 
 #[skip_serializing_none]
-#[cfg_attr(test, derive(Default))]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct ClassFunctions {
     /// Upcast to secondary base function.
     pub upcast_secondary: Option<U32Hash>,
@@ -177,8 +172,7 @@ pub struct ClassFunctions {
     pub register: Option<U32Hash>,
 }
 
-#[cfg_attr(test, derive(Default))]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct ClassFlags {
     /// True if this is an interface (no constructor).
     pub interface: bool,
@@ -195,8 +189,7 @@ pub struct ClassFlags {
 }
 
 #[skip_serializing_none]
-#[cfg_attr(test, derive(Default))]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Class {
     /// Base class hash, if any.
     pub base: Option<U32Hash>,
@@ -223,11 +216,10 @@ pub struct Class {
     pub defaults: Option<Map<U32Hash, serde_json::Value>>,
 }
 
-#[cfg_attr(test, derive(Default))]
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default, Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum BinType {
-    #[cfg_attr(test, default)]
+    #[default]
     None = 0,
     Bool = 1,
     I8 = 2,

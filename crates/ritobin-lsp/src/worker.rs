@@ -21,7 +21,7 @@ use ltk_ritobin::{
 };
 use ritobin_lsp::{
     cst_ext::CstExt as _,
-    scope::{self, ClassContextExt as _, CstExt, TokenExt},
+    scope::{ClassContextExt as _, CstExt, TokenExt},
 };
 use tokio::{
     sync::mpsc,
@@ -31,7 +31,6 @@ use tokio::{
 
 use crate::{
     document::Document,
-    lol_meta::schema::U32Hash,
     lsp::{
         ext::PositionOrRange,
         semantic_tokens::{TokenCache, TokenRequest, builder::SemanticTokensBuilder},
@@ -39,6 +38,8 @@ use crate::{
     server::Server,
     worker::semantic_tokens::SemanticVisitor,
 };
+
+use meta_wiki::schema::U32Hash;
 
 pub mod completion;
 pub mod diagnostics;

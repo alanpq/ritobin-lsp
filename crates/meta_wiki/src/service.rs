@@ -7,7 +7,7 @@ use std::{
     num::ParseIntError,
     path::{Path, PathBuf},
     str::FromStr,
-    sync::{Arc, atomic::AtomicBool},
+    sync::{atomic::AtomicBool, Arc},
 };
 
 use anyhow::Context;
@@ -17,7 +17,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
 use tokio::task::JoinError;
 
-use crate::lol_meta::schema::{Class, DumpFile, Property, U32Hash};
+use crate::schema::{Class, DumpFile, Property, U32Hash};
 
 #[derive(Debug, Default)]
 pub struct Classes {
@@ -308,7 +308,7 @@ struct GhReleases {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lol_meta::schema::ClassFlags;
+    use crate::schema::ClassFlags;
 
     fn class(base: Option<u32>, interface: bool) -> Class {
         Class {

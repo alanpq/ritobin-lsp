@@ -4,16 +4,15 @@ pub mod items;
 use lsp_types::{CompletionItem, CompletionResponse};
 use ltk_mimir_cache::Table;
 
-use crate::{
-    lol_meta::schema::U32Hash,
-    worker::{
-        CompletionRequest, Worker,
-        completion::{
-            context::CursorContext,
-            items::{property_items, type_item, value_items, value_slot},
-        },
+use crate::worker::{
+    CompletionRequest, Worker,
+    completion::{
+        context::CursorContext,
+        items::{property_items, type_item, value_items, value_slot},
     },
 };
+
+use meta_wiki::schema::U32Hash;
 
 impl Worker {
     pub fn complete(&self, req: CompletionRequest) -> anyhow::Result<Option<CompletionResponse>> {

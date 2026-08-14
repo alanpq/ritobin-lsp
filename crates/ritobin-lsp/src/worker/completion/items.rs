@@ -8,7 +8,7 @@ use ltk_hash::BinHash;
 use ltk_meta::PropertyKind;
 use rustc_hash::FxHashSet;
 
-use crate::lol_meta::{
+use meta_wiki::{
     schema::{Property, U32Hash},
     service::Classes,
 };

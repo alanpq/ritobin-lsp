@@ -5,7 +5,7 @@ use ltk_hash::{BinHash, Hash as _};
 use ltk_ritobin::{Cst, cst::visitor::VisitorExt as _};
 
 use super::*;
-use crate::lol_meta::schema::{Class, ClassFlags, Property, U32Hash};
+use meta_wiki::schema::{Class, ClassFlags, Property, U32Hash};
 
 const SKIN: &str = "SkinCharacterDataProperties";
 const CHILD: &str = "SkinMeshDataProperties";

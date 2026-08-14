@@ -13,7 +13,8 @@ use ltk_ritobin::HashProvider;
 use rustc_hash::FxHashMap;
 use tokio::sync::RwLock;
 
-use crate::{config::Config, lol_meta::service::MetaService, worker::WorkerHandle};
+use crate::{config::Config, worker::WorkerHandle};
+use meta_wiki::service::MetaService;
 
 #[derive(Clone)]
 pub struct Hashes {

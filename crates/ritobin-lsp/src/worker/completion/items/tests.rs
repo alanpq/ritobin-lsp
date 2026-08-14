@@ -1,7 +1,5 @@
 use super::*;
-use crate::lol_meta::schema::{
-    BinType, Class, ClassFlags, Property, PropertyContainer, PropertyMap,
-};
+use meta_wiki::schema::{BinType, Class, ClassFlags, Property, PropertyContainer, PropertyMap};
 use std::collections::HashMap;
 
 fn class(base: Option<u32>, interface: bool, properties: Vec<(u32, Property)>) -> Class {
@@ -55,7 +53,8 @@ fn map_of(value_type: BinType, other: u32) -> Property {
         map: Some(PropertyMap {
             key_type: BinType::Hash,
             value_type,
-            ..Default::default()
+            vtable: 0.into(),
+            storage: meta_wiki::schema::MapStorage::UnknownMap,
         }),
         ..Default::default()
     }
