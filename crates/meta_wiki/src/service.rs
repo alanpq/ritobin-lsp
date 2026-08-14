@@ -277,32 +277,27 @@ impl FromStr for VersionTriple {
         Ok(Self {
             major: s
                 .next()
-                .map(|n| u32::from_str(n))
+                .map(u32::from_str)
                 .ok_or(VersionParseError::NotEnoughParts)??,
             minor: s
                 .next()
-                .map(|n| u32::from_str(n))
+                .map(u32::from_str)
                 .ok_or(VersionParseError::NotEnoughParts)??,
-            patch: s
-                .next()
-                .map(|n| u32::from_str(n))
-                .transpose()?
-                .unwrap_or_default(),
+            patch: s.next().map(u32::from_str).transpose()?.unwrap_or_default(),
         })
     }
 }
 
 #[derive(Deserialize)]
 struct GhReleaseAsset {
-    pub name: String,
     pub content_type: String,
     pub browser_download_url: String,
 }
 
 #[derive(Deserialize)]
 struct GhReleases {
-    tag_name: String,
-    assets: Vec<GhReleaseAsset>,
+    pub tag_name: String,
+    pub assets: Vec<GhReleaseAsset>,
 }
 
 #[cfg(test)]
