@@ -111,7 +111,8 @@ fn properties_are_checked_against_the_innermost_class() {
 
 #[test]
 fn keys_inside_a_container_block_are_not_properties() {
-    // Map keys live in a container block, so no class declares them.
+    // Map keys live in a container block, so no class declares them. Needs two entries: leaving
+    // the first entry's class used to put us back in `SKIN`, flagging every key after it.
     let text = format!(
         "entries: map[hash,embed] = {{
     \"0x1\" = {SKIN} {{
@@ -119,12 +120,33 @@ fn keys_inside_a_container_block_are_not_properties() {
             0xdeadbeef = {CHILD} {{
                 boneName: string = \"root\"
             }}
+            0xfeedface = {CHILD} {{
+                boneName: string = \"neck\"
+            }}
         }}
     }}
 }}
 "
     );
     assert_eq!(unknown_fields(&text), Vec::<String>::new());
+}
+
+#[test]
+fn a_property_after_a_container_block_is_still_checked() {
+    // The container's block used to leave "not in a class" behind, so the first property after
+    // any container-valued property went unchecked.
+    let text = format!(
+        "entries: map[hash,embed] = {{
+    \"0x1\" = {SKIN} {{
+        childList: list[u32] = {{
+            1, 2
+        }}
+        notARealField: u32 = 3
+    }}
+}}
+"
+    );
+    assert_eq!(unknown_fields(&text), vec!["notARealField".to_owned()]);
 }
 
 #[test]

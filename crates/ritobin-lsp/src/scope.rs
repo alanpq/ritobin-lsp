@@ -20,7 +20,7 @@ pub trait CstExt {
 
 impl CstExt for Cst {
     fn class_context_at(&self, offset: u32, text: &str) -> ClassContext {
-        Finder::new(offset, text).walk(self).ctx
+        ClassFinder::new(offset, text).walk(self).finish()
     }
 }
 
@@ -34,14 +34,11 @@ pub trait ClassContextExt {
 
 impl ClassContextExt for ClassContext {
     fn current(&self) -> Option<&ClassScope> {
-        match self.state {
-            ClassContextState::NotInScope => None,
-            ClassContextState::InScope => self.nearest(),
-        }
+        self.blocks.last()?.as_ref()
     }
 
     fn nearest(&self) -> Option<&ClassScope> {
-        self.scopes.last()
+        self.classes().next_back()
     }
 }
 impl ClassContextExt for ClassTracker<'_> {
@@ -54,10 +51,18 @@ impl ClassContextExt for ClassTracker<'_> {
     }
 }
 
+/// The blocks enclosing a position, and the class each one is the body of.
 #[derive(Debug, Default, Clone)]
 pub struct ClassContext {
-    pub scopes: Vec<ClassScope>,
-    pub state: ClassContextState,
+    /// One entry per enclosing block, outermost first - `Some` when that block is a class' body.
+    blocks: Vec<Option<ClassScope>>,
+}
+
+impl ClassContext {
+    /// Every class whose body encloses the position, outermost first.
+    pub fn classes(&self) -> impl DoubleEndedIterator<Item = &ClassScope> {
+        self.blocks.iter().flatten()
+    }
 }
 
 /// A `Class` whose body encloses the current position.
@@ -101,61 +106,19 @@ impl TokenExt for Token {
     }
 }
 
-#[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq)]
-pub enum ClassContextState {
-    /// We are not directly inside a class' scope
-    #[default]
-    NotInScope,
-    /// We are currently directly inside a class' scope
-    InScope,
-}
-
 /// Feed every `enter_tree`/`exit_tree` through this, then ask it which class you are in.
+///
+/// Both halves are required - the scopes only stay balanced if every tree you hand to
+/// [`Self::enter_tree`] also reaches [`Self::exit_tree`]. Returning [`Visit::Skip`] is fine, the
+/// walker exits a skipped tree anyway.
 #[derive(Debug, Clone)]
 pub struct ClassTracker<'a> {
     /// The source document
     pub text: &'a str,
 
     pub ctx: ClassContext,
-    pub just_saw_class: bool,
-}
-
-impl Visitor for ClassTracker<'_> {
-    fn enter_tree(&mut self, ctx: &VisitCtx<'_>, tree: NodeId) -> Visit {
-        match ctx.node(tree) {
-            Some(Node {
-                kind: TreeKind::Class,
-                children,
-                ..
-            }) => {
-                if let Some(token) = children.get(ctx.cst).first().and_then(|t| t.token(ctx.cst)) {
-                    self.ctx
-                        .scopes
-                        .push(ClassScope::new(*token).resolved(self.text));
-                }
-                self.ctx.state = ClassContextState::InScope;
-                self.just_saw_class = true;
-            }
-            Some(Node {
-                kind: TreeKind::Block | TreeKind::ListItemBlock,
-                ..
-            }) => {
-                if !self.just_saw_class {
-                    self.ctx.state = ClassContextState::NotInScope;
-                }
-                self.just_saw_class = false;
-            }
-            _ => (),
-        }
-        Visit::Continue
-    }
-
-    fn exit_tree(&mut self, ctx: &VisitCtx<'_>, tree: NodeId) -> Visit {
-        if matches!(ctx.node(tree).map(|n| n.kind), Some(TreeKind::Class)) {
-            self.ctx.scopes.pop();
-        }
-        Visit::Continue
-    }
+    /// The class the next block belongs to, set between a `Class` and its own block.
+    next_class: Option<ClassScope>,
 }
 
 impl<'a> ClassTracker<'a> {
@@ -163,70 +126,93 @@ impl<'a> ClassTracker<'a> {
         Self {
             text,
             ctx: ClassContext::default(),
-            just_saw_class: false,
+            next_class: None,
         }
     }
-}
 
-pub struct Finder<'a> {
-    text: &'a str,
-    offset: u32,
-    entered: Vec<NodeId>,
-    ctx: ClassContext,
-    just_found_class: bool,
-}
-
-impl<'a> Finder<'a> {
-    pub fn new(offset: u32, text: &'a str) -> Self {
-        Self {
-            text,
-            offset,
-            entered: Vec::new(),
-            ctx: ClassContext::default(),
-            just_found_class: false,
-        }
-    }
-}
-
-impl<'a> Visitor for Finder<'a> {
-    fn enter_tree(&mut self, ctx: &VisitCtx, node: NodeId) -> Visit {
-        match ctx.node(node) {
-            Some(tree) if tree.span.contains(self.offset) => {}
-            _ => return Visit::Skip,
-        }
-
-        match ctx.node(node) {
+    /// Records a tree we are entering, opening a scope if it is a block.
+    ///
+    /// A `Class` names the block that follows it, so a block is a class' body exactly when it is
+    /// that class' own block. Anything else leaves the scopes alone.
+    fn enter(&mut self, ctx: &VisitCtx<'_>, tree: NodeId) {
+        match ctx.node(tree) {
             Some(Node {
                 kind: TreeKind::Class,
                 children,
                 ..
             }) => {
-                if let Some(token) = children.get(ctx.cst).first().and_then(|c| c.token(ctx.cst)) {
-                    self.entered.push(node);
-                    self.ctx
-                        .scopes
-                        .push(ClassScope::new(*token).resolved(self.text));
-                }
-                self.ctx.state = ClassContextState::InScope;
-                self.just_found_class = true;
+                self.next_class = children
+                    .get(ctx.cst)
+                    .first()
+                    .and_then(|c| c.token(ctx.cst))
+                    .map(|token| ClassScope::new(*token).resolved(self.text));
             }
             Some(Node {
-                kind: TreeKind::Block,
+                kind: TreeKind::Block | TreeKind::ListItemBlock,
                 ..
-            }) => {
-                if !self.just_found_class {
-                    self.ctx.state = ClassContextState::NotInScope;
-                }
-                self.just_found_class = false;
-            }
-            Some(Node {
-                kind: TreeKind::ListItemBlock,
-                ..
-            }) => {
-                self.ctx.state = ClassContextState::NotInScope;
-            }
-            _ => {}
+            }) => self.ctx.blocks.push(self.next_class.take()),
+            _ => (),
         }
+    }
+
+    /// Records a tree we are leaving, closing its scope if it is a block.
+    fn exit(&mut self, ctx: &VisitCtx<'_>, tree: NodeId) {
+        match ctx.node(tree).map(|node| node.kind) {
+            Some(TreeKind::Block | TreeKind::ListItemBlock) => {
+                self.ctx.blocks.pop();
+            }
+            // a class we never found a block for would otherwise name the next block we meet
+            Some(TreeKind::Class) => self.next_class = None,
+            _ => (),
+        }
+    }
+}
+
+impl Visitor for ClassTracker<'_> {
+    fn enter_tree(&mut self, ctx: &VisitCtx<'_>, tree: NodeId) -> Visit {
+        self.enter(ctx, tree);
+        Visit::Continue
+    }
+
+    fn exit_tree(&mut self, ctx: &VisitCtx<'_>, tree: NodeId) -> Visit {
+        self.exit(ctx, tree);
+        Visit::Continue
+    }
+}
+
+/// Tracks the class scopes at one offset, descending only the trees that contain it.
+struct ClassFinder<'a> {
+    tracker: ClassTracker<'a>,
+    offset: u32,
+}
+
+impl<'a> ClassFinder<'a> {
+    fn new(offset: u32, text: &'a str) -> Self {
+        Self {
+            tracker: ClassTracker::new(text),
+            offset,
+        }
+    }
+
+    /// The scopes at the offset, once the walk is done.
+    fn finish(mut self) -> ClassContext {
+        if let Some(class) = self.tracker.next_class.take() {
+            // we stopped on a class' name rather than in its body - being on the name still puts
+            // us at that class, which is what hovering one has to render
+            self.tracker.ctx.blocks.push(Some(class));
+        }
+        self.tracker.ctx
+    }
+}
+
+impl Visitor for ClassFinder<'_> {
+    fn enter_tree(&mut self, ctx: &VisitCtx<'_>, tree: NodeId) -> Visit {
+        match ctx.node(tree) {
+            Some(node) if node.span.contains(self.offset) => {}
+            _ => return Visit::Skip,
+        }
+
+        self.tracker.enter(ctx, tree);
         Visit::Continue
     }
 }
