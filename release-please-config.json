@@ -1,5 +1,12 @@
 {
-  "plugins": ["cargo-workspace"],
+  "plugins": [
+    "cargo-workspace",
+    {
+      "type": "linked-versions",
+      "groupName": "ritobin-lsp",
+      "components": ["crates/ritobin-lsp", "editors/code"]
+    }
+  ],
   "packages": {
     "crates/ritobin-lsp": {
       "changelog-path": "CHANGELOG.md",
