@@ -4,7 +4,9 @@ use std::{fmt::Write as _, str::FromStr, sync::Arc};
 
 use anyhow::Result;
 use lsp_server::Request as ServerRequest;
-use lsp_types::{CompletionItem, CompletionParams, request::ResolveCompletionItem};
+use lsp_types::{
+    CompletionItem, CompletionItemKind, CompletionParams, request::ResolveCompletionItem,
+};
 use lsp_types::{
     DocumentFormattingParams, SemanticTokensDeltaParams, SemanticTokensParams,
     SemanticTokensRangeParams,
@@ -64,6 +66,9 @@ pub async fn request(server: &Arc<Server>, req: ServerRequest) -> Result<()> {
             }
             ResolveCompletionItem::METHOD => {
                 let mut item: CompletionItem = serde_json::from_value(req.params)?;
+                if !matches!(item.kind, Some(CompletionItemKind::PROPERTY)) {
+                    return Ok(());
+                }
                 let server = server.clone();
                 tokio::spawn(async move {
                     tracing::info!(?item);
