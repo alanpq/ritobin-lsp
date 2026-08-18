@@ -373,7 +373,7 @@ impl Worker {
                         Some((_token, TreeKind::Class)) => match class {
                             Some(class) => {
                                 let mut txt = format!(
-                                    "## [{class_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/) (`0x{:>08x}`)\n\n",
+                                    "### [{class_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/) (`0x{:>08x}`)\n\n",
                                     class_name.to_ascii_lowercase(),
                                     class_hash,
                                 );

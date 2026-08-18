@@ -78,7 +78,7 @@ pub async fn request(server: &Arc<Server>, req: ServerRequest) -> Result<()> {
                             {
                                 Ok(docs) => {
                                     let mut str = format!(
-                                        "## [{}](https://meta-wiki.leaguetoolkit.dev/classes/{})\n",
+                                        "### [{}](https://meta-wiki.leaguetoolkit.dev/classes/{})\n",
                                         docs.name, docs.name
                                     );
                                     writeln!(
