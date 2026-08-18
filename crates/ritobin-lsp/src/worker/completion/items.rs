@@ -8,7 +8,7 @@ use ltk_hash::BinHash;
 use ltk_meta::PropertyKind;
 use rustc_hash::FxHashSet;
 
-use crate::lol_meta::{
+use meta_wiki::{
     schema::{Property, U32Hash},
     service::Classes,
 };
@@ -70,22 +70,29 @@ pub fn property_items<'a>(
 ) -> Vec<CompletionItem> {
     inherited_properties(classes, class)
         .into_iter()
-        .map(|(hash, property)| {
-            let label = name_of(hash).unwrap_or_else(|| hash_label(hash).into());
-            let ty = property.rito_type().to_string();
+        .map(
+            |FatProperty {
+                 hash,
+                 property,
+                 class,
+             }| {
+                let label = name_of(hash).unwrap_or_else(|| hash_label(hash).into());
+                let ty = property.rito_type().to_string();
 
-            CompletionItem {
-                insert_text: Some(format!("{label}: {ty} = ")),
-                sort_text: Some(sort_key(0, &label, name_of(hash).is_some(), hash)),
-                label_details: Some(CompletionItemLabelDetails {
-                    detail: Some(format!(": {ty}")),
-                    description: None,
-                }),
-                kind: Some(CompletionItemKind::PROPERTY),
-                label: label.into_owned(),
-                ..Default::default()
-            }
-        })
+                CompletionItem {
+                    insert_text: Some(format!("{label}: {ty} = ")),
+                    sort_text: Some(sort_key(0, &label, name_of(hash).is_some(), hash)),
+                    label_details: Some(CompletionItemLabelDetails {
+                        detail: Some(format!(": {ty}")),
+                        description: None,
+                    }),
+                    kind: Some(CompletionItemKind::PROPERTY),
+                    label: label.into_owned(),
+                    data: Some(class.to_string().into()),
+                    ..Default::default()
+                }
+            },
+        )
         .collect()
 }
 
@@ -161,16 +168,22 @@ fn class_items<'a>(
         .collect()
 }
 
+struct FatProperty<'a> {
+    hash: U32Hash,
+    property: &'a Property,
+    class: U32Hash,
+}
+
 /// A class's own properties plus everything it inherits, nearest declaration winning. The visited
 /// set keeps a malformed dump with a cyclic base chain from looping forever.
-fn inherited_properties(classes: &Classes, class: BinHash) -> Vec<(U32Hash, &Property)> {
+fn inherited_properties(classes: &Classes, class: BinHash) -> Vec<FatProperty<'_>> {
     let mut out = Vec::new();
     let mut seen_classes = FxHashSet::default();
     let mut seen_properties = FxHashSet::default();
     let mut search = Some(U32Hash::from(class));
 
-    while let Some(hash) = search.filter(|hash| seen_classes.insert(*hash)) {
-        let Some(class) = classes.get(hash) else {
+    while let Some(class_hash) = search.filter(|hash| seen_classes.insert(*hash)) {
+        let Some(class) = classes.get(class_hash) else {
             break;
         };
         out.extend(
@@ -178,7 +191,11 @@ fn inherited_properties(classes: &Classes, class: BinHash) -> Vec<(U32Hash, &Pro
                 .properties
                 .iter()
                 .filter(|(hash, _)| seen_properties.insert(**hash))
-                .map(|(hash, property)| (*hash, property)),
+                .map(|(hash, property)| FatProperty {
+                    hash: *hash,
+                    property,
+                    class: class_hash,
+                }),
         );
         search = class.base;
     }

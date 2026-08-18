@@ -1,11 +1,12 @@
 mod bin;
 
-use std::sync::Arc;
+use std::{fmt::Write as _, str::FromStr, sync::Arc};
 
 use anyhow::Result;
 use lsp_server::Request as ServerRequest;
-use lsp_types::CompletionParams;
-use lsp_types::request::Request;
+use lsp_types::{
+    CompletionItem, CompletionItemKind, CompletionParams, request::ResolveCompletionItem,
+};
 use lsp_types::{
     DocumentFormattingParams, SemanticTokensDeltaParams, SemanticTokensParams,
     SemanticTokensRangeParams,
@@ -14,10 +15,13 @@ use lsp_types::{
         SemanticTokensFullRequest, SemanticTokensRangeRequest,
     },
 };
+use lsp_types::{MarkupContent, request::Request};
+use meta_wiki::{client::types::GetDocsNameOrHash, schema::U32Hash};
 
 use crate::{
     lsp::ext::{DeserializeBin, HoverParams, SerializeBin, Unhash, UnhashParams},
     server::Server,
+    wiki,
     worker::{self, CompletionRequest},
 };
 
@@ -59,6 +63,59 @@ pub async fn request(server: &Arc<Server>, req: ServerRequest) -> Result<()> {
                         partial_result_params: p.partial_result_params,
                     }),
                 )
+            }
+            ResolveCompletionItem::METHOD => {
+                let mut item: CompletionItem = serde_json::from_value(req.params)?;
+                if !matches!(item.kind, Some(CompletionItemKind::PROPERTY)) {
+                    return Ok(());
+                }
+                let server = server.clone();
+                tokio::spawn(async move {
+                    tracing::info!(?item);
+                    match item
+                        .data
+                        .as_ref()
+                        .and_then(|value| value.as_str())
+                        .and_then(|v| GetDocsNameOrHash::try_from(v).ok())
+                    {
+                        Some(class_hash) => {
+                            let docs = match wiki::fetch_class_docs(&server.wiki, &class_hash).await
+                            {
+                                Ok(docs) => {
+                                    let mut str = format!(
+                                        "### [{}](https://meta-wiki.leaguetoolkit.dev/classes/{})\n",
+                                        docs.name, docs.name
+                                    );
+                                    writeln!(
+                                        str,
+                                        "{}",
+                                        wiki::describe(docs.properties.get(&item.label))
+                                    )
+                                    .unwrap();
+                                    str
+                                }
+                                Err(msg) => msg,
+                            };
+
+                            item.documentation
+                                .replace(lsp_types::Documentation::MarkupContent(MarkupContent {
+                                    kind: lsp_types::MarkupKind::Markdown,
+                                    value: docs,
+                                }));
+
+                            let _ = server.send_ok(id, &item);
+                        }
+                        None => {
+                            let _ = server.send_err(
+                                id.clone(),
+                                lsp_server::ErrorCode::RequestFailed,
+                                "An internal error occured trying to resolve completion information",
+                            );
+                        }
+                    }
+                });
+
+                return Ok(());
             }
             HoverRequest::METHOD => {
                 let p: HoverParams = serde_json::from_value(req.params.clone())?;

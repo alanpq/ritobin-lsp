@@ -5,23 +5,10 @@ edition = "2024"
 
 [dependencies]
 paths = { workspace = true, features = ["serde1"] }
+meta_wiki.workspace = true
 
-anyhow = "1.0.100"
-clap = { version = "4.5.54", features = ["derive"] }
-crossbeam-channel = "0.5.15"
-log = "0.4.29"
-lsp-server = "0.7.9"
-lsp-types = { version = "=0.95.0", features = ["proposed"] }
-
-ltk_ritobin = { git = "https://github.com/LeagueToolkit/league-toolkit.git", features = ["serde"] }
-ltk_meta = { git = "https://github.com/LeagueToolkit/league-toolkit.git", features = ["serde"] }
-ltk_hash = { git = "https://github.com/LeagueToolkit/league-toolkit.git" }
-
-rustc-hash = "2.1.1"
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.148"
-semver = "1.0.27"
-tracing = "0.1.44"
+log.workspace = true
+tracing.workspace = true
 tracing-subscriber = { version = "0.3.22", default-features = false, features = [
     "registry",
     "fmt",
@@ -30,18 +17,36 @@ tracing-subscriber = { version = "0.3.22", default-features = false, features = 
     "time",
     "tracing-log",
 ] }
-itertools = "0.14.0"
-tokio = { version = "1.50.0", features = ["full"] }
+
+thiserror.workspace = true
+anyhow.workspace = true
+itertools.workspace = true
+rustc-hash.workspace = true
+
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+serde_with.workspace = true
+
+ltk_ritobin = { workspace = true, features = ["serde"] }
+ltk_meta = { workspace = true, features = ["serde"] }
+ltk_hash.workspace = true
+ltk_mimir_cache.workspace = true
+ltk_hashdb.workspace = true
+
+futures.workspace = true
+crossbeam-channel.workspace = true
+dashmap = { workspace = true, features = ["serde"] }
+arc-swap = "1.9.2"
+
+tokio = { workspace = true, features = ["full"] }
+reqwest = { workspace = true, features = ["json", "stream", "blocking"] }
+
+lsp-server = "0.7.9"
+lsp-types = { version = "=0.95.0", features = ["proposed"] }
+
+clap = { version = "4.5.54", features = ["derive"] }
+semver = "1.0.27"
 directories-next = "2.0.0"
-dashmap = { version = "6.1.0", features = ["serde"] }
-serde_with = "3.18.0"
 memmap = "0.7.0"
 fst = "0.4.7"
-reqwest = { version = "0.13.2", features = ["json", "stream", "blocking"] }
-thiserror = "2.0.18"
-futures = "0.3.32"
 imara-diff = "0.2.0"
-
-ltk_mimir_cache = { git = "https://github.com/LeagueToolkit/Mimir.git" }
-ltk_hashdb = { git = "https://github.com/LeagueToolkit/Mimir.git" }
-arc-swap = "1.9.2"

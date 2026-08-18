@@ -7,7 +7,7 @@ use std::{
     num::ParseIntError,
     path::{Path, PathBuf},
     str::FromStr,
-    sync::{Arc, atomic::AtomicBool},
+    sync::{atomic::AtomicBool, Arc},
 };
 
 use anyhow::Context;
@@ -17,7 +17,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
 use tokio::task::JoinError;
 
-use crate::lol_meta::schema::{Class, DumpFile, Property, U32Hash};
+use crate::schema::{Class, DumpFile, Property, U32Hash};
 
 #[derive(Debug, Default)]
 pub struct Classes {
@@ -277,38 +277,33 @@ impl FromStr for VersionTriple {
         Ok(Self {
             major: s
                 .next()
-                .map(|n| u32::from_str(n))
+                .map(u32::from_str)
                 .ok_or(VersionParseError::NotEnoughParts)??,
             minor: s
                 .next()
-                .map(|n| u32::from_str(n))
+                .map(u32::from_str)
                 .ok_or(VersionParseError::NotEnoughParts)??,
-            patch: s
-                .next()
-                .map(|n| u32::from_str(n))
-                .transpose()?
-                .unwrap_or_default(),
+            patch: s.next().map(u32::from_str).transpose()?.unwrap_or_default(),
         })
     }
 }
 
 #[derive(Deserialize)]
 struct GhReleaseAsset {
-    pub name: String,
     pub content_type: String,
     pub browser_download_url: String,
 }
 
 #[derive(Deserialize)]
 struct GhReleases {
-    tag_name: String,
-    assets: Vec<GhReleaseAsset>,
+    pub tag_name: String,
+    pub assets: Vec<GhReleaseAsset>,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lol_meta::schema::ClassFlags;
+    use crate::schema::ClassFlags;
 
     fn class(base: Option<u32>, interface: bool) -> Class {
         Class {

@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     fmt::Write as _,
     panic::{AssertUnwindSafe, catch_unwind},
     sync::Arc,
@@ -21,7 +22,7 @@ use ltk_ritobin::{
 };
 use ritobin_lsp::{
     cst_ext::CstExt as _,
-    scope::{self, ClassContextExt as _, CstExt, TokenExt},
+    scope::{ClassContextExt as _, CstExt, TokenExt},
 };
 use tokio::{
     sync::mpsc,
@@ -31,14 +32,16 @@ use tokio::{
 
 use crate::{
     document::Document,
-    lol_meta::schema::U32Hash,
     lsp::{
         ext::PositionOrRange,
         semantic_tokens::{TokenCache, TokenRequest, builder::SemanticTokensBuilder},
     },
     server::Server,
+    wiki,
     worker::semantic_tokens::SemanticVisitor,
 };
+
+use meta_wiki::{client::types::GetDocsNameOrHash, schema::U32Hash};
 
 pub mod completion;
 pub mod diagnostics;
@@ -194,7 +197,7 @@ impl Worker {
                 },
             };
 
-            match self.respond(req) {
+            match self.respond(req).await {
                 Ok(next) => pending = next,
                 Err(e) => {
                     tracing::error!("[worker] '{}' request failed: {e:?}", self.document.uri)
@@ -205,7 +208,7 @@ impl Worker {
     }
 
     /// Handles one message, returning the request that interrupted a run of document changes.
-    fn respond(&mut self, req: Message) -> anyhow::Result<Option<Message>> {
+    async fn respond(&mut self, req: Message) -> anyhow::Result<Option<Message>> {
         // TODO: propagate err to lsp client instead of swallowing it
         match req {
             Message::UnhashRequest { id, range } => {
@@ -219,7 +222,8 @@ impl Worker {
                 work_done_progress_params,
             } => {
                 let res = self
-                    .hover(position, work_done_progress_params)?
+                    .hover(position, work_done_progress_params)
+                    .await?
                     .unwrap_or_else(|| Hover {
                         contents: lsp_types::HoverContents::Scalar(MarkedString::String(
                             String::new(),
@@ -299,7 +303,7 @@ impl Worker {
         visitor.builder.build()
     }
 
-    fn hover(
+    async fn hover(
         &self,
         position: PositionOrRange,
         _work_done_progress_params: WorkDoneProgressParams,
@@ -316,13 +320,15 @@ impl Worker {
             .find_node(offset)
             .and_then(|(kinds, token)| Some((token, *kinds.last()?)));
 
-        let classes = self.server.meta.classes.read();
-
         let markup = match scope.zip(scope.and_then(|s| s.hash)) {
             Some((scope, class_hash)) => {
                 let class_name_span = scope.token.span;
                 let class_name = &doc.text[class_name_span];
-                let class = classes.get(class_hash);
+
+                let class = {
+                    let classes = self.server.meta.classes.read();
+                    classes.get(class_hash).cloned()
+                };
 
                 MarkupContent {
                     kind: MarkupKind::Markdown,
@@ -330,30 +336,44 @@ impl Worker {
                         Some((token, TreeKind::EntryKey)) => {
                             let txt = &doc.text.as_str()[token.span];
                             match token.as_bin_hash(&doc.text).and_then(|hash| {
-                                Some((hash, classes.find_property(class_hash, hash)?))
+                                let classes = self.server.meta.classes.read();
+                                Some((hash, classes.find_property(class_hash, hash).cloned()?))
                             }) {
                                 Some((hash, prop)) => {
-                                    format!(
+                                    let name = GetDocsNameOrHash::try_from(class_name).unwrap();
+                                    let rito_type = prop.rito_type();
+
+                                    let mut str = format!(
                                         r#"### [{class_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/)
 
 `{txt}`: `{}`
 
-`0x{:>08x}`
-
-*No documentation available.*
 "#,
                                         class_name.to_ascii_lowercase(),
-                                        prop.rito_type(),
-                                        hash,
+                                        rito_type,
+                                    );
+                                    let body = match wiki::fetch_class_docs(
+                                        &self.server.wiki,
+                                        &name,
                                     )
+                                    .await
+                                    {
+                                        Ok(docs) => {
+                                            wiki::describe(docs.properties.get(txt)).to_owned()
+                                        }
+                                        Err(msg) => msg,
+                                    };
+                                    writeln!(str, "{body}").unwrap();
+                                    writeln!(str, "\n`0x{hash:>08x}`").unwrap();
+                                    str
                                 }
                                 None => format!("{txt}: ??"),
                             }
                         }
                         Some((_token, TreeKind::Class)) => match class {
                             Some(class) => {
-                                let mut str = format!(
-                                    "[{class_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/) (`0x{:>08x}`)\n\n",
+                                let mut txt = format!(
+                                    "### [{class_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/) (`0x{:>08x}`)\n\n",
                                     class_name.to_ascii_lowercase(),
                                     class_hash,
                                 );
@@ -365,24 +385,38 @@ impl Worker {
                                     .hashes
                                     .as_ref()
                                     .and_then(|hashes| hashes.table(Table::BinTypes));
-                                while let Some((hash, class)) = base {
-                                    if d > 0 {
-                                        let base_name = bin_types
-                                            .as_ref()
-                                            .and_then(|h| h.get((*hash).into()))
-                                            .unwrap_or_else(|| hash.to_string().into());
-                                        writeln!(
-                                            str,
-                                            "{}└─ [{base_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/)\n",
-                                            "\u{00A0}".repeat(d - 1),
-                                            base_name.to_ascii_lowercase()
-                                        )?;
+
+                                {
+                                    let classes = self.server.meta.classes.read();
+                                    while let Some((hash, class)) = base {
+                                        if d > 0 {
+                                            let base_name = bin_types
+                                                .as_ref()
+                                                .and_then(|h| h.get((*hash).into()))
+                                                .unwrap_or_else(|| hash.to_string().into());
+                                            writeln!(
+                                                txt,
+                                                "{}└─ [{base_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/)\n",
+                                                "\u{00A0}".repeat(d - 1),
+                                                base_name.to_ascii_lowercase()
+                                            )?;
+                                        }
+                                        d += 1;
+                                        base = class
+                                            .base
+                                            .and_then(|b| Some((b, classes.get(b).cloned()?)));
                                     }
-                                    d += 1;
-                                    base = class.base.and_then(|b| Some((b, classes.get(b)?)));
                                 }
 
-                                str
+                                let name = GetDocsNameOrHash::try_from(class_name).unwrap();
+                                let body =
+                                    match wiki::fetch_class_docs(&self.server.wiki, &name).await {
+                                        Ok(docs) => wiki::describe(docs.class.as_ref()).to_owned(),
+                                        Err(msg) => msg,
+                                    };
+                                writeln!(txt, "{body}").unwrap();
+
+                                txt
                             }
                             None => format!("*Unknown class `{class_name}`*"),
                         },

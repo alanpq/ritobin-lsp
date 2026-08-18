@@ -13,7 +13,8 @@ use ltk_ritobin::HashProvider;
 use rustc_hash::FxHashMap;
 use tokio::sync::RwLock;
 
-use crate::{config::Config, lol_meta::service::MetaService, worker::WorkerHandle};
+use crate::{config::Config, worker::WorkerHandle};
+use meta_wiki::{docs_cache::WikiDocs, service::MetaService};
 
 #[derive(Clone)]
 pub struct Hashes {
@@ -128,6 +129,7 @@ pub struct Server {
     pub config: Config,
     pub workers: RwLock<FxHashMap<Url, WorkerHandle>>,
     pub meta: MetaService,
+    pub wiki: WikiDocs,
     pub hashes: Option<Hashes>,
 }
 
@@ -138,6 +140,7 @@ impl Server {
             config,
             workers: Default::default(),
             meta: MetaService::default(),
+            wiki: WikiDocs::new("https://meta-api.leaguetoolkit.dev"),
             hashes,
         }
     }

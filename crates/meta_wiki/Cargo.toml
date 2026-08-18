@@ -1,0 +1,34 @@
+[package]
+name = "meta_wiki"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+tracing.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+
+rustc-hash.workspace = true
+
+futures.workspace = true
+dashmap.workspace = true
+tokio.workspace = true
+reqwest = { workspace = true, features = ["json", "stream", "blocking"] }
+progenitor = { git = "https://github.com/oxidecomputer/progenitor" }
+
+serde.workspace = true
+serde_with.workspace = true
+serde_json.workspace = true
+
+ltk_hash.workspace = true
+ltk_meta.workspace = true
+ltk_ritobin.workspace = true
+
+chrono = { version = "0.4", features = ["serde"] }
+regress = "0.4.1"
+
+[lints]
+workspace = true

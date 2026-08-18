@@ -7,6 +7,7 @@ target/
 *.iml
 !package.json
 *.json
+!openapi.json
 .vscode/settings.json
 .DS_Store
 .direnv

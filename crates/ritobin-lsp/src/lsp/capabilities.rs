@@ -171,6 +171,7 @@ pub fn server_capabilities(config: &Config) -> ServerCapabilities {
         completion_provider: Some(CompletionOptions {
             trigger_characters: Some(vec![":".to_owned(), "=".to_owned(), "{".to_owned()]),
             completion_item: config.caps().completion_item(),
+            resolve_provider: Some(true),
             ..Default::default()
         }),
         definition_provider: Some(OneOf::Left(false)),

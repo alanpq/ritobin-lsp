@@ -4,7 +4,8 @@ use ltk_ritobin::cst::{
 };
 use ritobin_lsp::scope::{ClassContextExt as _, ClassTracker, TokenExt};
 
-use crate::{document::Document, linter::Lint, lol_meta::service::Classes};
+use crate::{document::Document, linter::Lint};
+use meta_wiki::service::Classes;
 
 pub struct Linter<'a> {
     document: &'a Document,
