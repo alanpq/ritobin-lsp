@@ -20,7 +20,6 @@ use ltk_ritobin::{
     print::PrintConfig,
     typecheck::diagnostics::DiagnosticWithSpan,
 };
-use reqwest::StatusCode;
 use ritobin_lsp::{
     cst_ext::CstExt as _,
     scope::{ClassContextExt as _, CstExt, TokenExt},
@@ -38,6 +37,7 @@ use crate::{
         semantic_tokens::{TokenCache, TokenRequest, builder::SemanticTokensBuilder},
     },
     server::Server,
+    wiki,
     worker::semantic_tokens::SemanticVisitor,
 };
 
@@ -352,41 +352,19 @@ impl Worker {
                                         class_name.to_ascii_lowercase(),
                                         rito_type,
                                     );
-                                    match self.server.wiki.get_docs(&name).await {
-                                        Ok(res) => {
-                                            let res = res.into_inner();
-                                            match res.properties.get(txt) {
-                                                Some(entry) => {
-                                                    if let Some(desc) = &entry.description {
-                                                        writeln!(str, "{desc}").unwrap();
-                                                    }
-                                                }
-                                                None => {
-                                                    writeln!(str, "*No documentation available.*")
-                                                        .unwrap()
-                                                }
-                                            }
+                                    let body = match wiki::fetch_class_docs(
+                                        &self.server.wiki,
+                                        &name,
+                                    )
+                                    .await
+                                    {
+                                        Ok(docs) => {
+                                            wiki::describe(docs.properties.get(txt)).to_owned()
                                         }
-                                        Err(e) => match e.status() {
-                                            Some(StatusCode::NOT_FOUND) => {
-                                                writeln!(str, "*No documentation available.*")
-                                                    .unwrap()
-                                            }
-                                            _ => writeln!(
-                                                str,
-                                                "*Failed to fetch documentation - `{e}`*"
-                                            )
-                                            .unwrap(),
-                                        },
+                                        Err(msg) => msg,
                                     };
+                                    writeln!(str, "{body}").unwrap();
                                     writeln!(str, "\n`0x{hash:>08x}`").unwrap();
-                                    // .map(|res| {
-                                    //     res.into_inner()
-                                    //         .class
-                                    //         .map(|docs| format!("{}", docs.description).into())
-                                    //         .unwrap_or("*No documentation available.*".into())
-                                    // })
-                                    // .unwrap_or("*Failed to fetch class documentation.*".into());
                                     str
                                 }
                                 None => format!("{txt}: ??"),
@@ -431,29 +409,12 @@ impl Worker {
                                 }
 
                                 let name = GetDocsNameOrHash::try_from(class_name).unwrap();
-                                match self.server.wiki.get_docs(&name).await {
-                                    Ok(res) => {
-                                        let res = res.into_inner();
-                                        match res.class {
-                                            Some(class) => {
-                                                if let Some(desc) = class.description {
-                                                    writeln!(txt, "{desc}").unwrap();
-                                                }
-                                            }
-                                            None => writeln!(txt, "*No documentation available.*")
-                                                .unwrap(),
-                                        }
-                                    }
-                                    Err(e) => match e.status() {
-                                        Some(StatusCode::NOT_FOUND) => {
-                                            writeln!(txt, "*No documentation available.*").unwrap()
-                                        }
-                                        _ => {
-                                            writeln!(txt, "*Failed to fetch documentation - `{e}`*")
-                                                .unwrap()
-                                        }
-                                    },
-                                };
+                                let body =
+                                    match wiki::fetch_class_docs(&self.server.wiki, &name).await {
+                                        Ok(docs) => wiki::describe(docs.class.as_ref()).to_owned(),
+                                        Err(msg) => msg,
+                                    };
+                                writeln!(txt, "{body}").unwrap();
 
                                 txt
                             }

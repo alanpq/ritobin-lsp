@@ -14,7 +14,7 @@ use rustc_hash::FxHashMap;
 use tokio::sync::RwLock;
 
 use crate::{config::Config, worker::WorkerHandle};
-use meta_wiki::{client::Client, service::MetaService};
+use meta_wiki::{docs_cache::WikiDocs, service::MetaService};
 
 #[derive(Clone)]
 pub struct Hashes {
@@ -129,7 +129,7 @@ pub struct Server {
     pub config: Config,
     pub workers: RwLock<FxHashMap<Url, WorkerHandle>>,
     pub meta: MetaService,
-    pub wiki: meta_wiki::client::Client,
+    pub wiki: WikiDocs,
     pub hashes: Option<Hashes>,
 }
 
@@ -140,7 +140,7 @@ impl Server {
             config,
             workers: Default::default(),
             meta: MetaService::default(),
-            wiki: Client::new("https://meta-api.leaguetoolkit.dev"),
+            wiki: WikiDocs::new("https://meta-api.leaguetoolkit.dev"),
             hashes,
         }
     }

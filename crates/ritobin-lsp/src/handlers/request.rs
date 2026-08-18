@@ -15,11 +15,11 @@ use lsp_types::{
 };
 use lsp_types::{MarkupContent, request::Request};
 use meta_wiki::{client::types::GetDocsNameOrHash, schema::U32Hash};
-use reqwest::StatusCode;
 
 use crate::{
     lsp::ext::{DeserializeBin, HoverParams, SerializeBin, Unhash, UnhashParams},
     server::Server,
+    wiki,
     worker::{self, CompletionRequest},
 };
 
@@ -74,31 +74,22 @@ pub async fn request(server: &Arc<Server>, req: ServerRequest) -> Result<()> {
                         .and_then(|v| GetDocsNameOrHash::try_from(v).ok())
                     {
                         Some(class_hash) => {
-                            let docs = match server.wiki.get_docs(&class_hash).await {
+                            let docs = match wiki::fetch_class_docs(&server.wiki, &class_hash).await
+                            {
                                 Ok(docs) => {
-                                    let docs = docs.into_inner();
                                     let mut str = format!(
                                         "## [{}](https://meta-wiki.leaguetoolkit.dev/classes/{})\n",
                                         docs.name, docs.name
                                     );
-                                    match docs.properties.get(&item.label) {
-                                        Some(entry) => {
-                                            if let Some(desc) = &entry.description {
-                                                writeln!(str, "{desc}").unwrap();
-                                            }
-                                        }
-                                        None => {
-                                            writeln!(str, "*No documentation available.*").unwrap()
-                                        }
-                                    }
+                                    writeln!(
+                                        str,
+                                        "{}",
+                                        wiki::describe(docs.properties.get(&item.label))
+                                    )
+                                    .unwrap();
                                     str
                                 }
-                                Err(e) => match e.status() {
-                                    Some(StatusCode::NOT_FOUND) => {
-                                        "*No documentation available.*".into()
-                                    }
-                                    _ => format!("Failed to fetch documentation: `{e}`"),
-                                },
+                                Err(msg) => msg,
                             };
 
                             item.documentation
