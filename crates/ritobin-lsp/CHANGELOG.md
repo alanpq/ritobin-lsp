@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.13](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.12...ritobin-lsp-v0.1.13) (2026-08-18)
+
+
+### Features
+
+* meta wiki documentation in hover & completion requests ([#58](https://github.com/alanpq/ritobin-lsp/issues/58)) ([0ab6781](https://github.com/alanpq/ritobin-lsp/commit/0ab6781566b4d9be130ad9cf8894c1c134dc6715))
+
+
+### Bug Fixes
+
+* **lsp:** correct class scope tracking ([#57](https://github.com/alanpq/ritobin-lsp/issues/57)) ([f79bde0](https://github.com/alanpq/ritobin-lsp/commit/f79bde0b848a964c53382c17a67fb5139183beb1))
+
 ## [0.1.12](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.11...ritobin-lsp-v0.1.12) (2026-08-13)
 
 
