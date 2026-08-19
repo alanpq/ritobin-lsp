@@ -54,8 +54,9 @@ fn unknown_fields(text: &str) -> Vec<String> {
         .walk(&cst)
         .lints
         .into_iter()
-        .map(|lint| match lint {
-            Lint::UnknownField { span, .. } => document.text[span].to_owned(),
+        .filter_map(|lint| match lint {
+            Lint::UnknownField { span, .. } => Some(document.text[span].to_owned()),
+            _ => None,
         })
         .collect()
 }

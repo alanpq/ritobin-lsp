@@ -1,22 +1,63 @@
 use lsp_types::{Diagnostic as LspDiag, DiagnosticSeverity};
-use ltk_ritobin::parse::Span;
+use ltk_ritobin::{RitoType, cst::NodeId, parse::Span};
 
-use crate::document::Document;
+use crate::{document::Document, worker::code_actions::CodeActionData};
 
 pub enum Lint {
     /// Field doesn't exist in known meta class
-    UnknownField { span: Span, class: Span },
+    UnknownField {
+        entry: NodeId,
+        span: Span,
+        class: Span,
+    },
+    MismatchedMetaTypeArg {
+        entry: NodeId,
+        class: Span,
+        key: Span,
+        type_expr: Span,
+        expected: RitoType,
+        got: RitoType,
+    },
 }
 
 impl Lint {
-    pub fn into_lsp_diagnostic(self, document: &Document) -> LspDiag {
+    pub fn into_lsp_diagnostic(self, document: &Document) -> (LspDiag, Option<CodeActionData>) {
         match self {
-            Lint::UnknownField { span, class: _ } => LspDiag {
-                range: document.line_numbers.from_span(span),
-                message: format!("Unknown field '{}'", &document.text[span]),
-                severity: Some(DiagnosticSeverity::WARNING),
-                ..Default::default()
-            },
+            Lint::UnknownField {
+                entry,
+                span,
+                class: _,
+            } => (
+                LspDiag {
+                    range: document.line_numbers.from_span(span),
+                    message: format!("Unknown field '{}'", &document.text[span]),
+                    severity: Some(DiagnosticSeverity::WARNING),
+                    ..Default::default()
+                },
+                Some(CodeActionData::RemoveEntry(entry)),
+            ),
+            Lint::MismatchedMetaTypeArg {
+                entry,
+                class,
+                key,
+                type_expr,
+                expected,
+                got,
+            } => (
+                LspDiag {
+                    range: document.line_numbers.from_span(type_expr),
+                    message: format!(
+                        "Class property type mismatch - {} has type {expected}, but got {got}",
+                        &document.text[key]
+                    ),
+                    severity: Some(DiagnosticSeverity::WARNING),
+                    ..Default::default()
+                },
+                Some(CodeActionData::TypeMismatch {
+                    type_expr,
+                    expected,
+                }),
+            ),
         }
     }
 }

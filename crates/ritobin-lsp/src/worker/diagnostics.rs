@@ -138,10 +138,14 @@ impl Worker {
 
     /// `typecheck` is `None` when the typechecker panicked on this tree.
     pub fn publish_parse_errors(
-        &self,
-        cst: &Cst,
+        &mut self,
+        // cst: &Cst,
         typecheck: Option<Vec<DiagnosticWithSpan>>,
     ) -> anyhow::Result<()> {
+        let Some(cst) = self.cst.as_ref() else {
+            return Ok(());
+        };
+
         let mut diagnostics = cst
             .errors
             .iter()
@@ -190,16 +194,22 @@ impl Worker {
             }),
         }
 
-        let classes = self.server.meta.classes.read();
+        let classes = self.server.meta.classes.clone();
+        let classes = classes.read();
         let mut linter = Linter::new(&self.document, &classes);
         cst.walk(&mut linter);
 
-        diagnostics.extend(
-            linter
-                .lints
-                .into_iter()
-                .map(|l| l.into_lsp_diagnostic(&self.document)),
-        );
+        for (mut diag, action) in linter
+            .lints
+            .into_iter()
+            .map(|l| l.into_lsp_diagnostic(&self.document))
+            .collect::<Vec<_>>()
+        {
+            if let Some(action) = action {
+                diag.data.replace(self.register_code_action(action).into());
+            }
+            diagnostics.push(diag);
+        }
 
         diagnostics.truncate(
             self.server
