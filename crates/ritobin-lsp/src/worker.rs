@@ -9,9 +9,10 @@ use std::{
 use imara_diff::{Algorithm, Diff, InternedInput};
 use lsp_server::RequestId;
 use lsp_types::{
-    CompletionContext, CompletionResponse, FormattingOptions, Hover, MarkedString, MarkupContent,
-    MarkupKind, PartialResultParams, Position, Range, SemanticToken, SemanticTokensFullDeltaResult,
-    TextDocumentContentChangeEvent, TextEdit, Url, WorkDoneProgressParams,
+    CompletionContext, CompletionResponse, Diagnostic, FormattingOptions, Hover, MarkedString,
+    MarkupContent, MarkupKind, PartialResultParams, Position, Range, SemanticToken,
+    SemanticTokensFullDeltaResult, TextDocumentContentChangeEvent, TextEdit, Url,
+    WorkDoneProgressParams,
 };
 use ltk_mimir_cache::Table;
 use ltk_ritobin::{
@@ -38,11 +39,12 @@ use crate::{
     },
     server::Server,
     wiki,
-    worker::semantic_tokens::SemanticVisitor,
+    worker::{code_actions::CodeActionData, semantic_tokens::SemanticVisitor},
 };
 
 use meta_wiki::{client::types::GetDocsNameOrHash, schema::U32Hash};
 
+pub mod code_actions;
 pub mod completion;
 pub mod diagnostics;
 pub mod semantic_tokens;
@@ -69,6 +71,13 @@ pub enum Message {
         work_done_progress_params: WorkDoneProgressParams,
     },
     CompletionRequest(CompletionRequest),
+    CodeActionRequest {
+        id: RequestId,
+        range: Range,
+        diagnostics: Vec<Diagnostic>,
+        work_done_progress_params: WorkDoneProgressParams,
+        partial_result_params: PartialResultParams,
+    },
     FormatRequest {
         id: RequestId,
         options: FormattingOptions,
@@ -120,10 +129,13 @@ fn typecheck(cst: &Cst, text: &str) -> Option<Vec<DiagnosticWithSpan>> {
 
 pub struct Worker {
     rx: mpsc::Receiver<Message>,
+    server: Arc<Server>,
+
     document: Document,
     cst: Option<Cst>,
-    server: Arc<Server>,
     tokens: TokenCache,
+    code_action_data: Vec<CodeActionData>,
+
     /// Deadline for the next diagnostics pass. `None` when diagnostics are up to date.
     diagnostics_due: Option<Instant>,
 }
@@ -141,6 +153,7 @@ impl Worker {
                     cst: None,
                     server,
                     tokens: TokenCache::default(),
+                    code_action_data: Vec::new(),
                     diagnostics_due: None,
                 };
                 worker.refresh_cst();
@@ -174,7 +187,8 @@ impl Worker {
 
         tracing::debug!("[worker] '{}' diagnostics", self.document.uri);
         let errors = typecheck(cst, &self.document.text);
-        if let Err(e) = self.publish_parse_errors(cst, errors) {
+        drop(cst);
+        if let Err(e) = self.publish_parse_errors(errors) {
             tracing::error!("[worker] '{}' publish failed: {e:?}", self.document.uri);
         }
     }
@@ -238,6 +252,17 @@ impl Worker {
                     &self
                         .complete(req)?
                         .unwrap_or_else(|| CompletionResponse::Array(vec![])),
+                );
+            }
+            Message::CodeActionRequest {
+                id,
+                range,
+                diagnostics,
+                ..
+            } => {
+                let _ = self.server.send_ok(
+                    id,
+                    &self.code_actions(range, diagnostics)?.unwrap_or_default(),
                 );
             }
             Message::FormatRequest {

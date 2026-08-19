@@ -5,15 +5,15 @@ use std::{fmt::Write as _, str::FromStr, sync::Arc};
 use anyhow::Result;
 use lsp_server::Request as ServerRequest;
 use lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionParams, request::ResolveCompletionItem,
-};
-use lsp_types::{
-    DocumentFormattingParams, SemanticTokensDeltaParams, SemanticTokensParams,
+    CodeActionParams, DocumentFormattingParams, SemanticTokensDeltaParams, SemanticTokensParams,
     SemanticTokensRangeParams,
     request::{
-        Completion, Formatting, HoverRequest, SemanticTokensFullDeltaRequest,
+        CodeActionRequest, Completion, Formatting, HoverRequest, SemanticTokensFullDeltaRequest,
         SemanticTokensFullRequest, SemanticTokensRangeRequest,
     },
+};
+use lsp_types::{
+    CompletionItem, CompletionItemKind, CompletionParams, request::ResolveCompletionItem,
 };
 use lsp_types::{MarkupContent, request::Request};
 use meta_wiki::{client::types::GetDocsNameOrHash, schema::U32Hash};
@@ -126,6 +126,19 @@ pub async fn request(server: &Arc<Server>, req: ServerRequest) -> Result<()> {
                         id,
                         position: p.position,
                         work_done_progress_params: p.work_done_progress_params,
+                    },
+                )
+            }
+            CodeActionRequest::METHOD => {
+                let p: CodeActionParams = serde_json::from_value(req.params.clone())?;
+                (
+                    p.text_document.uri.clone(),
+                    worker::Message::CodeActionRequest {
+                        id,
+                        range: p.range,
+                        diagnostics: p.context.diagnostics,
+                        work_done_progress_params: p.work_done_progress_params,
+                        partial_result_params: p.partial_result_params,
                     },
                 )
             }

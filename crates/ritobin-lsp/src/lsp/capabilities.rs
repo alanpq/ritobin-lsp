@@ -65,7 +65,7 @@ pub fn server_capabilities(config: &Config) -> ServerCapabilities {
         // document_highlight_provider: Some(OneOf::Left(true)),
         // document_symbol_provider: Some(OneOf::Left(true)),
         // workspace_symbol_provider: Some(OneOf::Left(true)),
-        // code_action_provider: Some(config.caps().code_action_capabilities()),
+        code_action_provider: Some(config.caps().code_action_capabilities()),
         // code_lens_provider: Some(CodeLensOptions {
         //     resolve_provider: Some(true),
         // }),
@@ -261,15 +261,9 @@ impl ClientCapabilities {
                     // Advertise support for all built-in CodeActionKinds.
                     // Ideally we would base this off of the client capabilities
                     // but the client is supposed to fall back gracefully for unknown values.
-                    code_action_kinds: Some(vec![
-                        CodeActionKind::EMPTY,
-                        CodeActionKind::QUICKFIX,
-                        CodeActionKind::REFACTOR,
-                        CodeActionKind::REFACTOR_EXTRACT,
-                        CodeActionKind::REFACTOR_INLINE,
-                        CodeActionKind::REFACTOR_REWRITE,
-                    ]),
-                    resolve_provider: Some(true),
+                    code_action_kinds: Some(vec![CodeActionKind::QUICKFIX]),
+                    // codeAction/resolve isn't implemented - actions are returned fully formed.
+                    resolve_provider: None,
                     work_done_progress_options: Default::default(),
                 })
             })
