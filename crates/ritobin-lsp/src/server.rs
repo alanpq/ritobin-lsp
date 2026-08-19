@@ -28,6 +28,7 @@ pub struct BinHashProvider {
     fields: Option<Arc<HashDb>>,
     hashes: Option<Arc<HashDb>>,
     types: Option<Arc<HashDb>>,
+    wad: Option<Arc<HashDb>>,
 }
 
 impl HashProvider for BinHashProvider {
@@ -46,6 +47,10 @@ impl HashProvider for BinHashProvider {
     fn lookup_type(&self, hash: BinHash) -> Option<std::borrow::Cow<'_, str>> {
         self.types.as_ref()?.get((*hash).into())
     }
+
+    fn lookup_wad(&self, hash: ltk_hash::WadHash) -> Option<std::borrow::Cow<'_, str>> {
+        self.wad.as_ref()?.get(*hash)
+    }
 }
 
 impl Hashes {
@@ -55,6 +60,7 @@ impl Hashes {
             fields: self.table(Table::BinFields),
             hashes: self.table(Table::BinHashes),
             types: self.table(Table::BinTypes),
+            wad: self.table(Table::Game),
         }
     }
     pub async fn update(
