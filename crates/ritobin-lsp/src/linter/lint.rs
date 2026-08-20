@@ -1,4 +1,4 @@
-use lsp_types::{Diagnostic as LspDiag, DiagnosticSeverity};
+use lsp_types::{Diagnostic as LspDiag, DiagnosticSeverity, DiagnosticTag};
 use ltk_ritobin::{RitoType, cst::NodeId, parse::Span};
 
 use crate::{document::Document, worker::code_actions::CodeActionData};
@@ -18,6 +18,8 @@ pub enum Lint {
         expected: RitoType,
         got: RitoType,
     },
+    /// Entry has the same value as the class' default
+    DefaultValue { entry: NodeId, span: Span },
 }
 
 impl Lint {
@@ -32,6 +34,16 @@ impl Lint {
                     range: document.line_numbers.from_span(span),
                     message: format!("Unknown field '{}'", &document.text[span]),
                     severity: Some(DiagnosticSeverity::WARNING),
+                    ..Default::default()
+                },
+                Some(CodeActionData::RemoveEntry(entry)),
+            ),
+            Lint::DefaultValue { entry, span } => (
+                LspDiag {
+                    range: document.line_numbers.from_span(span),
+                    message: "Entry has default value".into(),
+                    severity: Some(DiagnosticSeverity::HINT),
+                    tags: Some(vec![DiagnosticTag::UNNECESSARY]),
                     ..Default::default()
                 },
                 Some(CodeActionData::RemoveEntry(entry)),

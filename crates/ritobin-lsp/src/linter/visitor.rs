@@ -11,7 +11,10 @@ use ltk_ritobin::{
 use ritobin_lsp::scope::{ClassContextExt as _, ClassTracker, TokenExt};
 
 use crate::{document::Document, linter::Lint};
-use meta_wiki::service::Classes;
+use meta_wiki::{
+    schema::{EqExt, U32Hash},
+    service::Classes,
+};
 
 pub struct Linter<'a> {
     document: &'a Document,
@@ -44,10 +47,10 @@ impl Visitor for Linter<'_> {
             _ => return Visit::Continue,
         };
 
-        let Some(class) = self.class_scopes.current().copied() else {
+        let Some(class_scope) = self.class_scopes.current().copied() else {
             return Visit::Continue;
         };
-        let Some(class_hash) = class.hash else {
+        let Some(class_hash) = class_scope.hash else {
             return Visit::Continue;
         };
 
@@ -80,18 +83,37 @@ impl Visitor for Linter<'_> {
             return Visit::Continue;
         };
 
-        if self.class_meta.get(class_hash).is_some() {
+        if let Some(class) = self.class_meta.get(class_hash) {
             match self.class_meta.find_property(class_hash, key_hash) {
                 Some(prop) => {
                     let expected = prop.rito_type();
                     if expected != ritotype {
                         self.lints.push(Lint::MismatchedMetaTypeArg {
                             entry: tree,
-                            class: class.token.span,
+                            class: class_scope.token.span,
                             key: key.span,
                             type_expr: type_expr.span,
                             expected,
                             got: ritotype,
+                        });
+                    }
+                    if let Some(entry_value) = children.get(4).and_then(|c| c.tree(ctx.cst))
+                        && let Some(default) = class
+                            .defaults
+                            .as_ref()
+                            .and_then(|d| d.get(&U32Hash(*key_hash)))
+                        && let Ok(Some(value)) = typecheck::resolve::resolve_value(
+                            &mut tctx,
+                            ctx,
+                            entry_value,
+                            Some(expected),
+                            None,
+                        )
+                        && EqExt::eq(default, &value)
+                    {
+                        self.lints.push(Lint::DefaultValue {
+                            entry: tree,
+                            span: node.span,
                         });
                     }
                 }
@@ -99,7 +121,7 @@ impl Visitor for Linter<'_> {
                     self.lints.push(Lint::UnknownField {
                         entry: tree,
                         span: key.span,
-                        class: class.token.span,
+                        class: class_scope.token.span,
                     });
                 }
             }
