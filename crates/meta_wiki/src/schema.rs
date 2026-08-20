@@ -1,5 +1,9 @@
 use ltk_hash::BinHash;
-use ltk_meta::PropertyKind;
+use ltk_meta::{
+    PropertyKind,
+    PropertyValueEnum::{self},
+    property::values,
+};
 use ltk_ritobin::RitoType;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
@@ -302,4 +306,58 @@ pub enum MapStorage {
     StdMap,
     StdUnorderedMap,
     RitoVectorMap,
+}
+
+pub trait EqExt<Other> {
+    fn eq(&self, other: &Other) -> bool;
+}
+
+impl<M: Clone> EqExt<PropertyValueEnum<M>> for serde_json::Value {
+    fn eq(&self, other: &PropertyValueEnum<M>) -> bool {
+        match &self {
+            serde_json::Value::Null => other.kind() == PropertyKind::None,
+            serde_json::Value::Bool(a)
+                if let PropertyValueEnum::Bool(values::Bool { value: b, .. })
+                | PropertyValueEnum::BitBool(values::BitBool { value: b, .. }) = other =>
+            {
+                a == b
+            }
+            serde_json::Value::Number(number) => {
+                let cmp = |v: f64| number.as_f64().is_some_and(|n| n == v);
+                match other {
+                    PropertyValueEnum::I8(n) => cmp(n.value as f64),
+                    PropertyValueEnum::U8(n) => cmp(n.value as f64),
+                    PropertyValueEnum::I16(n) => cmp(n.value as f64),
+                    PropertyValueEnum::U16(n) => cmp(n.value as f64),
+                    PropertyValueEnum::I32(n) => cmp(n.value as f64),
+                    PropertyValueEnum::U32(n) => cmp(n.value as f64),
+                    PropertyValueEnum::I64(n) => cmp(n.value as f64),
+                    PropertyValueEnum::U64(n) => cmp(n.value as f64),
+                    PropertyValueEnum::F32(n) => cmp(n.value as f64),
+                    _ => false,
+                }
+            }
+            serde_json::Value::String(a) if let PropertyValueEnum::String(b) = other => {
+                a == &b.value
+            }
+            serde_json::Value::Array(values)
+                if let PropertyValueEnum::Container(c)
+                | PropertyValueEnum::UnorderedContainer(values::UnorderedContainer(c)) =
+                    other =>
+            {
+                let c = c.clone().into_items();
+                values.iter().zip(c).all(|(a, b)| EqExt::eq(a, &b))
+            }
+            serde_json::Value::Object(a) if let PropertyValueEnum::Map(b) = other => {
+                let entries = b.entries();
+                a.len() == entries.len()
+                    && a.iter().all(|(k, v)| {
+                        entries.iter().any(|(ek, ev)| {
+                            EqExt::eq(&serde_json::Value::String(k.clone()), ek) && EqExt::eq(v, ev)
+                        })
+                    })
+            }
+            _ => false,
+        }
+    }
 }
