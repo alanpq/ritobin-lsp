@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.14](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.13...ritobin-lsp-v0.1.14) (2026-08-19)
+
+
+### Features
+
+* code actions + new lint ([#64](https://github.com/alanpq/ritobin-lsp/issues/64)) ([4422a19](https://github.com/alanpq/ritobin-lsp/commit/4422a1991c0790b4cec1af08346ad56832f45a50))
+
+
+### Bug Fixes
+
+* load wad hashes ([#62](https://github.com/alanpq/ritobin-lsp/issues/62)) ([aea6a45](https://github.com/alanpq/ritobin-lsp/commit/aea6a45763a22aa56a0bc3bcaa1949d80f5f1c5b))
+
 ## [0.1.13](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.12...ritobin-lsp-v0.1.13) (2026-08-18)
 
 
