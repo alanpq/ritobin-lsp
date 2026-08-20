@@ -10,7 +10,7 @@ use ltk_ritobin::{
     typecheck::diagnostics::{Diagnostic, DiagnosticWithSpan},
 };
 
-use crate::{linter::Linter, worker::Worker};
+use crate::{config::LintsConfig, linter::Linter, worker::Worker};
 
 impl Worker {
     fn convert_diagnostic(&self, d: DiagnosticWithSpan) -> LspDiag {
@@ -199,10 +199,19 @@ impl Worker {
         let mut linter = Linter::new(&self.document, &classes);
         cst.walk(&mut linter);
 
+        let default_lints_config = LintsConfig::default();
+        let lints_config = self
+            .server
+            .config
+            .initialization_options
+            .as_ref()
+            .and_then(|opt| opt.lints.as_ref())
+            .unwrap_or(&default_lints_config);
+
         for (mut diag, action) in linter
             .lints
             .into_iter()
-            .map(|l| l.into_lsp_diagnostic(&self.document))
+            .filter_map(|l| l.into_lsp_diagnostic(&self.document, lints_config))
             .collect::<Vec<_>>()
         {
             if let Some(action) = action {

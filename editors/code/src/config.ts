@@ -43,6 +43,7 @@ export class Config {
     "server",
     "files",
     "showSyntaxTree",
+    "lints"
   ].map((opt) => `${this.rootSection}.${opt}`);
 
   private readonly requiresWindowReloadOpts = ["testExplorer"].map(
@@ -103,7 +104,7 @@ export class Config {
         return (
           section.startsWith(prefix) &&
           get(oldConfiguration, section.slice(prefix.length)) !==
-            get(newConfiguration, section.slice(prefix.length))
+          get(newConfiguration, section.slice(prefix.length))
         );
       },
     });
@@ -594,11 +595,11 @@ function computeVscodeVar(varName: string): string | null {
       folder === undefined
         ? "" // no workspace opened
         : // could use currently opened document to detect the correct
-          // workspace. However, that would be determined by the document
-          // user has opened on Editor startup. Could lead to
-          // unpredictable workspace selection in practice.
-          // It's better to pick the first one
-          normalizeDriveLetter(folder.uri.fsPath);
+        // workspace. However, that would be determined by the document
+        // user has opened on Editor startup. Could lead to
+        // unpredictable workspace selection in practice.
+        // It's better to pick the first one
+        normalizeDriveLetter(folder.uri.fsPath);
     return fsPath;
   };
   // https://code.visualstudio.com/docs/editor/variables-reference

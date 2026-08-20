@@ -1,7 +1,11 @@
 use lsp_types::{Diagnostic as LspDiag, DiagnosticSeverity, DiagnosticTag};
 use ltk_ritobin::{RitoType, cst::NodeId, parse::Span};
 
-use crate::{document::Document, worker::code_actions::CodeActionData};
+use crate::{
+    config::{LintSeverity, LintsConfig},
+    document::Document,
+    worker::code_actions::CodeActionData,
+};
 
 pub enum Lint {
     /// Field doesn't exist in known meta class
@@ -23,13 +27,17 @@ pub enum Lint {
 }
 
 impl Lint {
-    pub fn into_lsp_diagnostic(self, document: &Document) -> (LspDiag, Option<CodeActionData>) {
+    pub fn into_lsp_diagnostic(
+        self,
+        document: &Document,
+        lints: &LintsConfig,
+    ) -> Option<(LspDiag, Option<CodeActionData>)> {
         match self {
             Lint::UnknownField {
                 entry,
                 span,
                 class: _,
-            } => (
+            } => Some((
                 LspDiag {
                     range: document.line_numbers.from_span(span),
                     message: format!("Unknown field '{}'", &document.text[span]),
@@ -37,17 +45,24 @@ impl Lint {
                     ..Default::default()
                 },
                 Some(CodeActionData::RemoveEntry(entry)),
-            ),
-            Lint::DefaultValue { entry, span } => (
-                LspDiag {
-                    range: document.line_numbers.from_span(span),
-                    message: "Entry has default value".into(),
-                    severity: Some(DiagnosticSeverity::HINT),
-                    tags: Some(vec![DiagnosticTag::UNNECESSARY]),
-                    ..Default::default()
-                },
-                Some(CodeActionData::RemoveEntry(entry)),
-            ),
+            )),
+            Lint::DefaultValue { entry, span } => {
+                let severity = lints
+                    .default_value
+                    .and_then(|c| c.severity)
+                    .unwrap_or(LintSeverity::Hint)
+                    .to_lsp()?;
+                Some((
+                    LspDiag {
+                        range: document.line_numbers.from_span(span),
+                        message: "Entry has default value".into(),
+                        severity: Some(severity),
+                        tags: Some(vec![DiagnosticTag::UNNECESSARY]),
+                        ..Default::default()
+                    },
+                    Some(CodeActionData::RemoveEntry(entry)),
+                ))
+            }
             Lint::MismatchedMetaTypeArg {
                 entry,
                 class,
@@ -55,7 +70,7 @@ impl Lint {
                 type_expr,
                 expected,
                 got,
-            } => (
+            } => Some((
                 LspDiag {
                     range: document.line_numbers.from_span(type_expr),
                     message: format!(
@@ -69,7 +84,7 @@ impl Lint {
                     type_expr,
                     expected,
                 }),
-            ),
+            )),
         }
     }
 }
