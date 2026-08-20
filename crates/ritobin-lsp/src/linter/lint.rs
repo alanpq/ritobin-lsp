@@ -64,8 +64,8 @@ impl Lint {
                 ))
             }
             Lint::MismatchedMetaTypeArg {
-                entry,
-                class,
+                entry: _,
+                class: _,
                 key,
                 type_expr,
                 expected,

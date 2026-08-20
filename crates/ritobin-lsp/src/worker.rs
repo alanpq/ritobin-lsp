@@ -1,5 +1,4 @@
 use std::{
-    borrow::Cow,
     fmt::Write as _,
     panic::{AssertUnwindSafe, catch_unwind},
     sync::Arc,

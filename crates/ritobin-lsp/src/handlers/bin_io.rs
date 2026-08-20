@@ -17,11 +17,7 @@ use ltk_ritobin::{
     typecheck::diagnostics::Diagnostic,
 };
 
-use crate::{
-    fs_ext,
-    lsp::ext::DeserializeBinResult,
-    server::{BinHashProvider, Hashes},
-};
+use crate::{fs_ext, lsp::ext::DeserializeBinResult, server::BinHashProvider};
 
 #[derive(Debug, thiserror::Error)]
 pub enum DeserializeError {
