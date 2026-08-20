@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.15](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.14...ritobin-lsp-v0.1.15) (2026-08-20)
+
+
+### Features
+
+* configurable severity for default value lint ([ae4c30a](https://github.com/alanpq/ritobin-lsp/commit/ae4c30ab7743c2a052acd17278c10d03202a9d9a))
+* default entry lint ([07f6447](https://github.com/alanpq/ritobin-lsp/commit/07f64472064b8724b70f40766a6b56ee1298bee0))
+
 ## [0.1.14](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.13...ritobin-lsp-v0.1.14) (2026-08-19)
 
 
