@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fmt, iter, path::PathBuf, sync::Arc};
 
 use itertools::Itertools as _;
+use lsp_types::DiagnosticSeverity;
 use paths::AbsPathBuf;
 use semver::Version;
 use serde::{Deserialize, Deserializer, de::DeserializeOwned};
@@ -72,8 +73,45 @@ pub struct InitOptions {
     #[serde(deserialize_with = "empty_string_as_none")]
     pub meta_dump_path: Option<PathBuf>,
     pub diagnostic_limit: Option<usize>,
+    pub lints: Option<LintsConfig>,
     #[serde(flatten)]
     pub other: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum LintSeverity {
+    Error,
+    Warning,
+    Information,
+    Hint,
+    Off,
+}
+
+impl LintSeverity {
+    pub fn to_lsp(self) -> Option<DiagnosticSeverity> {
+        match self {
+            LintSeverity::Error => Some(DiagnosticSeverity::ERROR),
+            LintSeverity::Warning => Some(DiagnosticSeverity::WARNING),
+            LintSeverity::Information => Some(DiagnosticSeverity::INFORMATION),
+            LintSeverity::Hint => Some(DiagnosticSeverity::HINT),
+            LintSeverity::Off => None,
+        }
+    }
+}
+
+#[derive(Deserialize, Debug, Clone, Copy, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LintConfig {
+    pub severity: Option<LintSeverity>,
+}
+
+/// Per-lint configuration overrides, keyed by lint name. Add a field here for
+/// each lint that should be user-configurable.
+#[derive(Deserialize, Debug, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LintsConfig {
+    pub default_value: Option<LintConfig>,
 }
 
 fn empty_string_as_none<'de, D>(deserializer: D) -> Result<Option<PathBuf>, D::Error>

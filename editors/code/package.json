@@ -180,12 +180,32 @@
                         "type": "number"
                     },
                     "ritobin-lsp.hashPath": {
-                        "description": "Path to hashes folder",
+                        "description": "Path to hashes folder. Leave empty for automatically managed/updated hashes from Mimir (recommended)",
                         "type": "string"
                     },
                     "ritobin-lsp.metaDumpPath": {
                         "markdownDescription": "Meta dump file override. If left unset, will automatically fetch the latest release from the [lol-meta-classes repo](https://github.com/LeagueToolkit/lol-meta-classes/releases).",
                         "type": "string"
+                    }
+                }
+            },
+            {
+                "title": "Lints",
+                "properties": {
+                    "ritobin-lsp.lints.defaultValue.severity": {
+                        "type": "string",
+                        "enum": [
+                            "error",
+                            "warning",
+                            "hint"
+                        ],
+                        "enumDescriptions": [
+                            "Show as an error",
+                            "Show as a warning",
+                            "Show as a hint (default)"
+                        ],
+                        "default": "hint",
+                        "markdownDescription": "Severity for the lint that flags entries whose value matches the class' default (and can therefore be omitted)."
                     }
                 }
             },
