@@ -20,7 +20,7 @@ use ltk_ritobin::{
 use crate::{
     fs_ext,
     lsp::ext::DeserializeBinResult,
-    server::{BinHashProvider, Hashes},
+    server::BinHashProvider,
 };
 
 #[derive(Debug, thiserror::Error)]

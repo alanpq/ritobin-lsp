@@ -5,7 +5,7 @@ use lsp_types::{
     Diagnostic as LspDiag, DiagnosticRelatedInformation, DiagnosticSeverity, Location, Range,
 };
 use ltk_ritobin::{
-    Cst, RitoType,
+    RitoType,
     parse::ErrorKind,
     typecheck::diagnostics::{Diagnostic, DiagnosticWithSpan},
 };

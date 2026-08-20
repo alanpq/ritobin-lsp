@@ -1,6 +1,6 @@
 mod bin;
 
-use std::{fmt::Write as _, str::FromStr, sync::Arc};
+use std::{fmt::Write as _, sync::Arc};
 
 use anyhow::Result;
 use lsp_server::Request as ServerRequest;
@@ -16,7 +16,7 @@ use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionParams, request::ResolveCompletionItem,
 };
 use lsp_types::{MarkupContent, request::Request};
-use meta_wiki::{client::types::GetDocsNameOrHash, schema::U32Hash};
+use meta_wiki::client::types::GetDocsNameOrHash;
 
 use crate::{
     lsp::ext::{DeserializeBin, HoverParams, SerializeBin, Unhash, UnhashParams},

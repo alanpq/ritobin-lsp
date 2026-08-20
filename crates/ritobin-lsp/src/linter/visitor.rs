@@ -1,7 +1,5 @@
 use itertools::Itertools;
-use ltk_meta::PropertyKind;
 use ltk_ritobin::{
-    RitoType,
     cst::{
         NodeId, TreeKind, Visitor,
         visitor::{Visit, VisitCtx},
