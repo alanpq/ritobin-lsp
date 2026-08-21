@@ -26,7 +26,7 @@ impl Worker {
             return Ok(None);
         };
 
-        let guard = self.server.meta.classes.read();
+        let guard = self.server.meta.classes.read().unwrap();
         let classes = &*guard;
 
         let table = |table| self.server.hashes.as_ref().and_then(|h| h.table(table));

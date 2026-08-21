@@ -350,7 +350,7 @@ impl Worker {
                 let class_name = &doc.text[class_name_span];
 
                 let class = {
-                    let classes = self.server.meta.classes.read();
+                    let classes = self.server.meta.classes.read().unwrap();
                     classes.get(class_hash).cloned()
                 };
 
@@ -360,7 +360,7 @@ impl Worker {
                         Some((token, TreeKind::EntryKey)) => {
                             let txt = &doc.text.as_str()[token.span];
                             match token.as_bin_hash(&doc.text).and_then(|hash| {
-                                let classes = self.server.meta.classes.read();
+                                let classes = self.server.meta.classes.read().unwrap();
                                 Some((hash, classes.find_property(class_hash, hash).cloned()?))
                             }) {
                                 Some((hash, prop)) => {
@@ -411,7 +411,7 @@ impl Worker {
                                     .and_then(|hashes| hashes.table(Table::BinTypes));
 
                                 {
-                                    let classes = self.server.meta.classes.read();
+                                    let classes = self.server.meta.classes.read().unwrap();
                                     while let Some((hash, class)) = base {
                                         if d > 0 {
                                             let base_name = bin_types
