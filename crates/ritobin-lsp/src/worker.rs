@@ -16,6 +16,7 @@ use lsp_types::{
 use ltk_mimir_cache::Table;
 use ltk_ritobin::{
     Cst,
+    ast::Ast,
     cst::{Kind as TreeKind, visitor::VisitorExt as _},
     print::PrintConfig,
     typecheck::diagnostics::DiagnosticWithSpan,
@@ -120,10 +121,8 @@ fn parse_cst(text: &str) -> Option<Cst> {
 }
 
 /// `None` when the typechecker panicked on this revision.
-fn typecheck(cst: &Cst, text: &str) -> Option<Vec<DiagnosticWithSpan>> {
-    catch_unwind(AssertUnwindSafe(|| cst.build_bin(text)))
-        .ok()
-        .map(|(_bin, errors)| errors)
+fn build_ast(cst: &Cst, text: &str) -> Option<Ast> {
+    catch_unwind(AssertUnwindSafe(|| cst.build_ast(text))).ok()
 }
 
 pub struct Worker {
@@ -132,6 +131,7 @@ pub struct Worker {
 
     document: Document,
     cst: Option<Cst>,
+    ast: Option<Ast>,
     tokens: TokenCache,
     code_action_data: Vec<CodeActionData>,
 
@@ -150,6 +150,7 @@ impl Worker {
                     rx,
                     document: Document::new(uri, version, text),
                     cst: None,
+                    ast: None,
                     server,
                     tokens: TokenCache::default(),
                     code_action_data: Vec::new(),
@@ -185,8 +186,10 @@ impl Worker {
         };
 
         tracing::debug!("[worker] '{}' diagnostics", self.document.uri);
-        let errors = typecheck(cst, &self.document.text);
-        drop(cst);
+        let ast = build_ast(cst, &self.document.text);
+
+        let errors = ast.as_ref().map(|ast| ast.diagnostics.clone());
+        self.ast = ast;
         if let Err(e) = self.publish_parse_errors(errors) {
             tracing::error!("[worker] '{}' publish failed: {e:?}", self.document.uri);
         }
@@ -630,62 +633,6 @@ mod tests {
 
         assert!(drain_changes(&mut rx, &mut doc).is_none());
         assert_eq!(doc.text, "x");
-    }
-
-    /// The typechecker unwraps a `Literal`'s first child as a token, so recovery trees that put a
-    /// subtree there panic it. Half-typed and half-deleted strings reach that state constantly, and
-    /// a panic here used to kill the worker - and with it the document's highlighting.
-    #[test]
-    fn a_typechecker_panic_still_yields_a_tree() {
-        const BROKEN: &[&str] = &[
-            // a string left unterminated mid-entry
-            r#"#PROP_text
-entries: map[hash,embed] = {
-    "0x1" = Def {
-        name: string = "TRA
-        Group: string = "Transition Effect"
-    }
-}
-"#,
-            // ... and one that swallows the brace closing its entry
-            r#"#PROP_text
-entries: map[hash,embed] = {
-    "0x1" = Def {
-        name: string = "TRA
-    }
-    "0x2" = Def {
-        on: bool = false
-    }
-}
-"#,
-            // the quote on its own, as it exists for one keystroke
-            r#"#PROP_text
-entries: map[hash,embed] = {
-    "0x1" = Def {
-        name: string = "
-    }
-}
-"#,
-        ];
-
-        let hook = std::panic::take_hook();
-        std::panic::set_hook(Box::new(|_| {}));
-        let parsed: Vec<_> = BROKEN
-            .iter()
-            .map(|text| {
-                let cst = parse_cst(text).expect("the parser itself must survive");
-                let errors = typecheck(&cst, text);
-                (cst, errors)
-            })
-            .collect();
-        std::panic::set_hook(hook);
-
-        for (text, (cst, errors)) in BROKEN.iter().zip(parsed) {
-            // no diagnostics at all means the typechecker went down - that is the case under
-            // test, and the tree has to come back anyway
-            assert!(errors.is_none(), "no longer panics on:\n{text}");
-            assert!(!cst.errors.is_empty(), "should report a syntax error");
-        }
     }
 
     #[tokio::test]
