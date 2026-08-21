@@ -195,7 +195,7 @@ impl Worker {
         }
 
         let classes = self.server.meta.classes.clone();
-        let classes = classes.read();
+        let classes = classes.read().unwrap();
         let mut linter = Linter::new(&self.document, &classes);
         cst.walk(&mut linter);
 

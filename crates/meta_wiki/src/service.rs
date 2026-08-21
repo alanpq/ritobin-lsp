@@ -7,11 +7,10 @@ use std::{
     num::ParseIntError,
     path::{Path, PathBuf},
     str::FromStr,
-    sync::{Arc, atomic::AtomicBool},
+    sync::{Arc, RwLock, atomic::AtomicBool},
 };
 
 use anyhow::Context;
-use dashmap::RwLock;
 use futures::StreamExt as _;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
@@ -106,8 +105,8 @@ impl MetaService {
         let dump: DumpFile = serde_json::from_reader(&mut file)?;
         let count = dump.classes.len();
         let version = version.or_else(|| dump.version.parse().ok());
-        *self.version.write() = version;
-        *self.classes.write() = Classes::new(dump.classes);
+        *self.version.write().unwrap() = version;
+        *self.classes.write().unwrap() = Classes::new(dump.classes);
         self.loaded
             .store(true, std::sync::atomic::Ordering::Relaxed);
 
@@ -163,7 +162,7 @@ impl MetaService {
             .parse()
             .context("Could not determine release version!")?;
 
-        if let Some(existing) = self.version.read().as_ref() {
+        if let Some(existing) = self.version.read().unwrap().as_ref() {
             match existing.cmp(&version) {
                 Ordering::Equal => {
                     tracing::info!("Meta up to date.");
