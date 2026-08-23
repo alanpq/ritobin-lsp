@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.1.16](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.15...ritobin-lsp-v0.1.16) (2026-08-23)
+
+
+### Features
+
+* ast-based hover ([9e231cc](https://github.com/alanpq/ritobin-lsp/commit/9e231cc16ab558a7a4e0b8c516f8f52f0d471cc1))
+* higher hover resolution ([5d599fc](https://github.com/alanpq/ritobin-lsp/commit/5d599fc88979cf18746f417ebe1debb82a2681e1))
+* proper shadowed linting, better linter api ([3158c6a](https://github.com/alanpq/ritobin-lsp/commit/3158c6a3a29de238796202f72b874de7cbdbe992))
+* start building AST, replace cst for diagnostics ([cbe2232](https://github.com/alanpq/ritobin-lsp/commit/cbe223292b03432239ebcce6ee77ac3505f3a2de))
+* use ast for lint walk/actions ([0b0b925](https://github.com/alanpq/ritobin-lsp/commit/0b0b925d1254788cd1ea874ef5955b58613e1a49))
+
+
+### Bug Fixes
+
+* don't use dashmap rwlock ([2f4f187](https://github.com/alanpq/ritobin-lsp/commit/2f4f187ba1d764b63930f8eba8d91fd7191b5b2a))
+* switch to ritobin/ast branch of ltk ([7ca512c](https://github.com/alanpq/ritobin-lsp/commit/7ca512cd1cc6be77238e9009a2b1d7f87750f9fe))
+* use to_bin_value ([d1a5f64](https://github.com/alanpq/ritobin-lsp/commit/d1a5f6413b98566a93dc70703e1a44cccddd826c))
+
 ## [0.1.15](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.14...ritobin-lsp-v0.1.15) (2026-08-20)
 
 

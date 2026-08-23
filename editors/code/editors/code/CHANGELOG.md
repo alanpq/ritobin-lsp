@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.16](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.1.15...ritobin-lsp-vs-v0.1.16) (2026-08-23)
+
+
+### Miscellaneous Chores
+
+* **ritobin-lsp-vs:** Synchronize ritobin-lsp versions
+
 ## [0.1.15](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.0.14...ritobin-lsp-vs-v0.1.15) (2026-08-20)
 
 
