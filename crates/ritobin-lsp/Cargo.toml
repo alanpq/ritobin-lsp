@@ -27,7 +27,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 serde_with.workspace = true
 
-ltk_ritobin = { workspace = true, features = ["serde", "ast"] }
+ltk_ritobin = { workspace = true, features = ["serde"] }
 ltk_meta = { workspace = true, features = ["serde"] }
 ltk_hash.workspace = true
 ltk_mimir_cache.workspace = true

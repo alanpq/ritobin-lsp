@@ -6,8 +6,8 @@ use lsp_types::{
 };
 use ltk_ritobin::{
     RitoType,
+    ast::diagnostics::{Diagnostic, DiagnosticWithSpan},
     parse::ErrorKind,
-    typecheck::diagnostics::{Diagnostic, DiagnosticWithSpan},
 };
 
 use crate::{config::LintsConfig, linter::Linter, worker::Worker};
