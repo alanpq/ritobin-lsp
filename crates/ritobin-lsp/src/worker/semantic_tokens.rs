@@ -1,14 +1,54 @@
-use lsp_types::{Position, Range};
+use lsp_types::{Position, Range, SemanticToken, SemanticTokensFullDeltaResult};
 use ltk_ritobin::{
     cst::{
         Node, NodeId, TokenId, TreeKind, Visitor,
-        visitor::{Visit, VisitCtx},
+        visitor::{Visit, VisitCtx, VisitorExt as _},
     },
     parse::{Span, TokenKind},
 };
 use ritobin_lsp::line_ends::LineNumbers;
 
-use crate::lsp::semantic_tokens::{self, builder::SemanticTokensBuilder, types::idx};
+use crate::{
+    lsp::semantic_tokens::{self, TokenRequest, builder::SemanticTokensBuilder, types::idx},
+    worker::Worker,
+};
+
+impl Worker {
+    pub(super) fn semantic_tokens(
+        &mut self,
+        range: Option<Range>,
+        previous_result_id: Option<String>,
+    ) -> SemanticTokensFullDeltaResult {
+        let tokens = self.collect_tokens(range.as_ref());
+
+        let request = match (&range, &previous_result_id) {
+            (Some(_), _) => TokenRequest::Range,
+            (None, Some(cited)) => TokenRequest::Delta(cited),
+            (None, None) => TokenRequest::Full,
+        };
+
+        self.tokens.respond(request, tokens)
+    }
+
+    fn collect_tokens(&self, range: Option<&Range>) -> Vec<SemanticToken> {
+        let doc = &self.document;
+        let Some(cst) = self.cst.as_ref() else {
+            return Vec::new();
+        };
+
+        let visitor = SemanticVisitor {
+            text: &doc.text,
+            line_nums: &doc.line_numbers,
+            stack: Vec::new(),
+            entry_typed: Vec::new(),
+            range: range.map(|range| doc.line_numbers.from_range(range)),
+            builder: SemanticTokensBuilder::default(),
+        }
+        .walk(cst);
+
+        visitor.builder.build()
+    }
+}
 
 pub struct SemanticVisitor<'a> {
     pub text: &'a str,
