@@ -1,4 +1,7 @@
-use lsp_types::{Diagnostic as LspDiag, DiagnosticSeverity, DiagnosticTag};
+use lsp_types::{
+    Diagnostic as LspDiag, DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag,
+    Location,
+};
 use ltk_ritobin::{RitoType, parse::Span};
 
 use crate::{
@@ -18,6 +21,8 @@ pub enum Lint {
     },
     /// Entry has the same value as the class' default
     DefaultValue { entry: Span, span: Span },
+    /// Entry is shadowed by earlier entry with same key
+    ShadowedEntry { entry: Span, shadowed_by: Span },
 }
 
 impl Lint {
@@ -27,6 +32,26 @@ impl Lint {
         lints: &LintsConfig,
     ) -> Option<(LspDiag, Option<CodeActionData>)> {
         match self {
+            Lint::ShadowedEntry { entry, shadowed_by } => Some((
+                LspDiag {
+                    range: document.line_numbers.from_span(entry),
+                    message: format!(
+                        "Entry '{}' shadows (overrides) an already defined earlier entry in this block.",
+                        &document.text[entry]
+                    ),
+                    severity: Some(DiagnosticSeverity::WARNING),
+                    related_information: Some(vec![DiagnosticRelatedInformation {
+                        location: Location {
+                            uri: document.uri.clone(),
+                            range: document.line_numbers.from_span(shadowed_by),
+                        },
+                        message: "The shadowed/overriden entry is here".into(),
+                    }]),
+
+                    ..Default::default()
+                },
+                None,
+            )),
             Lint::UnknownField { entry, span } => Some((
                 LspDiag {
                     range: document.line_numbers.from_span(span),

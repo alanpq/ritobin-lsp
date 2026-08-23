@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use lsp_types::Url;
 use ltk_hash::{BinHash, Hash as _};
-use ltk_ritobin::{Cst, ast::visitor::VisitorExt as _};
+use ltk_ritobin::Cst;
 
 use super::*;
 use crate::document::Document;
@@ -52,8 +52,7 @@ fn unknown_fields(text: &str) -> Vec<String> {
     let ast = Cst::parse(&document.text).build_ast(&document.text);
 
     Linter::new(&classes)
-        .walk(&ast)
-        .lints
+        .run(&ast)
         .into_iter()
         .filter_map(|lint| match lint {
             Lint::UnknownField { span, .. } => Some(document.text[span].to_owned()),
