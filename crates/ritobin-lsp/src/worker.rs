@@ -17,7 +17,13 @@ use lsp_types::{
 use ltk_mimir_cache::Table;
 use ltk_ritobin::{
     Cst,
-    ast::{Ast, Node},
+    ast::{
+        Ast,
+        query::{
+            AstObjectDetail, AstPropertyDetail, AstStructDetail,
+            nodes::{DetailedNode, NodeExt as _},
+        },
+    },
     cst::visitor::VisitorExt as _,
     print::PrintConfig,
 };
@@ -338,14 +344,19 @@ impl Worker {
         };
 
         let offset = doc.line_numbers.from_position(pos);
-        let mut path = ast.path_to(offset).collect_vec();
+        let mut path = ast.fine_path_to(offset).collect_vec();
+
+        // tracing::info!("######");
+        // for n in &fine_path {
+        //     tracing::info!("- {:?} / {:?}", n.kind(), n.detail());
+        // }
 
         let Some(located) = path.pop() else {
             return Ok(None);
         };
         // the nearest enclosing class - what hover needs to resolve a property name or render a
         // class' doc link
-        let Some(scope) = path.pop().and_then(|n| n.class_hash()) else {
+        let Some(scope) = path.iter().rev().find_map(|n| n.class_hash()) else {
             return Ok(None);
         };
 
@@ -360,7 +371,10 @@ impl Worker {
         let markup = MarkupContent {
             kind: MarkupKind::Markdown,
             value: match located {
-                Node::Property(prop) => {
+                DetailedNode::Property(
+                    prop,
+                    AstPropertyDetail::Name | AstPropertyDetail::Trivia | AstPropertyDetail::Node,
+                ) => {
                     let txt = &doc.text[prop.name.span];
                     let hash = prop.name.value;
                     let prop_meta = {
@@ -393,62 +407,66 @@ impl Worker {
                         None => format!("{txt}: ??"),
                     }
                 }
-                Node::Object(_) | Node::Struct(_) => match class {
-                    Some(class) => {
-                        let mut txt = format!(
-                            "### [{class_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/) (`0x{:>08x}`)\n\n",
-                            class_name.to_ascii_lowercase(),
-                            class_hash,
-                        );
-
-                        let mut base = Some((U32Hash::from(class_hash), class));
-                        let mut d = 0;
-                        let bin_types = self
-                            .server
-                            .hashes
-                            .as_ref()
-                            .and_then(|hashes| hashes.table(Table::BinTypes));
-
-                        {
-                            let classes = self.server.meta.classes.read().unwrap();
-                            while let Some((hash, class)) = base {
-                                if d > 0 {
-                                    let base_name = bin_types
-                                        .as_ref()
-                                        .and_then(|h| h.get((*hash).into()))
-                                        .unwrap_or_else(|| hash.to_string().into());
-                                    writeln!(
-                                        txt,
-                                        "{}└─ [{base_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/)\n",
-                                        "\u{00A0}".repeat(d - 1),
-                                        base_name.to_ascii_lowercase()
-                                    )?;
-                                }
-                                d += 1;
-                                base = class.base.and_then(|b| Some((b, classes.get(b).cloned()?)));
-                            }
-                        }
-
-                        let name = GetDocsNameOrHash::try_from(class_name).unwrap();
-                        let body = match wiki::fetch_class_docs(&self.server.wiki, &name).await {
-                            Ok(docs) => wiki::describe(docs.class.as_ref()).to_owned(),
-                            Err(msg) => msg,
-                        };
-                        writeln!(txt, "{body}").unwrap();
-
-                        txt
-                    }
-                    None => format!("*Unknown class `{class_name}`*"),
-                },
-                Node::Value(value) => {
-                    return Ok(Some(Hover {
-                        range: None,
-                        contents: lsp_types::HoverContents::Array(vec![
-                            MarkedString::from_markdown(format!("`{}`", value.rito_type())),
-                            MarkedString::from_markdown(format!("value of literal: `{value}`")),
-                        ]),
-                    }));
+                DetailedNode::Property(_, AstPropertyDetail::TypeExpr) => {
+                    return Ok(None);
                 }
+                DetailedNode::Object(_, AstObjectDetail::PathHash | AstObjectDetail::Node)
+                | DetailedNode::Struct(_, AstStructDetail::ClassHash | AstStructDetail::Node) => {
+                    match class {
+                        Some(class) => {
+                            let mut txt = format!(
+                                "### [{class_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/) (`0x{:>08x}`)\n\n",
+                                class_name.to_ascii_lowercase(),
+                                class_hash,
+                            );
+
+                            let mut base = Some((U32Hash::from(class_hash), class));
+                            let mut d = 0;
+                            let bin_types = self
+                                .server
+                                .hashes
+                                .as_ref()
+                                .and_then(|hashes| hashes.table(Table::BinTypes));
+
+                            {
+                                let classes = self.server.meta.classes.read().unwrap();
+                                while let Some((hash, class)) = base {
+                                    if d > 0 {
+                                        let base_name = bin_types
+                                            .as_ref()
+                                            .and_then(|h| h.get((*hash).into()))
+                                            .unwrap_or_else(|| hash.to_string().into());
+                                        writeln!(
+                                            txt,
+                                            "{}└─ [{base_name}](https://meta-wiki.leaguetoolkit.dev/classes/{}/)\n",
+                                            "\u{00A0}".repeat(d - 1),
+                                            base_name.to_ascii_lowercase()
+                                        )?;
+                                    }
+                                    d += 1;
+                                    base = class
+                                        .base
+                                        .and_then(|b| Some((b, classes.get(b).cloned()?)));
+                                }
+                            }
+
+                            let name = GetDocsNameOrHash::try_from(class_name).unwrap();
+                            let body = match wiki::fetch_class_docs(&self.server.wiki, &name).await
+                            {
+                                Ok(docs) => wiki::describe(docs.class.as_ref()).to_owned(),
+                                Err(msg) => msg,
+                            };
+                            writeln!(txt, "{body}").unwrap();
+
+                            txt
+                        }
+                        None => format!("*Unknown class `{class_name}`*"),
+                    }
+                }
+                DetailedNode::Value(value) => {
+                    format!("**{}**\n\nvalue: `{value}`", value.rito_type())
+                }
+                _ => return Ok(None),
             },
         };
 
