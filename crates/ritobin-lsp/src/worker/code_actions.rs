@@ -3,13 +3,13 @@ use std::collections::HashMap;
 use lsp_types::{
     CodeAction, CodeActionOrCommand, CodeActionResponse, Diagnostic, Range, TextEdit, WorkspaceEdit,
 };
-use ltk_ritobin::{RitoType, cst::NodeId, parse::Span};
+use ltk_ritobin::{RitoType, parse::Span};
 
 use crate::worker::Worker;
 
 pub enum CodeActionData {
     TypeMismatch { type_expr: Span, expected: RitoType },
-    RemoveEntry(NodeId),
+    RemoveEntry(Span),
 }
 
 impl Worker {
@@ -61,27 +61,21 @@ impl Worker {
                     ..Default::default()
                 })
             }
-            CodeActionData::RemoveEntry(entry) => {
-                let cst = self.cst.as_ref()?;
-
-                let node = cst.node(*entry)?;
-
-                CodeActionOrCommand::CodeAction(CodeAction {
-                    title: "Remove this entry".into(),
-                    edit: Some(WorkspaceEdit {
-                        changes: Some(HashMap::from_iter([(
-                            self.document.uri.clone(),
-                            [TextEdit {
-                                range: self.document.line_numbers.from_span(node.span),
-                                new_text: String::new(),
-                            }]
-                            .into(),
-                        )])),
-                        ..Default::default()
-                    }),
+            CodeActionData::RemoveEntry(entry) => CodeActionOrCommand::CodeAction(CodeAction {
+                title: "Remove this entry".into(),
+                edit: Some(WorkspaceEdit {
+                    changes: Some(HashMap::from_iter([(
+                        self.document.uri.clone(),
+                        [TextEdit {
+                            range: self.document.line_numbers.from_span(*entry),
+                            new_text: String::new(),
+                        }]
+                        .into(),
+                    )])),
                     ..Default::default()
-                })
-            }
+                }),
+                ..Default::default()
+            }),
         })
     }
 }

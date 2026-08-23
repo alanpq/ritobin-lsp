@@ -1,5 +1,5 @@
 use lsp_types::{Diagnostic as LspDiag, DiagnosticSeverity, DiagnosticTag};
-use ltk_ritobin::{RitoType, cst::NodeId, parse::Span};
+use ltk_ritobin::{RitoType, parse::Span};
 
 use crate::{
     config::{LintSeverity, LintsConfig},
@@ -9,21 +9,15 @@ use crate::{
 
 pub enum Lint {
     /// Field doesn't exist in known meta class
-    UnknownField {
-        entry: NodeId,
-        span: Span,
-        class: Span,
-    },
+    UnknownField { entry: Span, span: Span },
     MismatchedMetaTypeArg {
-        entry: NodeId,
-        class: Span,
         key: Span,
         type_expr: Span,
         expected: RitoType,
         got: RitoType,
     },
     /// Entry has the same value as the class' default
-    DefaultValue { entry: NodeId, span: Span },
+    DefaultValue { entry: Span, span: Span },
 }
 
 impl Lint {
@@ -33,11 +27,7 @@ impl Lint {
         lints: &LintsConfig,
     ) -> Option<(LspDiag, Option<CodeActionData>)> {
         match self {
-            Lint::UnknownField {
-                entry,
-                span,
-                class: _,
-            } => Some((
+            Lint::UnknownField { entry, span } => Some((
                 LspDiag {
                     range: document.line_numbers.from_span(span),
                     message: format!("Unknown field '{}'", &document.text[span]),
@@ -64,8 +54,6 @@ impl Lint {
                 ))
             }
             Lint::MismatchedMetaTypeArg {
-                entry: _,
-                class: _,
                 key,
                 type_expr,
                 expected,
