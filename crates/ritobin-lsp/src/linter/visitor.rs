@@ -1,7 +1,6 @@
 use ltk_hash::BinHash;
-use ltk_meta::PropertyValueEnum;
 use ltk_ritobin::ast::{
-    AstProperty, AstStruct,
+    Ast, AstProperty, AstStruct, AstValue,
     visitor::{Visit, Visitor},
 };
 
@@ -11,7 +10,13 @@ use meta_wiki::{
     service::Classes,
 };
 
+mod shadowed;
+
 pub struct Linter<'a> {
+    inner: LintVisitor<'a>,
+}
+
+pub struct LintVisitor<'a> {
     class_meta: &'a Classes,
     class_scopes: Vec<BinHash>,
     pub lints: Vec<Lint>,
@@ -20,21 +25,38 @@ pub struct Linter<'a> {
 impl<'a> Linter<'a> {
     pub fn new(class_meta: &'a Classes) -> Self {
         Self {
-            class_meta,
-            class_scopes: vec![],
-            lints: vec![],
+            inner: LintVisitor {
+                class_meta,
+                class_scopes: vec![],
+                lints: vec![],
+            },
         }
+    }
+    pub fn run(mut self, ast: &Ast) -> Vec<Lint> {
+        shadowed::check_ast_objects(&mut self.inner.lints, ast);
+        ast.walk(&mut self.inner);
+        self.inner.lints
     }
 }
 
-impl Visitor for Linter<'_> {
+impl Visitor for LintVisitor<'_> {
     fn enter_struct(&mut self, s: &AstStruct) -> Visit {
         self.class_scopes.push(s.class_hash.value);
+
+        shadowed::check_struct(&mut self.lints, s);
+
         Visit::Continue
     }
 
     fn exit_struct(&mut self, _s: &AstStruct) -> Visit {
         self.class_scopes.pop();
+        Visit::Continue
+    }
+
+    fn enter_value(&mut self, value: &AstValue) -> Visit {
+        if let AstValue::Map { entries, .. } = value {
+            shadowed::check_map_entries(&mut self.lints, entries.iter());
+        }
         Visit::Continue
     }
 
