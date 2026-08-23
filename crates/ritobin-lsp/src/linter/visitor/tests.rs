@@ -2,9 +2,10 @@ use std::collections::HashMap;
 
 use lsp_types::Url;
 use ltk_hash::{BinHash, Hash as _};
-use ltk_ritobin::{Cst, cst::visitor::VisitorExt as _};
+use ltk_ritobin::{Cst, ast::visitor::VisitorExt as _};
 
 use super::*;
+use crate::document::Document;
 use meta_wiki::schema::{Class, ClassFlags, Property, U32Hash};
 
 const SKIN: &str = "SkinCharacterDataProperties";
@@ -48,10 +49,10 @@ fn classes() -> Classes {
 fn unknown_fields(text: &str) -> Vec<String> {
     let document = Document::new(Url::parse("file:///t.rito").unwrap(), 0, text.to_owned());
     let classes = classes();
-    let cst = Cst::parse(&document.text);
+    let ast = Cst::parse(&document.text).build_ast(&document.text);
 
-    Linter::new(&document, &classes)
-        .walk(&cst)
+    Linter::new(&classes)
+        .walk(&ast)
         .lints
         .into_iter()
         .filter_map(|lint| match lint {
@@ -99,7 +100,7 @@ fn properties_are_checked_against_the_innermost_class() {
             image: string = \"hello\"
         }}
 
-        skinMeshProperties = {CHILD} {{
+        skinMeshProperties: embed = {CHILD} {{
             boneName: string = \"root\"
             skinClassification: u32 = 1
         }}
