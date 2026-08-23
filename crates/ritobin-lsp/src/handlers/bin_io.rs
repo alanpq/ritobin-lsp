@@ -13,8 +13,8 @@ use std::{
 
 use ltk_ritobin::{
     Cst,
+    ast::{PartialBin, diagnostics::Diagnostic},
     print::{Print as _, PrintConfig, PrintError},
-    typecheck::diagnostics::Diagnostic,
 };
 
 use crate::{fs_ext, lsp::ext::DeserializeBinResult, server::BinHashProvider};
@@ -107,7 +107,7 @@ pub fn serialize_bin(bin_path: &Path, text: &str) -> Result<(), SerializeError> 
         return Err(SerializeError::InvalidSource);
     }
 
-    let (bin, diagnostics) = cst.build_bin(text);
+    let PartialBin { bin, diagnostics } = cst.build_bin(text);
     let has_errors = diagnostics
         .iter()
         .any(|d| !matches!(d.diagnostic, Diagnostic::ShadowedEntry { .. }));

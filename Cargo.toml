@@ -32,9 +32,9 @@ serde_with = "3.18.0"
 
 camino = "1.1.10"
 
-ltk_ritobin = { git = "https://github.com/LeagueToolkit/league-toolkit.git", branch = "lsp-escape-hatch", features = ["serde"] }
-ltk_meta = { git = "https://github.com/LeagueToolkit/league-toolkit.git", branch = "lsp-escape-hatch", features = ["serde"] }
-ltk_hash = { git = "https://github.com/LeagueToolkit/league-toolkit.git", branch = "lsp-escape-hatch" }
+ltk_ritobin = { git = "https://github.com/LeagueToolkit/league-toolkit.git", branch = "ritobin/ast", features = ["serde"] }
+ltk_meta = { git = "https://github.com/LeagueToolkit/league-toolkit.git", branch = "ritobin/ast", features = ["serde"] }
+ltk_hash = { git = "https://github.com/LeagueToolkit/league-toolkit.git", branch = "ritobin/ast" }
 ltk_mimir_cache = { git = "https://github.com/LeagueToolkit/Mimir.git" }
 ltk_hashdb = { git = "https://github.com/LeagueToolkit/Mimir.git" }
 
