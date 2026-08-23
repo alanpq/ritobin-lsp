@@ -63,8 +63,7 @@ impl Visitor for Linter<'_> {
                     .defaults
                     .as_ref()
                     .and_then(|d| d.get(&U32Hash::from(key_hash)))
-                    && let Ok(value) = PropertyValueEnum::try_from(property.value.clone())
-                    && EqExt::eq(default, &value)
+                    && EqExt::eq(default, &property.value.clone().to_bin_value())
                 {
                     self.lints.push(Lint::DefaultValue {
                         entry: property.span(),
