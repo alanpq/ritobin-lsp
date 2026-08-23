@@ -6,6 +6,7 @@ use lsp_types::{
 };
 use ltk_ritobin::{
     RitoType,
+    ast::visitor::VisitorExt as _,
     parse::ErrorKind,
     typecheck::diagnostics::{Diagnostic, DiagnosticWithSpan},
 };
@@ -194,30 +195,31 @@ impl Worker {
             }),
         }
 
-        let classes = self.server.meta.classes.clone();
-        let classes = classes.read().unwrap();
-        let mut linter = Linter::new(&self.document, &classes);
-        cst.walk(&mut linter);
+        if let Some(ast) = self.ast.as_ref() {
+            let classes = self.server.meta.classes.clone();
+            let classes = classes.read().unwrap();
+            let linter = Linter::new(&classes).walk(ast);
 
-        let default_lints_config = LintsConfig::default();
-        let lints_config = self
-            .server
-            .config
-            .initialization_options
-            .as_ref()
-            .and_then(|opt| opt.lints.as_ref())
-            .unwrap_or(&default_lints_config);
+            let default_lints_config = LintsConfig::default();
+            let lints_config = self
+                .server
+                .config
+                .initialization_options
+                .as_ref()
+                .and_then(|opt| opt.lints.as_ref())
+                .unwrap_or(&default_lints_config);
 
-        for (mut diag, action) in linter
-            .lints
-            .into_iter()
-            .filter_map(|l| l.into_lsp_diagnostic(&self.document, lints_config))
-            .collect::<Vec<_>>()
-        {
-            if let Some(action) = action {
-                diag.data.replace(self.register_code_action(action).into());
+            for (mut diag, action) in linter
+                .lints
+                .into_iter()
+                .filter_map(|l| l.into_lsp_diagnostic(&self.document, lints_config))
+                .collect::<Vec<_>>()
+            {
+                if let Some(action) = action {
+                    diag.data.replace(self.register_code_action(action).into());
+                }
+                diagnostics.push(diag);
             }
-            diagnostics.push(diag);
         }
 
         diagnostics.truncate(
