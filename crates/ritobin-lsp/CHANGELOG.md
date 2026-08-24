@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.17](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.16...ritobin-lsp-v0.1.17) (2026-08-24)
+
+
+### Bug Fixes
+
+* update ltk ([8a391f9](https://github.com/alanpq/ritobin-lsp/commit/8a391f977b0980cf370665d4e3e75133bba300f3))
+
 ## [0.1.16](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.15...ritobin-lsp-v0.1.16) (2026-08-23)
 
 
