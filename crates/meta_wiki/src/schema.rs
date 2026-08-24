@@ -345,6 +345,9 @@ impl<M: Clone> EqExt<PropertyValueEnum<M>> for serde_json::Value {
                 | PropertyValueEnum::UnorderedContainer(values::UnorderedContainer(c)) =
                     other =>
             {
+                if values.len() != c.len() {
+                    return false;
+                }
                 let c = c.clone().into_items();
                 values.iter().zip(c).all(|(a, b)| EqExt::eq(a, &b))
             }
