@@ -97,7 +97,7 @@ pub fn deserialize_bin(
 
     Ok(DeserializeBinResult {
         text,
-        is_override: bin.is_override,
+        is_override: false,
     })
 }
 
@@ -113,9 +113,6 @@ pub fn serialize_bin(bin_path: &Path, text: &str) -> Result<(), SerializeError> 
         .any(|d| !matches!(d.diagnostic, Diagnostic::ShadowedEntry { .. }));
     if has_errors {
         return Err(SerializeError::InvalidSource);
-    }
-    if bin.is_override {
-        return Err(SerializeError::Override);
     }
 
     let mut buf = Cursor::new(Vec::new());
