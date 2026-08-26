@@ -42,7 +42,7 @@ impl Worker {
         };
 
         let class_hash = scope.value;
-        let class_name = &doc.text[scope.span];
+        let class_name = &doc.text[scope.span()];
 
         let class = {
             let classes = self.server.meta.classes.read().unwrap();
@@ -56,7 +56,7 @@ impl Worker {
                     prop,
                     AstPropertyDetail::Name | AstPropertyDetail::Trivia | AstPropertyDetail::Node,
                 ) => {
-                    let txt = &doc.text[prop.name.span];
+                    let txt = &doc.text[prop.name.span()];
                     let hash = prop.name.value;
                     let prop_meta = {
                         let classes = self.server.meta.classes.read().unwrap();

@@ -1,10 +1,17 @@
+use std::{fmt, ops::Deref};
+
 use lsp_types::{Range, TextEdit};
 use ltk_hash::BinHash;
 use ltk_mimir_cache::Table;
 use ltk_ritobin::{
+    ast::{
+        AstStruct, AstValue,
+        hash::{HashedLiteral, Originally},
+        visitor::VisitorExt,
+    },
     cst::{
         NodeId, TokenId, Visitor,
-        visitor::{Visit, VisitCtx, VisitorExt},
+        visitor::{Visit, VisitCtx},
     },
     parse::{Span, TokenKind},
 };
@@ -13,7 +20,7 @@ use crate::{server::Hashes, worker::Worker};
 
 impl Worker {
     pub fn unhash(&self, _range: Option<Range>) -> anyhow::Result<Option<Vec<TextEdit>>> {
-        let Some(cst) = self.cst.as_ref() else {
+        let Some(ast) = self.ast.as_ref() else {
             return Ok(None);
         };
 
@@ -22,7 +29,7 @@ impl Worker {
             return Ok(None);
         };
 
-        let unhasher = Unhasher::new(hashes, &self.document.text).walk(cst);
+        let unhasher = Unhasher::new(hashes).walk(ast);
 
         Ok(Some(
             unhasher
@@ -39,58 +46,74 @@ impl Worker {
 
 struct Unhasher<'a> {
     hashes: &'a Hashes,
-    txt: &'a str,
     edits: Vec<(Span, String)>,
 }
 
-impl<'a> Unhasher<'a> {
-    pub fn new(hashes: &'a Hashes, txt: &'a str) -> Self {
-        Self {
-            hashes,
-            txt,
-            edits: vec![],
+enum OutputFormat {
+    String,
+    Name,
+}
+
+impl OutputFormat {
+    fn make_output(&self, inner: impl fmt::Display) -> String {
+        match self {
+            Self::String => format!("\"{inner}\""),
+            Self::Name => inner.to_string(),
         }
     }
 }
 
-impl<'a> Visitor for Unhasher<'a> {
-    fn visit_token(&mut self, ctx: &VisitCtx, token: TokenId, parent: NodeId) -> Visit {
-        let token = ctx.cst.token(token).unwrap();
-        let parent = ctx.cst.node(parent).unwrap();
-
-        if token.kind != TokenKind::HexLit {
-            return Visit::Continue;
+impl<'a> Unhasher<'a> {
+    pub fn new(hashes: &'a Hashes) -> Self {
+        Self {
+            hashes,
+            edits: vec![],
         }
+    }
 
-        // eprintln!("[unhash] {:?}", parent.kind);
-        let Some(txt) = &self.txt[token.span].strip_prefix("0x") else {
-            return Visit::Continue;
-        };
-
-        let bin_fields = self.hashes.table(Table::BinFields);
-        let bin_types = self.hashes.table(Table::BinTypes);
-
-        let unhashed = match parent.kind {
-            ltk_ritobin::cst::Kind::EntryKey => {
-                let Some(k) = BinHash::from_str_radix(txt, 16).ok() else {
-                    return Visit::Continue;
-                };
-                bin_fields.as_ref().and_then(|h| h.get((*k).into()))
+    fn unhash<H, T>(&mut self, hash: &HashedLiteral<H>, table: Table, format: OutputFormat)
+    where
+        H: ltk_hash::Hash + Deref<Target = T>,
+        T: Into<u64> + Copy,
+    {
+        if hash.was_hash() {
+            let table = self.hashes.table(table);
+            if let Some(unhashed) = table.as_ref().and_then(|h| h.get((*hash.value).into())) {
+                self.edits.push((hash.span(), format.make_output(unhashed)));
             }
-            ltk_ritobin::cst::Kind::Class => {
-                let Some(k) = BinHash::from_str_radix(txt, 16).ok() else {
-                    return Visit::Continue;
-                };
-                bin_types.as_ref().and_then(|h| h.get((*k).into()))
-            }
-            _ => return Visit::Continue,
-        };
-
-        if let Some(unhashed) = unhashed.as_ref() {
-            self.edits.push((token.span, unhashed.to_string()));
         }
-        // eprintln!("[unhash] -> {unhashed:?}");
+    }
+}
 
+impl<'a> ltk_ritobin::ast::visitor::Visitor for Unhasher<'a> {
+    fn enter_struct(&mut self, s: &AstStruct) -> Visit {
+        self.unhash(&s.class_hash, Table::BinTypes, OutputFormat::Name);
+        Visit::Continue
+    }
+
+    fn enter_property(&mut self, property: &ltk_ritobin::ast::AstProperty) -> Visit {
+        self.unhash(&property.name, Table::BinFields, OutputFormat::Name);
+        Visit::Continue
+    }
+
+    fn enter_object(&mut self, object: &ltk_ritobin::ast::AstObject) -> Visit {
+        self.unhash(&object.path_hash, Table::BinEntries, OutputFormat::String);
+        Visit::Continue
+    }
+
+    fn enter_value(&mut self, value: &AstValue) -> Visit {
+        match value {
+            AstValue::Hash(hash) => {
+                self.unhash(hash, Table::BinHashes, OutputFormat::String);
+            }
+            AstValue::WadChunkLink(hash) => {
+                self.unhash(hash, Table::Game, OutputFormat::String);
+            }
+            AstValue::ObjectLink(hash) => {
+                self.unhash(hash, Table::BinEntries, OutputFormat::String);
+            }
+            _ => {}
+        }
         Visit::Continue
     }
 }

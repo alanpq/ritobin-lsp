@@ -75,7 +75,7 @@ impl Visitor for LintVisitor<'_> {
                 let got = property.value.rito_type();
                 if expected != got {
                     self.lints.push(Lint::MismatchedMetaTypeArg {
-                        key: property.name.span,
+                        key: property.name.span(),
                         type_expr: property.type_span.unwrap_or(property.value.span()),
                         expected,
                         got,
@@ -96,7 +96,7 @@ impl Visitor for LintVisitor<'_> {
             None => {
                 self.lints.push(Lint::UnknownField {
                     entry: property.span(),
-                    span: property.name.span,
+                    span: property.name.span(),
                 });
             }
         }
