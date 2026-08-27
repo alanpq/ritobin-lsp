@@ -5,6 +5,7 @@ use lsp_types::{Hover, MarkupContent, MarkupKind, WorkDoneProgressParams};
 
 use ltk_mimir_cache::Table;
 use ltk_ritobin::ast::{
+    diagnostics::RitoTypeOrVirtual,
     node::{NodeExt as _, SubNodeRef},
     query::{AstObjectDetail, AstPropertyDetail, AstRootEntryDetail},
 };
@@ -148,7 +149,10 @@ impl Worker {
                     }
                 }
                 SubNodeRef::Value(value) => {
-                    format!("**{}**\n\nvalue: `{value}`", value.rito_type())
+                    format!(
+                        "**{}**\n\nvalue: `{value}`",
+                        RitoTypeOrVirtual::from(value.rito_type())
+                    )
                 }
                 _ => return Ok(None),
             },

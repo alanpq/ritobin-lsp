@@ -7,7 +7,7 @@ use ltk_mimir_cache::Table;
 use crate::worker::{
     CompletionRequest, Worker,
     completion::{
-        context::CursorContext,
+        context::{CompletionContext, CursorContext},
         items::{property_items, type_item, value_items, value_slot},
     },
 };
@@ -17,12 +17,12 @@ use meta_wiki::schema::U32Hash;
 impl Worker {
     pub fn complete(&self, req: CompletionRequest) -> anyhow::Result<Option<CompletionResponse>> {
         let doc = &self.document;
-        let Some(cst) = self.cst.as_ref() else {
+        let Some(ast) = self.ast.as_ref() else {
             return Ok(None);
         };
 
         let offset = doc.line_numbers.from_position(&req.position);
-        let Some(context) = context::resolve(cst, &doc.text, offset) else {
+        let Some(resolved) = CompletionContext::resolve(ast, &doc.text, offset) else {
             return Ok(None);
         };
 
@@ -35,16 +35,21 @@ impl Worker {
         let type_name = |hash: U32Hash| types.as_ref().and_then(|db| db.get(hash.0.into()));
 
         let snippets = self.server.config.caps().completion_snippet();
+        let replace = doc.line_numbers.from_span(resolved.replace);
         let values = |class, property, element| {
             value_slot(classes, class, property, element)
-                .map(|slot| value_items(classes, slot, type_name, snippets))
+                .map(|slot| value_items(classes, slot, type_name, snippets, replace))
                 .unwrap_or_default()
         };
 
-        let items: Vec<CompletionItem> = match context {
-            CursorContext::PropertyKey { class } => property_items(classes, class, field_name),
+        let items: Vec<CompletionItem> = match resolved.context {
+            CursorContext::PropertyKey { class } => {
+                property_items(classes, class, field_name, replace)
+            }
             CursorContext::PropertyType { class, property } => {
-                type_item(classes, class, property).into_iter().collect()
+                type_item(classes, class, property, replace)
+                    .into_iter()
+                    .collect()
             }
             CursorContext::PropertyValue { class, property } => values(class, property, false),
             CursorContext::ContainerItem { class, property } => values(class, property, true),
