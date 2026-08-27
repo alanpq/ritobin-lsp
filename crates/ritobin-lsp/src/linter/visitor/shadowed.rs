@@ -104,7 +104,7 @@ mod tests {
         let classes = Classes::default();
         let ast = Cst::parse(&document.text).build_ast(&document.text);
 
-        Linter::new(&classes)
+        Linter::new(&classes, None)
             .run(&ast)
             .into_iter()
             .filter_map(|lint| match lint {

@@ -1,22 +1,22 @@
-use std::{fmt, ops::Deref};
-
-use lsp_types::{Range, TextEdit};
-use ltk_hash::BinHash;
-use ltk_mimir_cache::Table;
-use ltk_ritobin::{
-    ast::{
-        AstStruct, AstValue,
-        hash::{HashedLiteral, Originally},
-        visitor::VisitorExt,
-    },
-    cst::{
-        NodeId, TokenId, Visitor,
-        visitor::{Visit, VisitCtx},
-    },
-    parse::{Span, TokenKind},
+use std::{
+    borrow::Cow,
+    fmt::{self, Display},
+    marker::PhantomData,
+    ops::Deref,
 };
 
-use crate::{server::Hashes, worker::Worker};
+use lsp_types::{Range, TextEdit};
+use ltk_mimir_cache::Table;
+use ltk_ritobin::{
+    Spanned,
+    ast::{
+        Ast, AstObject, AstProperty, AstStruct, AstValue,
+        hash::HashedLiteral,
+        visitor::{Visit, Visitor, VisitorExt},
+    },
+};
+
+use crate::{server::HashesSnapshot, worker::Worker};
 
 impl Worker {
     pub fn unhash(&self, _range: Option<Range>) -> anyhow::Result<Option<Vec<TextEdit>>> {
@@ -24,95 +24,177 @@ impl Worker {
             return Ok(None);
         };
 
-        let Some(hashes) = self.server.hashes.as_ref() else {
+        let Some(hashes) = self.server.hashes.as_ref().map(|h| h.snapshot()) else {
             // TODO: propagate this err to client
             return Ok(None);
         };
 
-        let unhasher = Unhasher::new(hashes).walk(ast);
+        let edits = Unhasher::new(&hashes, |report: Report<'_>| TextEdit {
+            range: self.document.line_numbers.from_span(report.hash.span),
+            new_text: report.unhash.to_string(),
+        })
+        .walk(ast);
 
-        Ok(Some(
-            unhasher
-                .edits
-                .into_iter()
-                .map(|e| TextEdit {
-                    range: self.document.line_numbers.from_span(e.0),
-                    new_text: e.1,
-                })
-                .collect(),
-        ))
+        Ok(Some(edits))
     }
 }
 
-struct Unhasher<'a> {
-    hashes: &'a Hashes,
-    edits: Vec<(Span, String)>,
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct Report<'a> {
+    pub hash: Spanned<u64>,
+    pub table: Table,
+    pub unhash: Unhash<'a>,
 }
 
-enum OutputFormat {
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct Unhash<'a> {
+    pub value: Cow<'a, str>,
+    pub format: OutputFormat,
+}
+
+impl<'a> Unhash<'a> {
+    pub fn new(value: impl Into<Cow<'a, str>>, format: OutputFormat) -> Self {
+        Self {
+            value: value.into(),
+            format,
+        }
+    }
+}
+
+impl Display for Unhash<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Unhash { value, format } = self;
+        match format {
+            OutputFormat::Name => value.fmt(f),
+            OutputFormat::String => write!(f, "\"{value}\""),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub enum OutputFormat {
     String,
     Name,
 }
 
-impl OutputFormat {
-    fn make_output(&self, inner: impl fmt::Display) -> String {
-        match self {
-            Self::String => format!("\"{inner}\""),
-            Self::Name => inner.to_string(),
-        }
+pub trait Map<T, U> {
+    fn map(&self, from: T) -> U;
+}
+
+impl<T, U, F: Fn(T) -> U> Map<T, U> for F {
+    fn map(&self, from: T) -> U {
+        (self)(from)
     }
 }
 
-impl<'a> Unhasher<'a> {
-    pub fn new(hashes: &'a Hashes) -> Self {
+/// Looks up hashed AST literals against the given hash tables.
+///
+/// Provides [`Self::unhash_struct`],[`Self::unhash_property`],[`Self::unhash_object`],[`Self::unhash_value`]
+#[derive(Clone, Copy)]
+pub struct Unhasher<'a, M: Map<Report<'a>, O>, O> {
+    hashes: &'a HashesSnapshot,
+    mapper: M,
+    _p: PhantomData<O>,
+}
+
+impl<'a, M: Map<Report<'a>, O>, O> Unhasher<'a, M, O> {
+    pub fn new(hashes: &'a HashesSnapshot, mapper: M) -> Self {
         Self {
             hashes,
-            edits: vec![],
+            mapper,
+            _p: PhantomData,
         }
     }
 
-    fn unhash<H, T>(&mut self, hash: &HashedLiteral<H>, table: Table, format: OutputFormat)
+    pub fn walk(self, ast: &Ast) -> Vec<O> {
+        Walker::new(self).run(ast)
+    }
+
+    fn unhash<H, T>(&self, hash: &HashedLiteral<H>, table: Table, format: OutputFormat) -> Option<O>
     where
         H: ltk_hash::Hash + Deref<Target = T>,
         T: Into<u64> + Copy,
     {
-        if hash.was_hash() {
-            let table = self.hashes.table(table);
-            if let Some(unhashed) = table.as_ref().and_then(|h| h.get((*hash.value).into())) {
-                self.edits.push((hash.span(), format.make_output(unhashed)));
+        if !hash.was_hash() {
+            return None;
+        }
+
+        let hash_val = (*hash.value).into();
+        let unhash = self.hashes.lookup(table, hash_val)?;
+        Some(self.mapper.map(Report {
+            table,
+            hash: Spanned::new(hash.span(), hash_val),
+            unhash: Unhash::new(unhash, format),
+        }))
+    }
+
+    pub fn unhash_struct(&self, s: &AstStruct) -> Option<O> {
+        self.unhash(&s.class_hash, Table::BinTypes, OutputFormat::Name)
+    }
+
+    pub fn unhash_property(&self, property: &AstProperty) -> Option<O> {
+        self.unhash(&property.name, Table::BinFields, OutputFormat::Name)
+    }
+
+    pub fn unhash_object(&self, object: &AstObject) -> Option<O> {
+        self.unhash(&object.path_hash, Table::BinEntries, OutputFormat::String)
+    }
+
+    pub fn unhash_value(&self, value: &AstValue) -> Option<O> {
+        match value {
+            AstValue::Hash(hash) => self.unhash(hash, Table::BinHashes, OutputFormat::String),
+            AstValue::WadChunkLink(hash) => self.unhash(hash, Table::Game, OutputFormat::String),
+            AstValue::ObjectLink(hash) => {
+                self.unhash(hash, Table::BinEntries, OutputFormat::String)
             }
+            _ => None,
         }
     }
 }
 
-impl<'a> ltk_ritobin::ast::visitor::Visitor for Unhasher<'a> {
+struct Walker<'a, M: Map<Report<'a>, O>, O> {
+    unhasher: Unhasher<'a, M, O>,
+    items: Vec<O>,
+}
+
+impl<'a, M: Map<Report<'a>, O>, O> Walker<'a, M, O> {
+    pub fn new(unhasher: Unhasher<'a, M, O>) -> Self {
+        Self {
+            unhasher,
+            items: vec![],
+        }
+    }
+
+    pub fn run(self, ast: &Ast) -> Vec<O> {
+        self.walk(ast).items
+    }
+}
+
+impl<'a, M: Map<Report<'a>, O>, O> Visitor for Walker<'a, M, O> {
     fn enter_struct(&mut self, s: &AstStruct) -> Visit {
-        self.unhash(&s.class_hash, Table::BinTypes, OutputFormat::Name);
+        if let Some(item) = self.unhasher.unhash_struct(s) {
+            self.items.push(item);
+        }
         Visit::Continue
     }
 
-    fn enter_property(&mut self, property: &ltk_ritobin::ast::AstProperty) -> Visit {
-        self.unhash(&property.name, Table::BinFields, OutputFormat::Name);
+    fn enter_property(&mut self, property: &AstProperty) -> Visit {
+        if let Some(item) = self.unhasher.unhash_property(property) {
+            self.items.push(item);
+        }
         Visit::Continue
     }
 
-    fn enter_object(&mut self, object: &ltk_ritobin::ast::AstObject) -> Visit {
-        self.unhash(&object.path_hash, Table::BinEntries, OutputFormat::String);
+    fn enter_object(&mut self, object: &AstObject) -> Visit {
+        if let Some(item) = self.unhasher.unhash_object(object) {
+            self.items.push(item);
+        }
         Visit::Continue
     }
 
     fn enter_value(&mut self, value: &AstValue) -> Visit {
-        match value {
-            AstValue::Hash(hash) => {
-                self.unhash(hash, Table::BinHashes, OutputFormat::String);
-            }
-            AstValue::WadChunkLink(hash) => {
-                self.unhash(hash, Table::Game, OutputFormat::String);
-            }
-            AstValue::ObjectLink(hash) => {
-                self.unhash(hash, Table::BinEntries, OutputFormat::String);
-            }
-            _ => {}
+        if let Some(item) = self.unhasher.unhash_value(value) {
+            self.items.push(item);
         }
         Visit::Continue
     }

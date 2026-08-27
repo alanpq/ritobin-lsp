@@ -10,6 +10,7 @@ use crate::worker::Worker;
 pub enum CodeActionData {
     TypeMismatch { type_expr: Span, expected: RitoType },
     RemoveEntry(Span),
+    Replace { span: Span, with: String },
 }
 
 impl Worker {
@@ -24,7 +25,7 @@ impl Worker {
     }
 
     pub fn code_actions(
-        &self,
+        &mut self,
         _range: Range,
         diagnostics: Vec<Diagnostic>,
     ) -> anyhow::Result<Option<CodeActionResponse>> {
@@ -36,10 +37,25 @@ impl Worker {
         ))
     }
 
-    fn code_action(&self, diagnostic: Diagnostic) -> Option<CodeActionOrCommand> {
+    fn code_action(&mut self, diagnostic: Diagnostic) -> Option<CodeActionOrCommand> {
         let idx = diagnostic.data.and_then(|d| d.as_u64())?;
-        let data = self.code_action_data.get(idx as usize)?;
+        let data = self.code_action_data.get_mut(idx as usize)?;
         Some(match data {
+            CodeActionData::Replace { span, with } => CodeActionOrCommand::CodeAction(CodeAction {
+                title: format!("Replace with '{with}'",),
+                edit: Some(WorkspaceEdit {
+                    changes: Some(HashMap::from_iter([(
+                        self.document.uri.clone(),
+                        [TextEdit {
+                            range: self.document.line_numbers.from_span(*span),
+                            new_text: with.clone(),
+                        }]
+                        .into(),
+                    )])),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
             CodeActionData::TypeMismatch {
                 type_expr,
                 expected,

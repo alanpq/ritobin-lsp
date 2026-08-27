@@ -197,7 +197,8 @@ impl Worker {
         if let Some(ast) = self.ast.as_ref() {
             let classes = self.server.meta.classes.clone();
             let classes = classes.read().unwrap();
-            let lints = Linter::new(&classes).run(ast);
+            let hashes = self.server.hashes.as_ref().map(|h| h.snapshot());
+            let lints = Linter::new(&classes, hashes.as_ref()).run(ast);
 
             let default_lints_config = LintsConfig::default();
             let lints_config = self
