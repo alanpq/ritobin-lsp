@@ -4,9 +4,9 @@ use itertools::Itertools;
 use lsp_types::{Hover, MarkupContent, MarkupKind, WorkDoneProgressParams};
 
 use ltk_mimir_cache::Table;
-use ltk_ritobin::ast::query::{
-    AstObjectDetail, AstPropertyDetail, AstStructDetail,
-    nodes::{DetailedNode, NodeExt as _},
+use ltk_ritobin::ast::{
+    node::{NodeExt as _, SubNodeRef},
+    query::{AstObjectDetail, AstPropertyDetail, AstRootEntryDetail},
 };
 
 use crate::{lsp::ext::PositionOrRange, wiki, worker::Worker};
@@ -52,7 +52,7 @@ impl Worker {
         let markup = MarkupContent {
             kind: MarkupKind::Markdown,
             value: match located {
-                DetailedNode::Property(
+                SubNodeRef::Property(
                     prop,
                     AstPropertyDetail::Name | AstPropertyDetail::Trivia | AstPropertyDetail::Node,
                 ) => {
@@ -88,11 +88,14 @@ impl Worker {
                         None => format!("{txt}: ??"),
                     }
                 }
-                DetailedNode::Property(_, AstPropertyDetail::TypeExpr) => {
+                SubNodeRef::Property(_, AstPropertyDetail::TypeExpr) => {
                     return Ok(None);
                 }
-                DetailedNode::Object(_, AstObjectDetail::PathHash | AstObjectDetail::Node)
-                | DetailedNode::Struct(_, AstStructDetail::ClassHash | AstStructDetail::Node) => {
+                SubNodeRef::RootEntry(
+                    _,
+                    AstRootEntryDetail::PathHash | AstRootEntryDetail::Node,
+                )
+                | SubNodeRef::Object(_, AstObjectDetail::ClassHash | AstObjectDetail::Node) => {
                     match class {
                         Some(class) => {
                             let mut txt = format!(
@@ -144,7 +147,7 @@ impl Worker {
                         None => format!("*Unknown class `{class_name}`*"),
                     }
                 }
-                DetailedNode::Value(value) => {
+                SubNodeRef::Value(value) => {
                     format!("**{}**\n\nvalue: `{value}`", value.rito_type())
                 }
                 _ => return Ok(None),

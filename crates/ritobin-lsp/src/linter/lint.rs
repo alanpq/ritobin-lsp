@@ -5,7 +5,7 @@ use lsp_types::{
     Location,
 };
 use ltk_mimir_cache::Table;
-use ltk_ritobin::{RitoType, Spanned, parse::Span};
+use ltk_ritobin::{RitoType, Spanned, ast::diagnostics::RitoTypeOrVirtual, parse::Span};
 
 use crate::{
     config::{LintSeverity, LintsConfig},
@@ -20,7 +20,7 @@ pub enum Lint {
         key: Span,
         type_expr: Span,
         expected: RitoType,
-        got: RitoType,
+        got: RitoTypeOrVirtual,
     },
     /// Entry has the same value as the class' default
     DefaultValue { entry: Span, span: Span },

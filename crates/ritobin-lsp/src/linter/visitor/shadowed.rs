@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use ltk_hash::{BinHash, WadHash};
-use ltk_ritobin::ast::{Ast, AstStruct, AstValue};
+use ltk_ritobin::ast::{Ast, Object, Value};
 
 use crate::linter::Lint;
 
@@ -23,42 +23,42 @@ enum MapKey {
 }
 
 impl MapKey {
-    fn from_value(value: &AstValue) -> Option<MapKey> {
+    fn from_value(value: &Value) -> Option<MapKey> {
         Some(match value {
-            AstValue::Bool(v) => MapKey::Bool(v.value),
-            AstValue::I8(v) => MapKey::I8(v.value),
-            AstValue::U8(v) => MapKey::U8(v.value),
-            AstValue::I16(v) => MapKey::I16(v.value),
-            AstValue::U16(v) => MapKey::U16(v.value),
-            AstValue::I32(v) => MapKey::I32(v.value),
-            AstValue::U32(v) => MapKey::U32(v.value),
-            AstValue::I64(v) => MapKey::I64(v.value),
-            AstValue::U64(v) => MapKey::U64(v.value),
-            AstValue::String(v) => MapKey::String(v.value.clone()),
-            AstValue::Hash(v) => MapKey::Hash(v.value),
-            AstValue::WadChunkLink(v) => MapKey::WadChunkLink(v.value),
-            AstValue::ObjectLink(v) => MapKey::ObjectLink(v.value),
+            Value::Bool(v) => MapKey::Bool(v.value),
+            Value::I8(v) => MapKey::I8(v.value),
+            Value::U8(v) => MapKey::U8(v.value),
+            Value::I16(v) => MapKey::I16(v.value),
+            Value::U16(v) => MapKey::U16(v.value),
+            Value::I32(v) => MapKey::I32(v.value),
+            Value::U32(v) => MapKey::U32(v.value),
+            Value::I64(v) => MapKey::I64(v.value),
+            Value::U64(v) => MapKey::U64(v.value),
+            Value::String(v) => MapKey::String(v.value.clone()),
+            Value::Hash(v) => MapKey::Hash(v.value),
+            Value::WadChunkLink(v) => MapKey::WadChunkLink(v.value),
+            Value::ObjectLink(v) => MapKey::ObjectLink(v.value),
             _ => return None,
         })
     }
 }
 
-pub fn check_ast_objects(lints: &mut Vec<Lint>, ast: &Ast) {
+pub fn check_root_objects(lints: &mut Vec<Lint>, ast: &Ast) {
     let mut seen = HashMap::new();
 
-    for obj in &ast.objects {
-        if let Some(shadowed_by) = seen.insert(obj.path_hash.value, obj.path_hash.span()) {
+    for entry in ast.root_entries() {
+        if let Some(shadowed_by) = seen.insert(entry.path_hash.value, entry.path_hash.span()) {
             lints.push(Lint::ShadowedEntry {
-                entry: obj.path_hash.span(),
+                entry: entry.path_hash.span(),
                 shadowed_by,
             });
         }
     }
 }
 
-pub fn check_struct(lints: &mut Vec<Lint>, s: &AstStruct) {
+pub fn check_object(lints: &mut Vec<Lint>, object: &Object) {
     let mut seen = HashMap::new();
-    for property in &s.properties {
+    for property in &object.properties {
         if let Some(shadowed_by) = seen.insert(property.name.value, property.name.span()) {
             lints.push(Lint::ShadowedEntry {
                 entry: property.name.span(),
@@ -68,12 +68,9 @@ pub fn check_struct(lints: &mut Vec<Lint>, s: &AstStruct) {
     }
 }
 
-pub fn check_map_entries<'a>(
-    lints: &mut Vec<Lint>,
-    entries: impl Iterator<Item = &'a (AstValue, AstValue)>,
-) {
+pub fn check_map_entries<'a>(lints: &mut Vec<Lint>, entry_keys: impl Iterator<Item = &'a Value>) {
     let mut seen = HashMap::new();
-    for (key, _) in entries {
+    for key in entry_keys {
         let Some(key_value) = MapKey::from_value(key) else {
             continue;
         };

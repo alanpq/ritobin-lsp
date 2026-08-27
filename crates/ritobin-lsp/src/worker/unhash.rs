@@ -10,9 +10,9 @@ use ltk_mimir_cache::Table;
 use ltk_ritobin::{
     Spanned,
     ast::{
-        Ast, AstObject, AstProperty, AstStruct, AstValue,
+        Ast, Object, Property, RootEntry, Value,
         hash::HashedLiteral,
-        visitor::{Visit, Visitor, VisitorExt},
+        visitor::{Descend, EnterFlow, Visitor, VisitorExt},
     },
 };
 
@@ -128,25 +128,23 @@ impl<'a, M: Map<Report<'a>, O>, O> Unhasher<'a, M, O> {
         }))
     }
 
-    pub fn unhash_struct(&self, s: &AstStruct) -> Option<O> {
+    pub fn unhash_object(&self, s: &Object) -> Option<O> {
         self.unhash(&s.class_hash, Table::BinTypes, OutputFormat::Name)
     }
 
-    pub fn unhash_property(&self, property: &AstProperty) -> Option<O> {
+    pub fn unhash_property(&self, property: &Property) -> Option<O> {
         self.unhash(&property.name, Table::BinFields, OutputFormat::Name)
     }
 
-    pub fn unhash_object(&self, object: &AstObject) -> Option<O> {
+    pub fn unhash_root_entry(&self, object: &RootEntry) -> Option<O> {
         self.unhash(&object.path_hash, Table::BinEntries, OutputFormat::String)
     }
 
-    pub fn unhash_value(&self, value: &AstValue) -> Option<O> {
+    pub fn unhash_value(&self, value: &Value) -> Option<O> {
         match value {
-            AstValue::Hash(hash) => self.unhash(hash, Table::BinHashes, OutputFormat::String),
-            AstValue::WadChunkLink(hash) => self.unhash(hash, Table::Game, OutputFormat::String),
-            AstValue::ObjectLink(hash) => {
-                self.unhash(hash, Table::BinEntries, OutputFormat::String)
-            }
+            Value::Hash(hash) => self.unhash(hash, Table::BinHashes, OutputFormat::String),
+            Value::WadChunkLink(hash) => self.unhash(hash, Table::Game, OutputFormat::String),
+            Value::ObjectLink(hash) => self.unhash(hash, Table::BinEntries, OutputFormat::String),
             _ => None,
         }
     }
@@ -171,31 +169,31 @@ impl<'a, M: Map<Report<'a>, O>, O> Walker<'a, M, O> {
 }
 
 impl<'a, M: Map<Report<'a>, O>, O> Visitor for Walker<'a, M, O> {
-    fn enter_struct(&mut self, s: &AstStruct) -> Visit {
-        if let Some(item) = self.unhasher.unhash_struct(s) {
+    fn enter_object(&mut self, s: &Object) -> EnterFlow {
+        if let Some(item) = self.unhasher.unhash_object(s) {
             self.items.push(item);
         }
-        Visit::Continue
+        EnterFlow::Continue(Descend::Children)
     }
 
-    fn enter_property(&mut self, property: &AstProperty) -> Visit {
+    fn enter_property(&mut self, property: &Property) -> EnterFlow {
         if let Some(item) = self.unhasher.unhash_property(property) {
             self.items.push(item);
         }
-        Visit::Continue
+        EnterFlow::Continue(Descend::Children)
     }
 
-    fn enter_object(&mut self, object: &AstObject) -> Visit {
-        if let Some(item) = self.unhasher.unhash_object(object) {
+    fn enter_root_entry(&mut self, entry: &RootEntry) -> EnterFlow {
+        if let Some(item) = self.unhasher.unhash_root_entry(entry) {
             self.items.push(item);
         }
-        Visit::Continue
+        EnterFlow::Continue(Descend::Children)
     }
 
-    fn enter_value(&mut self, value: &AstValue) -> Visit {
+    fn enter_value(&mut self, value: &Value) -> EnterFlow {
         if let Some(item) = self.unhasher.unhash_value(value) {
             self.items.push(item);
         }
-        Visit::Continue
+        EnterFlow::Continue(Descend::Children)
     }
 }
