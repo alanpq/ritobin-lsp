@@ -1242,7 +1242,7 @@ dependencies = [
 [[package]]
 name = "ltk_hash"
 version = "0.4.0"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=ritobin%2Fast#fa177dd00a3bf7d5dc984fb9def9d3c7ba0dcc77"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=ritobin%2Fast#1e9de2eacc3f617354a3ef562d22bbe2d2ee0977"
 dependencies = [
  "byteorder",
  "serde",
@@ -1264,7 +1264,7 @@ dependencies = [
 [[package]]
 name = "ltk_io_ext"
 version = "0.4.4"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=ritobin%2Fast#fa177dd00a3bf7d5dc984fb9def9d3c7ba0dcc77"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=ritobin%2Fast#1e9de2eacc3f617354a3ef562d22bbe2d2ee0977"
 dependencies = [
  "byteorder",
  "glam",
@@ -1274,8 +1274,8 @@ dependencies = [
 
 [[package]]
 name = "ltk_meta"
-version = "0.6.1"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=ritobin%2Fast#fa177dd00a3bf7d5dc984fb9def9d3c7ba0dcc77"
+version = "0.7.0"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=ritobin%2Fast#1e9de2eacc3f617354a3ef562d22bbe2d2ee0977"
 dependencies = [
  "byteorder",
  "enum_dispatch",
@@ -1309,7 +1309,7 @@ dependencies = [
 [[package]]
 name = "ltk_primitives"
 version = "0.3.5"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=ritobin%2Fast#fa177dd00a3bf7d5dc984fb9def9d3c7ba0dcc77"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=ritobin%2Fast#1e9de2eacc3f617354a3ef562d22bbe2d2ee0977"
 dependencies = [
  "byteorder",
  "glam",
@@ -1319,8 +1319,8 @@ dependencies = [
 
 [[package]]
 name = "ltk_ritobin"
-version = "0.5.0"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=ritobin%2Fast#fa177dd00a3bf7d5dc984fb9def9d3c7ba0dcc77"
+version = "0.6.0"
+source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=ritobin%2Fast#1e9de2eacc3f617354a3ef562d22bbe2d2ee0977"
 dependencies = [
  "glam",
  "indexmap 2.14.0",
