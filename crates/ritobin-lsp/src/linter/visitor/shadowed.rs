@@ -47,9 +47,9 @@ pub fn check_ast_objects(lints: &mut Vec<Lint>, ast: &Ast) {
     let mut seen = HashMap::new();
 
     for obj in &ast.objects {
-        if let Some(shadowed_by) = seen.insert(obj.path_hash.value, obj.path_hash.span) {
+        if let Some(shadowed_by) = seen.insert(obj.path_hash.value, obj.path_hash.span()) {
             lints.push(Lint::ShadowedEntry {
-                entry: obj.path_hash.span,
+                entry: obj.path_hash.span(),
                 shadowed_by,
             });
         }
@@ -59,9 +59,9 @@ pub fn check_ast_objects(lints: &mut Vec<Lint>, ast: &Ast) {
 pub fn check_struct(lints: &mut Vec<Lint>, s: &AstStruct) {
     let mut seen = HashMap::new();
     for property in &s.properties {
-        if let Some(shadowed_by) = seen.insert(property.name.value, property.name.span) {
+        if let Some(shadowed_by) = seen.insert(property.name.value, property.name.span()) {
             lints.push(Lint::ShadowedEntry {
-                entry: property.name.span,
+                entry: property.name.span(),
                 shadowed_by,
             });
         }
@@ -89,7 +89,7 @@ pub fn check_map_entries<'a>(
 #[cfg(test)]
 mod tests {
     use lsp_types::Url;
-    use ltk_ritobin::{Cst, ast::visitor::VisitorExt as _};
+    use ltk_ritobin::Cst;
     use meta_wiki::service::Classes;
 
     use super::*;
@@ -104,7 +104,7 @@ mod tests {
         let classes = Classes::default();
         let ast = Cst::parse(&document.text).build_ast(&document.text);
 
-        Linter::new(&classes)
+        Linter::new(&classes, None)
             .run(&ast)
             .into_iter()
             .filter_map(|lint| match lint {

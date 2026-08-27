@@ -4,7 +4,11 @@ use ltk_ritobin::ast::{
     visitor::{Visit, Visitor},
 };
 
-use crate::linter::Lint;
+use crate::{
+    linter::Lint,
+    server::{Hashes, HashesSnapshot},
+    worker::unhash::{self, Unhasher},
+};
 use meta_wiki::{
     schema::{EqExt, U32Hash},
     service::Classes,
@@ -16,19 +20,33 @@ pub struct Linter<'a> {
     inner: LintVisitor<'a>,
 }
 
+struct LintMap;
+impl<'a> unhash::Map<unhash::Report<'a>, Lint> for LintMap {
+    fn map(&self, report: unhash::Report) -> Lint {
+        Lint::KnownHash {
+            hash: report.hash,
+            table: report.table,
+            value: report.unhash.to_string(),
+        }
+    }
+}
+
 pub struct LintVisitor<'a> {
     class_meta: &'a Classes,
     class_scopes: Vec<BinHash>,
     pub lints: Vec<Lint>,
+
+    unhasher: Option<Unhasher<'a, LintMap, Lint>>,
 }
 
 impl<'a> Linter<'a> {
-    pub fn new(class_meta: &'a Classes) -> Self {
+    pub fn new(class_meta: &'a Classes, hashes: Option<&'a HashesSnapshot>) -> Self {
         Self {
             inner: LintVisitor {
                 class_meta,
                 class_scopes: vec![],
                 lints: vec![],
+                unhasher: hashes.map(|hashes| Unhasher::new(hashes, LintMap)),
             },
         }
     }
@@ -45,6 +63,10 @@ impl Visitor for LintVisitor<'_> {
 
         shadowed::check_struct(&mut self.lints, s);
 
+        if let Some(lint) = self.unhasher.as_ref().and_then(|u| u.unhash_struct(s)) {
+            self.lints.push(lint);
+        }
+
         Visit::Continue
     }
 
@@ -53,7 +75,18 @@ impl Visitor for LintVisitor<'_> {
         Visit::Continue
     }
 
+    fn enter_object(&mut self, object: &ltk_ritobin::ast::AstObject) -> Visit {
+        if let Some(lint) = self.unhasher.as_ref().and_then(|u| u.unhash_object(object)) {
+            self.lints.push(lint);
+        }
+
+        Visit::Continue
+    }
+
     fn enter_value(&mut self, value: &AstValue) -> Visit {
+        if let Some(lint) = self.unhasher.as_ref().and_then(|u| u.unhash_value(value)) {
+            self.lints.push(lint);
+        }
         if let AstValue::Map { entries, .. } = value {
             shadowed::check_map_entries(&mut self.lints, entries.iter());
         }
@@ -61,6 +94,14 @@ impl Visitor for LintVisitor<'_> {
     }
 
     fn enter_property(&mut self, property: &AstProperty) -> Visit {
+        if let Some(lint) = self
+            .unhasher
+            .as_ref()
+            .and_then(|u| u.unhash_property(property))
+        {
+            self.lints.push(lint);
+        }
+
         let Some(&class_hash) = self.class_scopes.last() else {
             return Visit::Continue;
         };
@@ -75,7 +116,7 @@ impl Visitor for LintVisitor<'_> {
                 let got = property.value.rito_type();
                 if expected != got {
                     self.lints.push(Lint::MismatchedMetaTypeArg {
-                        key: property.name.span,
+                        key: property.name.span(),
                         type_expr: property.type_span.unwrap_or(property.value.span()),
                         expected,
                         got,
@@ -96,7 +137,7 @@ impl Visitor for LintVisitor<'_> {
             None => {
                 self.lints.push(Lint::UnknownField {
                     entry: property.span(),
-                    span: property.name.span,
+                    span: property.name.span(),
                 });
             }
         }

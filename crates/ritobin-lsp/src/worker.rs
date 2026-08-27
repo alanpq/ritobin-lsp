@@ -267,10 +267,8 @@ impl Worker {
                 diagnostics,
                 ..
             } => {
-                let _ = self.server.send_ok(
-                    id,
-                    &self.code_actions(range, diagnostics)?.unwrap_or_default(),
-                );
+                let res = self.code_actions(range, diagnostics)?.unwrap_or_default();
+                let _ = self.server.send_ok(id, &res);
             }
             Message::FormatRequest {
                 id,

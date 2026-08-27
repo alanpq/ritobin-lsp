@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use arc_swap::ArcSwap;
 use lsp_server::{Connection, Message, RequestId, Response};
@@ -20,6 +20,16 @@ use meta_wiki::{docs_cache::WikiDocs, service::MetaService};
 pub struct Hashes {
     store: Arc<HashStore>,
     tables: Arc<ArcSwap<HashMap<Table, Arc<HashDb>>>>,
+}
+
+/// See [`Hashes::snapshot`].
+#[derive(Clone)]
+pub struct HashesSnapshot(Arc<HashMap<Table, Arc<HashDb>>>);
+
+impl HashesSnapshot {
+    pub fn lookup(&self, table: Table, hash: u64) -> Option<Cow<'_, str>> {
+        self.0.get(&table)?.get(hash)
+    }
 }
 
 #[derive(Clone, Default)]
@@ -93,6 +103,15 @@ impl Hashes {
 
     pub fn table(&self, table: Table) -> Option<Arc<HashDb>> {
         self.tables.load().get(&table).cloned()
+    }
+
+    /// A consistent, owned view of every table as of now. Tables are only ever swapped out as a
+    /// whole (see [`Hashes::load`]), and only on startup or an explicit user-triggered update, so
+    /// a snapshot held for e.g. the lifetime of one lint pass won't tear or go stale in any way
+    /// that matters - and unlike per-call lookups through [`Hashes::table`], it lets lookups hand
+    /// back data borrowed for as long as the snapshot itself is kept alive.
+    pub fn snapshot(&self) -> HashesSnapshot {
+        HashesSnapshot(self.tables.load_full())
     }
 
     pub fn load(&self) {
