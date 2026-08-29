@@ -269,6 +269,10 @@ function createCommands(): Record<string, CommandFactory> {
       enabled: (_) => async () => {},
       disabled: (_) => async () => {},
     },
+    openLogs: {
+      enabled: (ctx) => async () => ctx.showOutputChannel(),
+      disabled: (ctx) => async () => ctx.showOutputChannel(),
+    },
     toggleLSPLogs: {
       enabled: (_) => async () => {},
       disabled: (_) => async () => {},

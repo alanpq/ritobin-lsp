@@ -1,4 +1,8 @@
-use std::{borrow::Cow, collections::HashMap, sync::Arc};
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use arc_swap::ArcSwap;
 use lsp_server::{Connection, Message, RequestId, Response};
@@ -13,7 +17,9 @@ use ltk_ritobin::HashProvider;
 use rustc_hash::FxHashMap;
 use tokio::sync::RwLock;
 
-use crate::{config::Config, worker::WorkerHandle};
+use crate::{
+    config::Config, lsp::ext::ServerStatusNotification, status::ServerStatus, worker::WorkerHandle,
+};
 use meta_wiki::{docs_cache::WikiDocs, service::MetaService};
 
 #[derive(Clone)]
@@ -156,6 +162,7 @@ pub struct Server {
     pub meta: MetaService,
     pub wiki: WikiDocs,
     pub hashes: Option<Hashes>,
+    status: Mutex<ServerStatus>,
 }
 
 impl Server {
@@ -167,6 +174,34 @@ impl Server {
             meta: MetaService::default(),
             wiki: WikiDocs::new("https://meta-api.leaguetoolkit.dev"),
             hashes,
+            status: Default::default(),
+        }
+    }
+
+    pub fn send_notification<N>(&self, params: N::Params) -> anyhow::Result<()>
+    where
+        N: lsp_types::notification::Notification,
+    {
+        self.conn
+            .sender
+            .send(Message::Notification(lsp_server::Notification::new(
+                N::METHOD.to_owned(),
+                params,
+            )))?;
+        Ok(())
+    }
+
+    /// Mutate the readiness state and tell the client about it. The lock is released before the
+    /// notification goes out, so a slow client can never stall a background task.
+    pub fn update_status(&self, f: impl FnOnce(&mut ServerStatus)) {
+        let params = {
+            let mut status = self.status.lock().unwrap();
+            f(&mut status);
+            status.params()
+        };
+
+        if let Err(e) = self.send_notification::<ServerStatusNotification>(params) {
+            tracing::error!("failed to send server status: {e}");
         }
     }
 
