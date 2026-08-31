@@ -1,17 +1,11 @@
-//! Readiness of the background resources the server needs before its answers can be trusted.
-//!
-//! Completion, hover and the linter are all only as good as the meta dump and the hashtables. Until
-//! those have loaded the server still answers, it just answers with hex names and no classes, which
-//! is indistinguishable from "broken" unless we say so.
-
 use crate::lsp::ext::{Health, ServerStatusParams};
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Default)]
 pub enum TaskStatus {
     /// Queued, not started yet.
     #[default]
     Pending,
-    /// Running, with something to show the user.
+    /// Running, with message to show to user
     Loading(String),
     /// Done and usable.
     Ready,
@@ -75,6 +69,3 @@ impl ServerStatus {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

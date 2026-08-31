@@ -22,8 +22,6 @@ pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result
 
     let server = Arc::new(Server::new(connection, config.clone(), hashes.clone()));
 
-    // Announce the work before starting it. Until these land the server still answers, it just
-    // answers with hex names and no classes, and silence makes that look like a bug.
     server.update_status(|status| {
         status.hashes = match hashes.is_some() {
             true => TaskStatus::Loading("Updating hashtables".to_owned()),
@@ -102,8 +100,6 @@ pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result
                 }
             }
 
-            // `loaded` is the authoritative answer: a stale dump that loaded is still usable, and a
-            // fetch that failed after a good local load is not a degraded server.
             let outcome = match server.meta.loaded.load(Ordering::Relaxed) {
                 true => TaskStatus::Ready,
                 false => TaskStatus::Failed("No meta dump available".to_owned()),

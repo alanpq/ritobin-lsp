@@ -191,8 +191,7 @@ impl Server {
         Ok(())
     }
 
-    /// Mutate the readiness state and tell the client about it. The lock is released before the
-    /// notification goes out, so a slow client can never stall a background task.
+    /// Update and send new server status
     pub fn update_status(&self, f: impl FnOnce(&mut ServerStatus)) {
         let params = {
             let mut status = self.status.lock().unwrap();
