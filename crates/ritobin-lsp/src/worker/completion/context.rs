@@ -98,10 +98,10 @@ fn classify(
     text: &str,
     offset: u32,
 ) -> Option<CompletionContext> {
-    tracing::info!(
-        "{}",
-        path.iter().map(|p| format!("{:?}", p.detail())).join(", ")
-    );
+    // tracing::info!(
+    //     "{}",
+    //     path.iter().map(|p| format!("{:?}", p.detail())).join(", ")
+    // );
     let Some(&last) = path.last() else {
         return Some(CompletionContext {
             context: CursorContext::RootKey {

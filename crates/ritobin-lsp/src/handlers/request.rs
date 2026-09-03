@@ -71,7 +71,6 @@ pub async fn request(server: &Arc<Server>, req: ServerRequest) -> Result<()> {
                 }
                 let server = server.clone();
                 tokio::spawn(async move {
-                    tracing::info!(?item);
                     let data = item.data.as_ref();
                     match data {
                         Some(data) => match data
