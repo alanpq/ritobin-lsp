@@ -72,45 +72,71 @@ pub async fn request(server: &Arc<Server>, req: ServerRequest) -> Result<()> {
                 let server = server.clone();
                 tokio::spawn(async move {
                     tracing::info!(?item);
-                    match item
-                        .data
-                        .as_ref()
-                        .and_then(|value| value.as_str())
-                        .and_then(|v| GetDocsNameOrHash::try_from(v).ok())
-                    {
-                        Some(class_hash) => {
-                            let docs = match wiki::fetch_class_docs(&server.wiki, &class_hash).await
-                            {
-                                Ok(docs) => {
-                                    let mut str = format!(
-                                        "### [{}](https://meta-wiki.leaguetoolkit.dev/classes/{})\n",
-                                        docs.name, docs.name
-                                    );
-                                    writeln!(
-                                        str,
-                                        "{}",
-                                        wiki::describe(docs.properties.get(&item.label))
-                                    )
-                                    .unwrap();
-                                    str
-                                }
-                                Err(msg) => msg,
-                            };
+                    let data = item.data.as_ref();
+                    match data {
+                        Some(data) => match data
+                            .as_str()
+                            .and_then(|v| GetDocsNameOrHash::try_from(v).ok())
+                        {
+                            Some(class_hash) => {
+                                let docs = match wiki::fetch_class_docs(&server.wiki, &class_hash)
+                                    .await
+                                {
+                                    Ok(docs) => {
+                                        let mut str = format!(
+                                            "### [{}](https://meta-wiki.leaguetoolkit.dev/classes/{})\n",
+                                            docs.name, docs.name
+                                        );
+                                        writeln!(
+                                            str,
+                                            "{}",
+                                            wiki::describe(docs.properties.get(&item.label))
+                                        )
+                                        .unwrap();
+                                        str
+                                    }
+                                    Err(msg) => msg,
+                                };
 
+                                item.documentation.replace(
+                                    lsp_types::Documentation::MarkupContent(MarkupContent {
+                                        kind: lsp_types::MarkupKind::Markdown,
+                                        value: docs,
+                                    }),
+                                );
+
+                                let _ = server.send_ok(id, &item);
+                            }
+                            None => {
+                                let _ = server.send_err(
+                                    id.clone(),
+                                    lsp_server::ErrorCode::RequestFailed,
+                                    "An internal error occured trying to resolve completion information",
+                                );
+                            }
+                        },
+                        None => {
+                            let docs = match item.label.as_str() {
+                                "type" => "The type of the resulting bin. Can be `PTCH` or `PROP`.",
+                                "version" => {
+                                    "The bin's version. The latest version is `3` (most converters ignore this version when converting to `.bin`)."
+                                }
+                                "entries" => "The objects in this bin tree, keyed by path hash.",
+                                "linked" => "List of other bins this file depends on.",
+                                _ => "",
+                            };
                             item.documentation
                                 .replace(lsp_types::Documentation::MarkupContent(MarkupContent {
                                     kind: lsp_types::MarkupKind::Markdown,
-                                    value: docs,
+                                    value: docs.into(),
                                 }));
-
+                            // item.documentation.repl
                             let _ = server.send_ok(id, &item);
-                        }
-                        None => {
-                            let _ = server.send_err(
-                                id.clone(),
-                                lsp_server::ErrorCode::RequestFailed,
-                                "An internal error occured trying to resolve completion information",
-                            );
+                            // let _ = server.send_err(
+                            //     id.clone(),
+                            //     lsp_server::ErrorCode::RequestFailed,
+                            //     "An internal error occured trying to resolve completion information",
+                            // );
                         }
                     }
                 });
