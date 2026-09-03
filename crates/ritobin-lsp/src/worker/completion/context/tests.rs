@@ -293,6 +293,44 @@ fn top_level_has_no_completion() {
     assert_eq!(resolve_at("type: string = \"PROP\"\n|\n"), None);
 }
 
+fn root_set(kinds: &[RootKind]) -> RootKindSet {
+    let mut s = RootKindSet::default();
+    for &k in kinds {
+        s.insert(k);
+    }
+    s
+}
+
+#[test]
+fn root_key_completion_offers_kinds_not_already_present() {
+    // `version` is under the cursor, so it stays on offer; `type` is present elsewhere and drops.
+    assert_eq!(
+        resolve_at("vers|ion: u32 = 1\ntype: string = \"PROP\"\n"),
+        Some(CursorContext::RootKey {
+            missing: root_set(&[RootKind::Version, RootKind::Linked, RootKind::Entries]),
+        })
+    );
+}
+
+#[test]
+fn root_key_completion_replaces_the_whole_prefix() {
+    assert_eq!(
+        replace_at("ty|pe: string = \"PROP\"\n"),
+        Some("type: string = ".to_owned())
+    );
+}
+
+#[test]
+fn root_type_completion_resolves_the_expected_type() {
+    assert_eq!(
+        resolve_at("version: u3|2 = 1\n"),
+        Some(CursorContext::RootType {
+            kind: RootKind::Version,
+        })
+    );
+    assert_eq!(replace_at("version: u3|2 = 1\n"), Some("u32".to_owned()));
+}
+
 #[test]
 fn hex_class_name_resolves_to_its_hash() {
     assert_eq!(

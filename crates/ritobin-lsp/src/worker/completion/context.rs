@@ -1,9 +1,14 @@
+use itertools::Itertools;
 use ltk_hash::BinHash;
 use ltk_ritobin::{
     ast::{
         Ast, Property, Value,
-        node::{NodeExt as _, SubNodeRef},
-        query::{AstObjectDetail, AstPropertyDetail, AstRootEntryDetail},
+        node::{
+            NodeExt as _, SubNodeRef,
+            root::{Root, RootKind, RootValue},
+            roots::Roots,
+        },
+        query::{AstObjectDetail, AstPropertyDetail, AstRootDetail, AstRootEntryDetail},
     },
     parse::Span,
 };
@@ -13,10 +18,64 @@ mod tests;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CursorContext {
-    PropertyKey { class: BinHash },
-    PropertyType { class: BinHash, property: BinHash },
-    PropertyValue { class: BinHash, property: BinHash },
-    ContainerItem { class: BinHash, property: BinHash },
+    /// A top-level root property (`version`/`type`/`linked`/`entries`)
+    RootKey {
+        missing: RootKindSet,
+    },
+    /// The type expression of a top-level root, whose kind fixes the expected type
+    RootType {
+        kind: RootKind,
+    },
+    PropertyKey {
+        class: BinHash,
+    },
+    PropertyType {
+        class: BinHash,
+        property: BinHash,
+    },
+    PropertyValue {
+        class: BinHash,
+        property: BinHash,
+    },
+    ContainerItem {
+        class: BinHash,
+        property: BinHash,
+    },
+}
+
+const KNOWN_ROOT_KINDS: [RootKind; 4] = [
+    RootKind::Version,
+    RootKind::Type,
+    RootKind::Linked,
+    RootKind::Entries,
+];
+
+/// A set of the known [`RootKind`]s. [`RootKind::Unknown`] is never a member.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct RootKindSet(u8);
+
+impl RootKindSet {
+    fn bit(kind: RootKind) -> Option<u8> {
+        let idx = KNOWN_ROOT_KINDS.iter().position(|k| *k == kind)?;
+        Some(1 << idx)
+    }
+
+    fn insert(&mut self, kind: RootKind) {
+        if let Some(bit) = Self::bit(kind) {
+            self.0 |= bit;
+        }
+    }
+
+    pub fn contains(self, kind: RootKind) -> bool {
+        Self::bit(kind).is_some_and(|bit| self.0 & bit != 0)
+    }
+
+    /// The member kinds, in canonical order.
+    pub fn iter(self) -> impl Iterator<Item = RootKind> {
+        KNOWN_ROOT_KINDS
+            .into_iter()
+            .filter(move |k| self.contains(*k))
+    }
 }
 
 pub struct CompletionContext {
@@ -29,13 +88,34 @@ impl CompletionContext {
     /// What a completion at `offset` should offer, and what it should replace.
     pub fn resolve(ast: &Ast, text: &str, offset: u32) -> Option<Self> {
         let path: Vec<SubNodeRef> = ast.fine_path_to(offset).collect();
-        classify(&path, text, offset)
+        classify(&path, &ast.roots, text, offset)
     }
 }
 
-fn classify(path: &[SubNodeRef], text: &str, offset: u32) -> Option<CompletionContext> {
-    tracing::info!("{:?}", path.last());
+fn classify(
+    path: &[SubNodeRef],
+    roots: &Roots,
+    text: &str,
+    offset: u32,
+) -> Option<CompletionContext> {
+    tracing::info!(
+        "{}",
+        path.iter().map(|p| format!("{:?}", p.detail())).join(", ")
+    );
     match *path.last()? {
+        SubNodeRef::Root(root, AstRootDetail::Name) => Some(CompletionContext {
+            context: CursorContext::RootKey {
+                missing: missing_root_kinds(roots, root),
+            },
+            replace: root_key_prefix(root),
+        }),
+        SubNodeRef::Root(root, AstRootDetail::TypeExpr) => Some(CompletionContext {
+            context: CursorContext::RootType {
+                kind: root.name.value.expected_type().map(|_| root.name.value)?,
+            },
+            replace: filter_empty(root.type_expr.span, text).unwrap_or(Span::empty(offset)),
+        }),
+
         // object trivia means we're in the body of it's properties,
         // which means we want to recommend property keys
         SubNodeRef::Object(s, AstObjectDetail::Node | AstObjectDetail::Trivia) => {
@@ -48,6 +128,7 @@ fn classify(path: &[SubNodeRef], text: &str, offset: u32) -> Option<CompletionCo
                 replace: word_at(text, offset),
             })
         }
+
         // On an existing key of a property, a completion includes the entire
         // `key: type = ` prefix, so we can replace the old one entirely.
         SubNodeRef::Property(p, AstPropertyDetail::Name) => Some(CompletionContext {
@@ -70,10 +151,11 @@ fn classify(path: &[SubNodeRef], text: &str, offset: u32) -> Option<CompletionCo
             classify_value(path, text, offset)
         }
 
-        // object/property trivia is dead space we don't care about, Node shouldn't show up in the
+        // object/property/root trivia is dead space we don't care about, Node shouldn't show up in the
         // final noderef in the path
         SubNodeRef::RootEntry(_, AstRootEntryDetail::Trivia | AstRootEntryDetail::Node)
-        | SubNodeRef::Property(_, AstPropertyDetail::Trivia | AstPropertyDetail::Node) => None,
+        | SubNodeRef::Property(_, AstPropertyDetail::Trivia | AstPropertyDetail::Node)
+        | SubNodeRef::Root(_, AstRootDetail::Trivia | AstRootDetail::Node) => None,
     }
 }
 
@@ -134,6 +216,34 @@ fn key_prefix(p: &Property) -> Span {
         None => p.name.span().end,
     };
     Span::new(p.name.span().start, end)
+}
+
+/// [`key_prefix`] for a top-level root; roots always carry a value structurally, so this usually
+/// spans up to the value's start.
+fn root_key_prefix(r: &Root) -> Span {
+    let end = match r.value.as_ref().map(RootValue::span) {
+        Some(value_span) => value_span.start,
+        None if r.type_expr.value.is_some() => r.type_expr.span.end,
+        None => r.name.span.end,
+    };
+    Span::new(r.name.span.start, end)
+}
+
+/// The known root kinds not already declared elsewhere in the file. `current` (the root under the
+/// cursor) is excluded so re-selecting its own kind stays on offer.
+fn missing_root_kinds(roots: &Roots, current: &Root) -> RootKindSet {
+    let mut present = RootKindSet::default();
+    for root in roots.iter().filter(|r| !std::ptr::eq(*r, current)) {
+        present.insert(root.name.value);
+    }
+
+    let mut missing = RootKindSet::default();
+    for kind in KNOWN_ROOT_KINDS {
+        if !present.contains(kind) {
+            missing.insert(kind);
+        }
+    }
+    missing
 }
 
 fn enclosing_class(path: &[SubNodeRef], before: usize) -> Option<BinHash> {

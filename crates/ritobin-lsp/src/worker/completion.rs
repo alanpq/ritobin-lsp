@@ -8,7 +8,9 @@ use crate::worker::{
     CompletionRequest, Worker,
     completion::{
         context::{CompletionContext, CursorContext},
-        items::{property_items, type_item, value_items, value_slot},
+        items::{
+            property_items, root_property_items, root_type_item, type_item, value_items, value_slot,
+        },
     },
 };
 
@@ -43,6 +45,8 @@ impl Worker {
         };
 
         let items: Vec<CompletionItem> = match resolved.context {
+            CursorContext::RootKey { missing } => root_property_items(missing, replace),
+            CursorContext::RootType { kind } => root_type_item(kind, replace).into_iter().collect(),
             CursorContext::PropertyKey { class } => {
                 property_items(classes, class, field_name, replace)
             }

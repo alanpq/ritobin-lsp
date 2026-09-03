@@ -6,7 +6,10 @@ use lsp_types::{
 };
 use ltk_hash::BinHash;
 use ltk_meta::PropertyKind;
+use ltk_ritobin::ast::node::root::RootKind;
 use rustc_hash::FxHashSet;
+
+use super::context::RootKindSet;
 
 use meta_wiki::{
     schema::{Property, U32Hash},
@@ -117,6 +120,48 @@ pub fn type_item(
         .find_property(class, property)?
         .rito_type()
         .to_string();
+
+    Some(CompletionItem {
+        text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+            range: replace,
+            new_text: ty.clone(),
+        })),
+        kind: Some(CompletionItemKind::TYPE_PARAMETER),
+        preselect: Some(true),
+        label: ty,
+        ..Default::default()
+    })
+}
+
+pub fn root_property_items(missing: RootKindSet, replace: Range) -> Vec<CompletionItem> {
+    missing
+        .iter()
+        .enumerate()
+        .filter_map(|(order, kind)| {
+            let ty = kind.expected_type()?.to_string();
+            let label = kind.as_str();
+
+            Some(CompletionItem {
+                text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+                    range: replace,
+                    new_text: format!("{label}: {ty} = "),
+                })),
+                sort_text: Some(format!("{order:02}")),
+                label_details: Some(CompletionItemLabelDetails {
+                    detail: Some(format!(": {ty}")),
+                    description: None,
+                }),
+                kind: Some(CompletionItemKind::PROPERTY),
+                label: label.to_owned(),
+                ..Default::default()
+            })
+        })
+        .collect()
+}
+
+/// The type a root kind expects, e.g. `u32` for `version`
+pub fn root_type_item(kind: RootKind, replace: Range) -> Option<CompletionItem> {
+    let ty = kind.expected_type()?.to_string();
 
     Some(CompletionItem {
         text_edit: Some(CompletionTextEdit::Edit(TextEdit {
