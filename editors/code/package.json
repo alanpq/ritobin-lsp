@@ -129,6 +129,11 @@
                 "category": "ritobin-lsp"
             },
             {
+                "command": "ritobin-lsp.openLogs",
+                "title": "Open Logs",
+                "category": "ritobin-lsp"
+            },
+            {
                 "command": "ritobin-lsp.toggleLSPLogs",
                 "title": "Toggle LSP Logs",
                 "category": "ritobin-lsp"

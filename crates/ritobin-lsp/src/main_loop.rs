@@ -1,17 +1,12 @@
 use lsp_server::{Connection, Message};
-use lsp_types::notification::Notification as _;
-use lsp_types::request::Request as _;
 use ltk_mimir_cache::UpdateOutcome;
-use std::sync::Arc;
+use std::sync::{Arc, atomic::Ordering};
 
 use crate::{
     config::Config,
     handlers,
-    lsp::{
-        self,
-        ext::{ServerStatusNotification, ServerStatusParams},
-    },
     server::{Hashes, Server},
+    status::TaskStatus,
 };
 
 pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
@@ -24,26 +19,41 @@ pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result
             tracing::warn!("No hashes will be loaded.");
         })
         .ok();
-    if let Some(hashes) = hashes.clone() {
-        tokio::spawn(async move {
-            tracing::info!("Checking for new hashes...");
-            match hashes.update().await {
-                Ok(UpdateOutcome::Completed(report)) => {
-                    tracing::info!("Updated {} tables.", report.installed.len());
-                }
-                Ok(UpdateOutcome::Locked) => {
-                    tracing::info!("Another application is updating hashes. Doing nothing.");
-                }
-                Err(e) => {
-                    tracing::error!("Failed to update hashtables: {e}");
-                }
+
+    let server = Arc::new(Server::new(connection, config.clone(), hashes.clone()));
+
+    server.update_status(|status| {
+        status.hashes = match hashes.is_some() {
+            true => TaskStatus::Loading("Updating hashtables".to_owned()),
+            false => TaskStatus::Failed("No hashtable directory".to_owned()),
+        };
+        status.meta = TaskStatus::Loading("Loading meta dump".to_owned());
+    });
+
+    if let Some(hashes) = hashes {
+        tokio::spawn({
+            let server = server.clone();
+            async move {
+                tracing::info!("Checking for new hashes...");
+                let outcome = match hashes.update().await {
+                    Ok(UpdateOutcome::Completed(report)) => {
+                        tracing::info!("Updated {} tables.", report.installed.len());
+                        TaskStatus::Ready
+                    }
+                    Ok(UpdateOutcome::Locked) => {
+                        tracing::info!("Another application is updating hashes. Doing nothing.");
+                        TaskStatus::Ready
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to update hashtables: {e}");
+                        TaskStatus::Failed("Could not update hashtables".to_owned())
+                    }
+                };
+                hashes.load();
+                server.update_status(|status| status.hashes = outcome);
             }
-            hashes.load();
         });
     }
-
-    let server = Server::new(connection, config.clone(), hashes);
-    let server = Arc::new(server);
 
     tokio::spawn({
         let server = server.clone();
@@ -59,7 +69,9 @@ pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result
         async move {
             match meta_override {
                 Some(meta_override) => {
-                    server.meta.load_file(meta_override).await.unwrap();
+                    if let Err(e) = server.meta.load_file(meta_override).await {
+                        tracing::error!("Failed to load overridden meta dump - {e:?}");
+                    }
                     tracing::info!(
                         "Skipping latest meta dump fetching - dump file path has been explicitly specified."
                     );
@@ -70,32 +82,31 @@ pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result
                         tracing::error!("Failed to load existing meta - {e:?}");
                     }
 
+                    server.update_status(|status| {
+                        status.meta = TaskStatus::Loading("Updating meta dump".to_owned())
+                    });
+
                     match server.meta.fetch_latest(dir).await {
                         Err(e) => {
                             tracing::error!("Failed to fetch latest meta dump - {e:?}");
                         }
                         Ok(Some(path)) => {
-                            server.meta.load_file(path).await.unwrap();
+                            if let Err(e) = server.meta.load_file(path).await {
+                                tracing::error!("Failed to load fetched meta dump - {e:?}");
+                            }
                         }
                         Ok(None) => {}
                     }
                 }
             }
+
+            let outcome = match server.meta.loaded.load(Ordering::Relaxed) {
+                true => TaskStatus::Ready,
+                false => TaskStatus::Failed("No meta dump available".to_owned()),
+            };
+            server.update_status(|status| status.meta = outcome);
         }
     });
-
-    let not = lsp_server::Notification::new(
-        ServerStatusNotification::METHOD.to_owned(),
-        ServerStatusParams {
-            health: lsp::ext::Health::Ok,
-            quiescent: true,
-            message: None,
-        },
-    );
-    server
-        .conn
-        .sender
-        .send(lsp_server::Message::Notification(not))?;
 
     for msg in &server.conn.receiver {
         match msg {

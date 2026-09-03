@@ -32,6 +32,7 @@ pub mod linter;
 pub mod lsp;
 pub mod main_loop;
 pub mod server;
+pub mod status;
 pub mod wiki;
 pub mod worker;
 

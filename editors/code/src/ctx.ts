@@ -403,6 +403,10 @@ export class Ctx implements RustAnalyzerExtensionApi {
     }
   }
 
+  showOutputChannel() {
+    this.outputChannel?.show();
+  }
+
   setServerStatus(status: ServerStatusParams | { health: "stopped" }) {
     this.lastStatus = status;
     this.updateStatusBarItem();
