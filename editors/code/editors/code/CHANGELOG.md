@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.18](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.1.17...ritobin-lsp-vs-v0.1.18) (2026-09-03)
+
+
+### Features
+
+* server status reporting and fix Open Logs button ([#71](https://github.com/alanpq/ritobin-lsp/issues/71)) ([ede8374](https://github.com/alanpq/ritobin-lsp/commit/ede8374b205826e6f64cb2f007974efcbd25f216))
+
 ## [0.1.17](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.1.16...ritobin-lsp-vs-v0.1.17) (2026-08-24)
 
 

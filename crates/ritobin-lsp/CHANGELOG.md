@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.18](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.17...ritobin-lsp-v0.1.18) (2026-09-03)
+
+
+### Features
+
+* ast based completions ([#72](https://github.com/alanpq/ritobin-lsp/issues/72)) ([cec77d1](https://github.com/alanpq/ritobin-lsp/commit/cec77d197a0176a268273883976e31ce5fe3fd62))
+* known hash lint, migrate unhash behaviour to ast ([#70](https://github.com/alanpq/ritobin-lsp/issues/70)) ([c73a762](https://github.com/alanpq/ritobin-lsp/commit/c73a7624ce294be7c002cf8a3ff0a4ef99b0327a))
+* server status reporting and fix Open Logs button ([#71](https://github.com/alanpq/ritobin-lsp/issues/71)) ([ede8374](https://github.com/alanpq/ritobin-lsp/commit/ede8374b205826e6f64cb2f007974efcbd25f216))
+
 ## [0.1.17](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.16...ritobin-lsp-v0.1.17) (2026-08-24)
 
 
