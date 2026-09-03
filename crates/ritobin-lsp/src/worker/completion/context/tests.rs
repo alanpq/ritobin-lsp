@@ -289,8 +289,15 @@ fn map_entry_key_has_no_completion() {
 }
 
 #[test]
-fn top_level_has_no_completion() {
-    assert_eq!(resolve_at("type: string = \"PROP\"\n|\n"), None);
+fn top_level_outside_roots_offers_missing_keys() {
+    // Blank line after a `type` root: no node under the cursor, but the top level
+    // still offers the kinds not yet present.
+    assert_eq!(
+        resolve_at("type: string = \"PROP\"\n|\n"),
+        Some(CursorContext::RootKey {
+            missing: root_set(&[RootKind::Version, RootKind::Linked, RootKind::Entries]),
+        })
+    );
 }
 
 fn root_set(kinds: &[RootKind]) -> RootKindSet {

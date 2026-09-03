@@ -102,10 +102,18 @@ fn classify(
         "{}",
         path.iter().map(|p| format!("{:?}", p.detail())).join(", ")
     );
-    match *path.last()? {
+    let Some(&last) = path.last() else {
+        return Some(CompletionContext {
+            context: CursorContext::RootKey {
+                missing: missing_root_kinds(roots, None),
+            },
+            replace: word_at(text, offset),
+        });
+    };
+    match last {
         SubNodeRef::Root(root, AstRootDetail::Name) => Some(CompletionContext {
             context: CursorContext::RootKey {
-                missing: missing_root_kinds(roots, root),
+                missing: missing_root_kinds(roots, Some(root)),
             },
             replace: root_key_prefix(root),
         }),
@@ -229,11 +237,12 @@ fn root_key_prefix(r: &Root) -> Span {
     Span::new(r.name.span.start, end)
 }
 
-/// The known root kinds not already declared elsewhere in the file. `current` (the root under the
-/// cursor) is excluded so re-selecting its own kind stays on offer.
-fn missing_root_kinds(roots: &Roots, current: &Root) -> RootKindSet {
+fn missing_root_kinds(roots: &Roots, current: Option<&Root>) -> RootKindSet {
     let mut present = RootKindSet::default();
-    for root in roots.iter().filter(|r| !std::ptr::eq(*r, current)) {
+    for root in roots
+        .iter()
+        .filter(|r| !current.is_some_and(|c| std::ptr::eq(*r, c)))
+    {
         present.insert(root.name.value);
     }
 
