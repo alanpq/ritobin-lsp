@@ -1,187 +1,289 @@
+use itertools::Itertools;
 use ltk_hash::BinHash;
 use ltk_ritobin::{
-    Cst,
-    cst::{
-        Kind as TreeKind, Node, NodeId, Visitor,
-        visitor::{Visit, VisitCtx, VisitorExt as _},
+    ast::{
+        Ast, Property, Value,
+        node::{
+            NodeExt as _, SubNodeRef,
+            root::{Root, RootKind, RootValue},
+            roots::Roots,
+        },
+        query::{AstObjectDetail, AstPropertyDetail, AstRootDetail, AstRootEntryDetail},
     },
-    parse::TokenKind,
+    parse::Span,
 };
-use ritobin_lsp::scope::TokenExt;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CursorContext {
-    PropertyKey { class: BinHash },
-    PropertyType { class: BinHash, property: BinHash },
-    PropertyValue { class: BinHash, property: BinHash },
-    ContainerItem { class: BinHash, property: BinHash },
-}
-
-pub fn resolve(cst: &Cst, text: &str, offset: u32) -> Option<CursorContext> {
-    let path = PathFinder {
-        offset,
-        stack: Vec::new(),
-        path: None,
-    }
-    .walk(cst)
-    .path?;
-
-    classify(cst, text, &path, offset)
-}
-
-struct PathFinder {
-    offset: u32,
-    stack: Vec<NodeId>,
-    path: Option<Vec<NodeId>>,
-}
-
-impl Visitor for PathFinder {
-    fn enter_tree(&mut self, ctx: &VisitCtx, node: NodeId) -> Visit {
-        let Some(tree) = ctx.node(node) else {
-            return Visit::Skip;
-        };
-        if !tree.span.contains(self.offset) {
-            return Visit::Skip;
-        }
-
-        self.stack.push(node);
-        if self
-            .path
-            .as_ref()
-            .is_none_or(|p| p.len() <= self.stack.len())
-        {
-            self.path = Some(self.stack.clone());
-        }
-        Visit::Continue
-    }
-
-    fn exit_tree(&mut self, _ctx: &VisitCtx, node: NodeId) -> Visit {
-        if self.stack.last() == Some(&node) {
-            self.stack.pop();
-        }
-        Visit::Continue
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-enum Scope {
-    Class { class: BinHash },
-    Container { class: BinHash, property: BinHash },
-    Opaque,
-}
-
-enum Region {
-    Key,
-    Type,
-    Value,
-}
-
-fn classify(cst: &Cst, text: &str, path: &[NodeId], offset: u32) -> Option<CursorContext> {
-    let mut scope = None;
-    let mut scope_idx = 0;
-    for i in 1..path.len() {
-        let parent = cst.node(path[i - 1])?;
-        let next = match cst.node(path[i])?.kind {
-            TreeKind::Block => match parent.kind {
-                TreeKind::Class => match class_hash(cst, text, parent) {
-                    Some(class) => Scope::Class { class },
-                    None => Scope::Opaque,
-                },
-                TreeKind::EntryValue => owning_entry(cst, text, path, i)
-                    .zip(match scope {
-                        Some(Scope::Class { class }) => Some(class),
-                        _ => None,
-                    })
-                    .map_or(Scope::Opaque, |(property, class)| Scope::Container {
-                        class,
-                        property,
-                    }),
-                _ => Scope::Opaque,
-            },
-            TreeKind::ListItemBlock => Scope::Opaque,
-            _ => continue,
-        };
-
-        scope = Some(next);
-        scope_idx = i;
-    }
-
-    let entry = path[scope_idx..].iter().rev().find_map(|&id| {
-        let node = cst.node(id)?;
-        matches!(node.kind, TreeKind::Entry | TreeKind::EntryTerminator).then_some(node)
-    });
-
-    match (scope?, entry) {
-        (Scope::Class { class }, None) => Some(CursorContext::PropertyKey { class }),
-        (Scope::Class { class }, Some(entry)) => match region(cst, entry, offset) {
-            Region::Key => Some(CursorContext::PropertyKey { class }),
-            Region::Type => Some(CursorContext::PropertyType {
-                class,
-                property: entry_key(cst, text, entry)?,
-            }),
-            Region::Value => Some(CursorContext::PropertyValue {
-                class,
-                property: entry_key(cst, text, entry)?,
-            }),
-        },
-        (Scope::Container { class, property }, None) => {
-            Some(CursorContext::ContainerItem { class, property })
-        }
-        (Scope::Container { class, property }, Some(entry)) => match region(cst, entry, offset) {
-            Region::Value => Some(CursorContext::ContainerItem { class, property }),
-            _ => None,
-        },
-        (Scope::Opaque, _) => None,
-    }
-}
-
-fn owning_entry(cst: &Cst, text: &str, path: &[NodeId], block_idx: usize) -> Option<BinHash> {
-    let entry = cst.node(*path.get(block_idx.checked_sub(2)?)?)?;
-    (entry.kind == TreeKind::Entry)
-        .then(|| entry_key(cst, text, entry))
-        .flatten()
-}
-
-fn region(cst: &Cst, entry: &Node, offset: u32) -> Region {
-    match entry.kind {
-        TreeKind::Entry => {
-            let (mut colon, mut eq) = (None, None);
-
-            for token in entry.children.get(cst).iter().filter_map(|c| c.token(cst)) {
-                match token.kind {
-                    TokenKind::Colon => colon = colon.or(Some(token.span)),
-                    TokenKind::Eq => eq = eq.or(Some(token.span)),
-                    _ => {}
-                }
-            }
-
-            match (colon, eq) {
-                (_, Some(eq)) if offset >= eq.end => Region::Value,
-                (Some(colon), _) if offset > colon.start => Region::Type,
-                _ => Region::Key,
-            }
-        }
-        _ => Region::Key,
-    }
-}
-
-fn entry_key(cst: &Cst, text: &str, entry: &Node) -> Option<BinHash> {
-    let key = entry.children.get(cst).iter().find_map(|child| {
-        let node = child.tree(cst)?;
-        (node.kind == TreeKind::EntryKey).then_some(node)
-    })?;
-
-    key.children.get(cst).first()?.token(cst)?.as_bin_hash(text)
-}
-
-fn class_hash(cst: &Cst, text: &str, class: &Node) -> Option<BinHash> {
-    class
-        .children
-        .get(cst)
-        .first()?
-        .token(cst)?
-        .as_bin_hash(text)
-}
 
 #[cfg(test)]
 mod tests;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CursorContext {
+    /// A top-level root property (`version`/`type`/`linked`/`entries`)
+    RootKey {
+        missing: RootKindSet,
+    },
+    /// The type expression of a top-level root, whose kind fixes the expected type
+    RootType {
+        kind: RootKind,
+    },
+    PropertyKey {
+        class: BinHash,
+    },
+    PropertyType {
+        class: BinHash,
+        property: BinHash,
+    },
+    PropertyValue {
+        class: BinHash,
+        property: BinHash,
+    },
+    ContainerItem {
+        class: BinHash,
+        property: BinHash,
+    },
+}
+
+const KNOWN_ROOT_KINDS: [RootKind; 4] = [
+    RootKind::Version,
+    RootKind::Type,
+    RootKind::Linked,
+    RootKind::Entries,
+];
+
+/// A set of the known [`RootKind`]s. [`RootKind::Unknown`] is never a member.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct RootKindSet(u8);
+
+impl RootKindSet {
+    fn bit(kind: RootKind) -> Option<u8> {
+        let idx = KNOWN_ROOT_KINDS.iter().position(|k| *k == kind)?;
+        Some(1 << idx)
+    }
+
+    fn insert(&mut self, kind: RootKind) {
+        if let Some(bit) = Self::bit(kind) {
+            self.0 |= bit;
+        }
+    }
+
+    pub fn contains(self, kind: RootKind) -> bool {
+        Self::bit(kind).is_some_and(|bit| self.0 & bit != 0)
+    }
+
+    /// The member kinds, in canonical order.
+    pub fn iter(self) -> impl Iterator<Item = RootKind> {
+        KNOWN_ROOT_KINDS
+            .into_iter()
+            .filter(move |k| self.contains(*k))
+    }
+}
+
+pub struct CompletionContext {
+    pub context: CursorContext,
+    /// The span that should be replaced
+    pub replace: Span,
+}
+
+impl CompletionContext {
+    /// What a completion at `offset` should offer, and what it should replace.
+    pub fn resolve(ast: &Ast, text: &str, offset: u32) -> Option<Self> {
+        let path: Vec<SubNodeRef> = ast.fine_path_to(offset).collect();
+        classify(&path, &ast.roots, text, offset)
+    }
+}
+
+fn classify(
+    path: &[SubNodeRef],
+    roots: &Roots,
+    text: &str,
+    offset: u32,
+) -> Option<CompletionContext> {
+    // tracing::info!(
+    //     "{}",
+    //     path.iter().map(|p| format!("{:?}", p.detail())).join(", ")
+    // );
+    let Some(&last) = path.last() else {
+        return Some(CompletionContext {
+            context: CursorContext::RootKey {
+                missing: missing_root_kinds(roots, None),
+            },
+            replace: word_at(text, offset),
+        });
+    };
+    match last {
+        SubNodeRef::Root(root, AstRootDetail::Name) => Some(CompletionContext {
+            context: CursorContext::RootKey {
+                missing: missing_root_kinds(roots, Some(root)),
+            },
+            replace: root_key_prefix(root),
+        }),
+        SubNodeRef::Root(root, AstRootDetail::TypeExpr) => Some(CompletionContext {
+            context: CursorContext::RootType {
+                kind: root.name.value.expected_type().map(|_| root.name.value)?,
+            },
+            replace: filter_empty(root.type_expr.span, text).unwrap_or(Span::empty(offset)),
+        }),
+
+        // object trivia means we're in the body of it's properties,
+        // which means we want to recommend property keys
+        SubNodeRef::Object(s, AstObjectDetail::Node | AstObjectDetail::Trivia) => {
+            Some(CompletionContext {
+                context: CursorContext::PropertyKey {
+                    class: s.class_hash.value,
+                },
+                // ast properties don't exist when it's just a naked key (for now), so we
+                // need to check for partially typed keys here
+                replace: word_at(text, offset),
+            })
+        }
+
+        // On an existing key of a property, a completion includes the entire
+        // `key: type = ` prefix, so we can replace the old one entirely.
+        SubNodeRef::Property(p, AstPropertyDetail::Name) => Some(CompletionContext {
+            context: CursorContext::PropertyKey {
+                class: enclosing_class(path, path.len() - 1)?,
+            },
+            replace: key_prefix(p),
+        }),
+        SubNodeRef::Property(p, AstPropertyDetail::TypeExpr) => Some(CompletionContext {
+            context: CursorContext::PropertyType {
+                class: enclosing_class(path, path.len() - 1)?,
+                property: p.name.value,
+            },
+            replace: filter_empty(p.type_expr.span, text).unwrap_or(Span::empty(offset)),
+        }),
+
+        SubNodeRef::Value(_)
+        | SubNodeRef::Object(_, AstObjectDetail::ClassHash)
+        | SubNodeRef::RootEntry(_, AstRootEntryDetail::PathHash) => {
+            classify_value(path, text, offset)
+        }
+
+        // object/property/root trivia is dead space we don't care about, Node shouldn't show up in the
+        // final noderef in the path
+        SubNodeRef::RootEntry(_, AstRootEntryDetail::Trivia | AstRootEntryDetail::Node)
+        | SubNodeRef::Property(_, AstPropertyDetail::Trivia | AstPropertyDetail::Node)
+        | SubNodeRef::Root(_, AstRootDetail::Trivia | AstRootDetail::Node) => None,
+    }
+}
+
+fn classify_value(path: &[SubNodeRef], text: &str, offset: u32) -> Option<CompletionContext> {
+    // The deepest value on the path is the one the cursor is actually in.
+    let (vi, value) = path.iter().enumerate().rev().find_map(|(i, n)| match n {
+        SubNodeRef::Value(v) => Some((i, *v)),
+        _ => None,
+    })?;
+
+    // A container item / property value always belongs to some owning property.
+    let (pi, property) = path.iter().enumerate().rev().find_map(|(i, n)| match n {
+        SubNodeRef::Property(p, _) => Some((i, *p)),
+        _ => None,
+    })?;
+    let class = enclosing_class(path, pi)?;
+    let property = property.name.value;
+
+    let context = match *path.get(vi.checked_sub(1)?)? {
+        // Descended into a map entry: keys aren't completable, only values.
+        SubNodeRef::Value(Value::Map { entries, .. }) => {
+            if entries.iter().any(|(key, _)| std::ptr::eq(key, value)) {
+                return None;
+            }
+            CursorContext::ContainerItem { class, property }
+        }
+        SubNodeRef::Value(
+            Value::Container { .. } | Value::UnorderedContainer { .. } | Value::Optional { .. },
+        ) => CursorContext::ContainerItem { class, property },
+        // The value belongs directly to the property. A container value offers
+        // its items (once past the opening brace); anything else is the value.
+        SubNodeRef::Property(..) if value.is_containerlike() => {
+            if offset <= value.span().start {
+                return None;
+            }
+            CursorContext::ContainerItem { class, property }
+        }
+        SubNodeRef::Property(..) => CursorContext::PropertyValue { class, property },
+        _ => return None,
+    };
+
+    Some(CompletionContext {
+        context,
+        replace: if value.is_containerlike() {
+            // we still need to worry about partially typed keys as before
+            word_at(text, offset)
+        } else {
+            filter_empty(value.span(), text).unwrap_or(Span::empty(offset))
+        },
+    })
+}
+
+/// The span that covers `[key: type = ]value`
+fn key_prefix(p: &Property) -> Span {
+    let end = match &p.value {
+        Some(value) => value.span().start,
+        None if p.type_expr.value.is_some() => p.type_expr.span.end,
+        None => p.name.span().end,
+    };
+    Span::new(p.name.span().start, end)
+}
+
+/// [`key_prefix`] for a top-level root; roots always carry a value structurally, so this usually
+/// spans up to the value's start.
+fn root_key_prefix(r: &Root) -> Span {
+    let end = match r.value.as_ref().map(RootValue::span) {
+        Some(value_span) => value_span.start,
+        None if r.type_expr.value.is_some() => r.type_expr.span.end,
+        None => r.name.span.end,
+    };
+    Span::new(r.name.span.start, end)
+}
+
+fn missing_root_kinds(roots: &Roots, current: Option<&Root>) -> RootKindSet {
+    let mut present = RootKindSet::default();
+    for root in roots
+        .iter()
+        .filter(|r| !current.is_some_and(|c| std::ptr::eq(*r, c)))
+    {
+        present.insert(root.name.value);
+    }
+
+    let mut missing = RootKindSet::default();
+    for kind in KNOWN_ROOT_KINDS {
+        if !present.contains(kind) {
+            missing.insert(kind);
+        }
+    }
+    missing
+}
+
+fn enclosing_class(path: &[SubNodeRef], before: usize) -> Option<BinHash> {
+    path[..before]
+        .iter()
+        .rev()
+        .find_map(|n| n.class_hash())
+        .map(|h| h.value)
+}
+
+/// Return the span iff it contains some non-whitespace characters
+fn filter_empty(span: Span, text: &str) -> Option<Span> {
+    text[span]
+        .chars()
+        .any(|c| !c.is_whitespace())
+        .then_some(span)
+}
+
+/// Find the largest continuous span of ASCII alphanumeric characters that covers this offset.
+/// Returns an empty span at the given offset if no alphanumeric characters are found.
+fn word_at(text: &str, offset: u32) -> Span {
+    let bytes = text.as_bytes();
+    let is_word = |b: u8| b.is_ascii_alphanumeric() || b == b'_';
+
+    let mut start = (offset as usize).min(bytes.len());
+    while start > 0 && is_word(bytes[start - 1]) {
+        start -= 1;
+    }
+    let mut end = (offset as usize).min(bytes.len());
+    while end < bytes.len() && is_word(bytes[end]) {
+        end += 1;
+    }
+    Span::new(start as u32, end as u32)
+}

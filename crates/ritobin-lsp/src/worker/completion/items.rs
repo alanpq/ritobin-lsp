@@ -1,12 +1,15 @@
 use std::borrow::Cow;
 
 use lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionItemLabelDetails, Documentation,
-    InsertTextFormat, MarkupContent, MarkupKind,
+    CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionTextEdit,
+    Documentation, InsertTextFormat, MarkupContent, MarkupKind, Range, TextEdit,
 };
 use ltk_hash::BinHash;
 use ltk_meta::PropertyKind;
+use ltk_ritobin::ast::node::root::RootKind;
 use rustc_hash::FxHashSet;
+
+use super::context::RootKindSet;
 
 use meta_wiki::{
     schema::{Property, U32Hash},
@@ -49,16 +52,22 @@ pub fn value_items<'a>(
     slot: ValueSlot,
     name_of: impl Fn(U32Hash) -> Option<Name<'a>>,
     snippets: bool,
+    replace: Range,
 ) -> Vec<CompletionItem> {
     use PropertyKind as K;
 
     match slot.kind {
-        K::Bool | K::BitBool => ["true", "false"].into_iter().map(literal_item).collect(),
+        K::Bool | K::BitBool => ["true", "false"]
+            .into_iter()
+            .map(|text| literal_item(text, replace))
+            .collect(),
         K::Struct | K::Embedded => slot
             .other_class
-            .map(|root| class_items(classes, root, name_of, snippets))
+            .map(|root| class_items(classes, root, name_of, snippets, replace))
             .unwrap_or_default(),
-        K::Container | K::UnorderedContainer | K::Optional | K::Map => vec![block_item(snippets)],
+        K::Container | K::UnorderedContainer | K::Optional | K::Map => {
+            vec![block_item(snippets, replace)]
+        }
         _ => Vec::new(),
     }
 }
@@ -67,6 +76,7 @@ pub fn property_items<'a>(
     classes: &Classes,
     class: BinHash,
     name_of: impl Fn(U32Hash) -> Option<Name<'a>>,
+    replace: Range,
 ) -> Vec<CompletionItem> {
     inherited_properties(classes, class)
         .into_iter()
@@ -78,9 +88,13 @@ pub fn property_items<'a>(
              }| {
                 let label = name_of(hash).unwrap_or_else(|| hash_label(hash).into());
                 let ty = property.rito_type().to_string();
+                let new_text = format!("{label}: {ty} = ");
 
                 CompletionItem {
-                    insert_text: Some(format!("{label}: {ty} = ")),
+                    text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+                        range: replace,
+                        new_text,
+                    })),
                     sort_text: Some(sort_key(0, &label, name_of(hash).is_some(), hash)),
                     label_details: Some(CompletionItemLabelDetails {
                         detail: Some(format!(": {ty}")),
@@ -96,14 +110,64 @@ pub fn property_items<'a>(
         .collect()
 }
 
-pub fn type_item(classes: &Classes, class: BinHash, property: BinHash) -> Option<CompletionItem> {
+pub fn type_item(
+    classes: &Classes,
+    class: BinHash,
+    property: BinHash,
+    replace: Range,
+) -> Option<CompletionItem> {
     let ty = classes
         .find_property(class, property)?
         .rito_type()
         .to_string();
 
     Some(CompletionItem {
-        insert_text: Some(ty.clone()),
+        text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+            range: replace,
+            new_text: ty.clone(),
+        })),
+        kind: Some(CompletionItemKind::TYPE_PARAMETER),
+        preselect: Some(true),
+        label: ty,
+        ..Default::default()
+    })
+}
+
+pub fn root_property_items(missing: RootKindSet, replace: Range) -> Vec<CompletionItem> {
+    missing
+        .iter()
+        .enumerate()
+        .filter_map(|(order, kind)| {
+            let ty = kind.expected_type()?.to_string();
+            let label = kind.as_str();
+
+            Some(CompletionItem {
+                text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+                    range: replace,
+                    new_text: format!("{label}: {ty} = "),
+                })),
+                sort_text: Some(format!("{order:02}")),
+                label_details: Some(CompletionItemLabelDetails {
+                    detail: Some(format!(": {ty}")),
+                    description: None,
+                }),
+                kind: Some(CompletionItemKind::PROPERTY),
+                label: label.to_owned(),
+                ..Default::default()
+            })
+        })
+        .collect()
+}
+
+/// The type a root kind expects, e.g. `u32` for `version`
+pub fn root_type_item(kind: RootKind, replace: Range) -> Option<CompletionItem> {
+    let ty = kind.expected_type()?.to_string();
+
+    Some(CompletionItem {
+        text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+            range: replace,
+            new_text: ty.clone(),
+        })),
         kind: Some(CompletionItemKind::TYPE_PARAMETER),
         preselect: Some(true),
         label: ty,
@@ -116,6 +180,7 @@ fn class_items<'a>(
     root: U32Hash,
     name_of: impl Fn(U32Hash) -> Option<Name<'a>>,
     snippets: bool,
+    replace: Range,
 ) -> Vec<CompletionItem> {
     let mut found: Vec<_> = classes
         .concrete_descendants(root)
@@ -148,11 +213,16 @@ fn class_items<'a>(
                 .and_then(|class| class.base)
                 .and_then(&name_of);
 
+            let new_text = match snippets {
+                true => format!("{label} {{\n\t$0\n}}"),
+                false => format!("{label} {{\n}}"),
+            };
+
             CompletionItem {
-                insert_text: Some(match snippets {
-                    true => format!("{label} {{\n\t$0\n}}"),
-                    false => format!("{label} {{\n}}"),
-                }),
+                text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+                    range: replace,
+                    new_text,
+                })),
                 insert_text_format: snippets.then_some(InsertTextFormat::SNIPPET),
                 sort_text: Some(sort_key(depth, &label, named, hash)),
                 label_details: base.map(|base| CompletionItemLabelDetails {
@@ -203,21 +273,30 @@ fn inherited_properties(classes: &Classes, class: BinHash) -> Vec<FatProperty<'_
     out
 }
 
-fn literal_item(text: &str) -> CompletionItem {
+fn literal_item(text: &str, replace: Range) -> CompletionItem {
     CompletionItem {
         label: text.to_owned(),
+        text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+            range: replace,
+            new_text: text.to_owned(),
+        })),
         kind: Some(CompletionItemKind::VALUE),
         ..Default::default()
     }
 }
 
-fn block_item(snippets: bool) -> CompletionItem {
+fn block_item(snippets: bool, replace: Range) -> CompletionItem {
+    let new_text = match snippets {
+        true => "{\n\t$0\n}".to_owned(),
+        false => "{\n}".to_owned(),
+    };
+
     CompletionItem {
         label: "{}".to_owned(),
-        insert_text: Some(match snippets {
-            true => "{\n\t$0\n}".to_owned(),
-            false => "{\n}".to_owned(),
-        }),
+        text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+            range: replace,
+            new_text,
+        })),
         insert_text_format: snippets.then_some(InsertTextFormat::SNIPPET),
         kind: Some(CompletionItemKind::STRUCT),
         ..Default::default()

@@ -1,32 +1,16 @@
 use std::{
-    fmt::Write as _,
     panic::{AssertUnwindSafe, catch_unwind},
     sync::Arc,
     time::Duration,
 };
 
-use imara_diff::{Algorithm, Diff, InternedInput};
-use itertools::Itertools;
 use lsp_server::RequestId;
 use lsp_types::{
     CompletionContext, CompletionResponse, Diagnostic, FormattingOptions, Hover, MarkedString,
-    MarkupContent, MarkupKind, PartialResultParams, Position, Range, SemanticToken,
-    SemanticTokensFullDeltaResult, TextDocumentContentChangeEvent, TextEdit, Url,
+    PartialResultParams, Position, Range, TextDocumentContentChangeEvent, Url,
     WorkDoneProgressParams,
 };
-use ltk_mimir_cache::Table;
-use ltk_ritobin::{
-    Cst,
-    ast::{
-        Ast,
-        query::{
-            AstObjectDetail, AstPropertyDetail, AstStructDetail,
-            nodes::{DetailedNode, NodeExt as _},
-        },
-    },
-    cst::visitor::VisitorExt as _,
-    print::PrintConfig,
-};
+use ltk_ritobin::{Cst, ast::Ast};
 use tokio::{
     sync::mpsc,
     task::JoinHandle,
@@ -35,16 +19,10 @@ use tokio::{
 
 use crate::{
     document::Document,
-    lsp::{
-        ext::PositionOrRange,
-        semantic_tokens::{TokenCache, TokenRequest, builder::SemanticTokensBuilder},
-    },
+    lsp::{ext::PositionOrRange, semantic_tokens::TokenCache},
     server::Server,
-    wiki,
-    worker::{code_actions::CodeActionData, semantic_tokens::SemanticVisitor},
+    worker::code_actions::CodeActionData,
 };
-
-use meta_wiki::{client::types::GetDocsNameOrHash, schema::U32Hash};
 
 pub mod code_actions;
 pub mod completion;

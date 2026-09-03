@@ -1,12 +1,12 @@
 use ltk_hash::BinHash;
 use ltk_ritobin::ast::{
-    Ast, AstProperty, AstStruct, AstValue,
-    visitor::{Visit, Visitor},
+    Ast, Object, Property, RootEntry, Value,
+    visitor::{Continue, Descend, EnterFlow, ExitFlow, Visitor},
 };
 
 use crate::{
     linter::Lint,
-    server::{Hashes, HashesSnapshot},
+    server::HashesSnapshot,
     worker::unhash::{self, Unhasher},
 };
 use meta_wiki::{
@@ -51,49 +51,53 @@ impl<'a> Linter<'a> {
         }
     }
     pub fn run(mut self, ast: &Ast) -> Vec<Lint> {
-        shadowed::check_ast_objects(&mut self.inner.lints, ast);
+        shadowed::check_root_objects(&mut self.inner.lints, ast);
         ast.walk(&mut self.inner);
         self.inner.lints
     }
 }
 
 impl Visitor for LintVisitor<'_> {
-    fn enter_struct(&mut self, s: &AstStruct) -> Visit {
-        self.class_scopes.push(s.class_hash.value);
+    fn enter_object(&mut self, object: &Object) -> EnterFlow {
+        self.class_scopes.push(object.class_hash.value);
 
-        shadowed::check_struct(&mut self.lints, s);
+        shadowed::check_object(&mut self.lints, object);
 
-        if let Some(lint) = self.unhasher.as_ref().and_then(|u| u.unhash_struct(s)) {
-            self.lints.push(lint);
-        }
-
-        Visit::Continue
-    }
-
-    fn exit_struct(&mut self, _s: &AstStruct) -> Visit {
-        self.class_scopes.pop();
-        Visit::Continue
-    }
-
-    fn enter_object(&mut self, object: &ltk_ritobin::ast::AstObject) -> Visit {
         if let Some(lint) = self.unhasher.as_ref().and_then(|u| u.unhash_object(object)) {
             self.lints.push(lint);
         }
 
-        Visit::Continue
+        EnterFlow::Continue(Descend::Children)
     }
 
-    fn enter_value(&mut self, value: &AstValue) -> Visit {
+    fn exit_object(&mut self, _: &Object) -> ExitFlow {
+        self.class_scopes.pop();
+        ExitFlow::Continue(Continue::Siblings)
+    }
+
+    fn enter_root_entry(&mut self, entry: &RootEntry) -> ltk_ritobin::ast::visitor::EnterFlow {
+        if let Some(lint) = self
+            .unhasher
+            .as_ref()
+            .and_then(|u| u.unhash_root_entry(entry))
+        {
+            self.lints.push(lint);
+        }
+
+        EnterFlow::Continue(Descend::Children)
+    }
+
+    fn enter_value(&mut self, value: &Value) -> EnterFlow {
         if let Some(lint) = self.unhasher.as_ref().and_then(|u| u.unhash_value(value)) {
             self.lints.push(lint);
         }
-        if let AstValue::Map { entries, .. } = value {
-            shadowed::check_map_entries(&mut self.lints, entries.iter());
+        if let Value::Map { entries, .. } = value {
+            shadowed::check_map_entries(&mut self.lints, entries.iter().map(|e| &e.0));
         }
-        Visit::Continue
+        EnterFlow::Continue(Descend::Children)
     }
 
-    fn enter_property(&mut self, property: &AstProperty) -> Visit {
+    fn enter_property(&mut self, property: &Property) -> EnterFlow {
         if let Some(lint) = self
             .unhasher
             .as_ref()
@@ -103,30 +107,40 @@ impl Visitor for LintVisitor<'_> {
         }
 
         let Some(&class_hash) = self.class_scopes.last() else {
-            return Visit::Continue;
+            return EnterFlow::Continue(Descend::Children);
         };
         let Some(class) = self.class_meta.get(class_hash) else {
-            return Visit::Continue;
+            return EnterFlow::Continue(Descend::Children);
         };
 
         let key_hash = property.name.value;
         match self.class_meta.find_property(class_hash, key_hash) {
             Some(meta_prop) => {
                 let expected = meta_prop.rito_type();
-                let got = property.value.rito_type();
-                if expected != got {
-                    self.lints.push(Lint::MismatchedMetaTypeArg {
-                        key: property.name.span(),
-                        type_expr: property.type_span.unwrap_or(property.value.span()),
-                        expected,
-                        got,
-                    });
+                if let Some(value) = property.value.as_ref() {
+                    let got = value.rito_type();
+                    if got.is_some_and(|got| got != expected) {
+                        self.lints.push(Lint::MismatchedMetaTypeArg {
+                            key: property.name.span(),
+                            type_expr: if property.type_expr.value.is_some() {
+                                property.type_expr.span
+                            } else {
+                                value.span()
+                            },
+                            expected,
+                            got: got.into(),
+                        });
+                    }
                 }
                 if let Some(default) = class
                     .defaults
                     .as_ref()
                     .and_then(|d| d.get(&U32Hash::from(key_hash)))
-                    && EqExt::eq(default, &property.value.clone().to_bin_value())
+                    && property
+                        .value
+                        .as_ref()
+                        .and_then(|v| v.to_bin_value())
+                        .is_some_and(|v| EqExt::eq(default, &v))
                 {
                     self.lints.push(Lint::DefaultValue {
                         entry: property.span(),
@@ -142,7 +156,7 @@ impl Visitor for LintVisitor<'_> {
             }
         }
 
-        Visit::Continue
+        EnterFlow::Continue(Descend::Children)
     }
 }
 
