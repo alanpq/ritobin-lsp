@@ -4,13 +4,14 @@ import * as vscode from "vscode";
 
 import type { Ctx } from "./ctx";
 import { askUser, toast } from "./ide_utils";
-import * as registry from "./registry";
+import { EXPLORER_LAYOUT_VERSION } from "./registry/constants";
 import {
-  EXPLORER_EXTENSION_KEYS,
-  EXPLORER_PROG_ID,
-  EXPLORER_PROG_ID_KEY,
-  EXPLORER_VERB_KEY,
-} from "./registry/constants";
+  expectedCommand,
+  readInstalledCommand,
+  removeExplorerKeys,
+  sweepLegacyExplorerKeys,
+  writeExplorerKeys,
+} from "./registry/explorer_keys";
 import { log } from "./util";
 
 export function explorerIntegrationSupported(): boolean {
@@ -40,12 +41,12 @@ function resolveCodeExe(): string | undefined {
   return undefined;
 }
 
-export async function installExplorerIntegration(): Promise<boolean> {
+export async function installExplorerIntegration(ctx: Ctx): Promise<boolean> {
   if (!explorerIntegrationSupported()) {
     toast.warn(
       "Explorer integration is only available on local Windows installs.",
     );
-  
+
     return false;
   }
 
@@ -54,51 +55,25 @@ export async function installExplorerIntegration(): Promise<boolean> {
     toast.error(
       "Could not locate the VS Code executable to register with Explorer.",
     );
-  
+
     return false;
   }
 
-  const command = `"${codeExe}" "%1"`;
-  const icon = `"${codeExe}",0`;
-  const results = [
-    await registry.setValue(EXPLORER_VERB_KEY, undefined, "Open as Ritobin"),
-    await registry.setValue(EXPLORER_VERB_KEY, "Icon", icon),
-    await registry.setValue(
-      `${EXPLORER_VERB_KEY}\\command`,
-      undefined,
-      command,
-    ),
-    await registry.setValue(
-      EXPLORER_PROG_ID_KEY,
-      undefined,
-      "Ritobin Text File",
-    ),
-    await registry.setValue(
-      `${EXPLORER_PROG_ID_KEY}\\DefaultIcon`,
-      undefined,
-      icon,
-    ),
-    await registry.setValue(
-      `${EXPLORER_PROG_ID_KEY}\\shell\\open\\command`,
-      undefined,
-      command,
-    ),
-  ];
-
-  for (const key of EXPLORER_EXTENSION_KEYS) {
-    results.push(await registry.setValue(key, undefined, EXPLORER_PROG_ID));
-  }
-
-  const failures = results.filter((ok) => !ok).length;
+  const failures = await writeExplorerKeys(codeExe);
   if (failures > 0) {
     toast.error(
       `Explorer integration install failed (${failures} registry operation(s) failed). ` +
         "See the ritobin-lsp Extension output for details.",
     );
-  
+
     return false;
   }
-  
+
+  await ctx.persistentState.updateExplorerIntegrationPrompt("installed");
+  await ctx.persistentState.updateExplorerLayoutVersion(
+    EXPLORER_LAYOUT_VERSION,
+  );
+
   log.info("Explorer integration installed", { codeExe });
   toast.info(
     'Explorer integration installed: right-click a .bin file and choose "Open as Ritobin"; ' +
@@ -108,7 +83,7 @@ export async function installExplorerIntegration(): Promise<boolean> {
   return true;
 }
 
-export async function uninstallExplorerIntegration(): Promise<boolean> {
+export async function uninstallExplorerIntegration(ctx: Ctx): Promise<boolean> {
   if (!explorerIntegrationSupported()) {
     toast.warn(
       "Explorer integration is only available on local Windows installs.",
@@ -117,17 +92,87 @@ export async function uninstallExplorerIntegration(): Promise<boolean> {
     return false;
   }
 
-  await registry.deleteKey(EXPLORER_VERB_KEY);
-  await registry.deleteKey(EXPLORER_PROG_ID_KEY);
+  await removeExplorerKeys();
 
-  for (const key of EXPLORER_EXTENSION_KEYS) {
-    if ((await registry.getValue(key)) === EXPLORER_PROG_ID) {
-      await registry.deleteValue(key);
-    }
-  }
+  // "dismissed" both records the answer to the one-time prompt and stops
+  // `reconcileExplorerIntegration` from putting the keys straight back.
+  await ctx.persistentState.updateExplorerIntegrationPrompt("dismissed");
+  await ctx.persistentState.updateExplorerLayoutVersion(undefined);
 
   toast.info("Explorer integration uninstalled.");
   return true;
+}
+
+/**
+ * Re-assert the registry layout for users who already opted in, if it has
+ * drifted from what this version of the extension writes.
+ *
+ * Drift happens two ways: the extension changes its key layout (caught by the
+ * stored layout version), or the VS Code executable moves — a Stable → Insiders
+ * switch, or a portable install being relocated (caught by comparing the
+ * registered command against the current one).
+ *
+ * Deliberately silent. The user consented to these keys already; re-writing
+ * them is not a new consent event, so there is no toast on either path.
+ */
+export async function reconcileExplorerIntegration(ctx: Ctx): Promise<void> {
+  if (!explorerIntegrationSupported()) {
+    return;
+  }
+
+  // Only ever touch installs the user opted into. `undefined` (not asked yet)
+  // and "dismissed" (declined, or explicitly uninstalled) are both hands-off.
+  if (ctx.persistentState.explorerIntegrationPrompt !== "installed") {
+    return;
+  }
+
+  try {
+    const codeExe = resolveCodeExe();
+    if (!codeExe) {
+      log.warn(
+        "Skipping Explorer integration reconcile: VS Code executable not found.",
+      );
+
+      return;
+    }
+
+    const staleLayout =
+      ctx.persistentState.explorerLayoutVersion !== EXPLORER_LAYOUT_VERSION;
+
+    // Skip the registry read when the layout version has already decided it.
+    // Otherwise this is the one `reg query` an unchanged session costs. A
+    // missing key reads as `undefined`, which counts as drift and restores it.
+    const staleCommand =
+      !staleLayout &&
+      (await readInstalledCommand()) !== expectedCommand(codeExe);
+
+    if (!staleLayout && !staleCommand) {
+      return;
+    }
+
+    await sweepLegacyExplorerKeys();
+
+    const failures = await writeExplorerKeys(codeExe);
+    if (failures > 0) {
+      log.warn(
+        `Explorer integration reconcile: ${failures} registry operation(s) failed.`,
+      );
+
+      return;
+    }
+
+    await ctx.persistentState.updateExplorerLayoutVersion(
+      EXPLORER_LAYOUT_VERSION,
+    );
+
+    log.info("Explorer integration reconciled", {
+      codeExe,
+      reason: staleLayout ? "layout version" : "command drift",
+    });
+  } catch (err) {
+    // Never let a background repair break activation.
+    log.warn("Explorer integration reconcile failed:", err);
+  }
 }
 
 export async function maybePromptExplorerIntegration(ctx: Ctx): Promise<void> {
@@ -148,9 +193,7 @@ export async function maybePromptExplorerIntegration(ctx: Ctx): Promise<void> {
     "Don't ask again",
   );
   if (choice === "Yes") {
-    if (await installExplorerIntegration()) {
-      await ctx.persistentState.updateExplorerIntegrationPrompt("installed");
-    }
+    await installExplorerIntegration(ctx);
   } else if (choice === "Don't ask again") {
     await ctx.persistentState.updateExplorerIntegrationPrompt("dismissed");
   }

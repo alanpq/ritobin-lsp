@@ -1,4 +1,4 @@
-import { log, spawnAsync } from "../util";
+import { spawnAsync } from "../process";
 
 /**
  * Thin async wrapper around the Windows `reg.exe` CLI.
@@ -6,17 +6,31 @@ import { log, spawnAsync } from "../util";
  * Arguments are passed as an array (no shell), so keys and values need no
  * quoting or escaping. Mutating operations log failures and return `false`
  * instead of throwing; only string (REG_SZ) values are supported.
+ *
+ * This module must stay free of any `vscode` import, directly or transitively —
+ * it is reachable from `src/uninstall.ts`, which runs in plain Node. That is why
+ * the logger is injected rather than imported from `../util`.
  */
+
+let warn: (message: string) => void = () => {};
+
+/**
+ * Route this module's failure messages somewhere. The extension host wires this
+ * to `log.warn`, the uninstall script to `console.warn`; left unset, failures
+ * are silent.
+ */
+export function setRegistryLogger(fn: (message: string) => void): void {
+  warn = fn;
+}
 
 async function reg(args: string[]): Promise<{ ok: boolean; stdout: string }> {
   const res = await spawnAsync("reg", args, { windowsHide: true });
-  
+
   const ok = res.status === 0 && !res.error;
   if (!ok) {
-    log.warn(
-      `reg ${args.join(" ")} failed:`,
-      res.stderr.trim() || res.error || `exit code ${res.status}`,
-    );
+    const reason =
+      res.stderr.trim() || res.error?.message || `exit code ${res.status}`;
+    warn(`reg ${args.join(" ")} failed: ${reason}`);
   }
 
   return { ok, stdout: res.stdout };
@@ -71,7 +85,12 @@ export async function getValue(
   if (res.status !== 0 || res.error) {
     return undefined;
   }
-  
+
   const match = /REG_SZ\s+(.+)/.exec(res.stdout);
-  return match?.[1]?.trim();
+  const value = match?.[1]?.trim();
+
+  // A key whose default value has been deleted still exists, and `reg query`
+  // reports it as the literal "(value not set)" with exit code 0. That is an
+  // absent value, not a value that happens to read like one.
+  return value === "(value not set)" ? undefined : value;
 }

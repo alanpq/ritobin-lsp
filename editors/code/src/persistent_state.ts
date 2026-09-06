@@ -35,6 +35,19 @@ export class PersistentState {
   }
 
   /**
+   * Registry layout version last written by the Explorer integration.
+   * `undefined` on installs that predate versioning, which is treated as
+   * stale and reconciled once on the next activation.
+   */
+  get explorerLayoutVersion(): number | undefined {
+    return this.globalState.get("explorerLayoutVersion");
+  }
+
+  async updateExplorerLayoutVersion(value: number | undefined) {
+    await this.globalState.update("explorerLayoutVersion", value);
+  }
+
+  /**
    * Whether the user dismissed the "opened .bin read-only" nudge with
    * "Don't show again". `undefined` means keep showing it on each bin open.
    */

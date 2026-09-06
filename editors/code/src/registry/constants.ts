@@ -20,3 +20,18 @@ export const EXPLORER_EXTENSION_KEYS = [
   "HKCU\\Software\\Classes\\.rito",
   "HKCU\\Software\\Classes\\.ritobin",
 ];
+
+/**
+ * Bump whenever the set or shape of the keys written by `writeExplorerKeys`
+ * changes. Installs stamped with an older version are reconciled on activation.
+ */
+export const EXPLORER_LAYOUT_VERSION = 1;
+
+/**
+ * Keys written by superseded layouts, swept on both reconcile and uninstall.
+ *
+ * Empty today. When a key is renamed or dropped from the layout above, add its
+ * old path here and bump [`EXPLORER_LAYOUT_VERSION`] — that is what lets an
+ * existing install shed keys it should no longer own.
+ */
+export const EXPLORER_LEGACY_KEYS: string[] = [];

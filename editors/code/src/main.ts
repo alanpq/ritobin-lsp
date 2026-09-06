@@ -14,9 +14,11 @@ import * as diagnostics from "./diagnostics";
 import {
   installExplorerIntegration,
   maybePromptExplorerIntegration,
+  reconcileExplorerIntegration,
   uninstallExplorerIntegration,
 } from "./explorer_integration";
 import { guard } from "./ide_utils";
+import { setRegistryLogger } from "./registry";
 // import { activateTaskProvider } from "./tasks";
 import { isRitobinDocument, log, setContextValue } from "./util";
 // import { initializeDebugSessionTrackingAndRebuild } from "./debug";
@@ -46,6 +48,10 @@ export async function activate(
 ): Promise<RustAnalyzerExtensionApi> {
   const ctx = new Ctx(context, createCommands(), fetchWorkspace());
   log.info("Activating...");
+
+  // The registry layer keeps no `vscode` dependency of its own (see
+  // src/uninstall.ts), so the extension host hands it a logger.
+  setRegistryLogger((message) => log.warn(message));
 
   // VS Code doesn't show a notification when an extension fails to activate
   // so we do it ourselves.
@@ -195,6 +201,9 @@ async function activateServer(ctx: Ctx): Promise<RustAnalyzerExtensionApi> {
     ctx.pushExtCleanup(lazyStart);
   }
 
+  // Mutually exclusive on persisted state: reconcile only touches installs
+  // already marked "installed", which is exactly what suppresses the prompt.
+  void reconcileExplorerIntegration(ctx);
   void maybePromptExplorerIntegration(ctx);
 
   return ctx;
@@ -202,16 +211,12 @@ async function activateServer(ctx: Ctx): Promise<RustAnalyzerExtensionApi> {
 
 const installExplorerIntegrationCommand = (ctx: Ctx) =>
   guard("Explorer integration install", async () => {
-    if (await installExplorerIntegration()) {
-      await ctx.persistentState.updateExplorerIntegrationPrompt("installed");
-    }
+    await installExplorerIntegration(ctx);
   });
 
 const uninstallExplorerIntegrationCommand = (ctx: Ctx) =>
   guard("Explorer integration uninstall", async () => {
-    if (await uninstallExplorerIntegration()) {
-      await ctx.persistentState.updateExplorerIntegrationPrompt("dismissed");
-    }
+    await uninstallExplorerIntegration(ctx);
   });
 
 function createCommands(): Record<string, CommandFactory> {
