@@ -236,6 +236,7 @@ async function isNixOs(): Promise<boolean> {
 }
 
 async function patchelf(dest: vscode.Uri): Promise<void> {
+  return;
   await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
