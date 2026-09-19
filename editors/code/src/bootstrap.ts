@@ -15,7 +15,7 @@ export async function bootstrap(
   if (!path) {
     throw new Error(
       "ritobin-lsp Language Server is not available. " +
-        "Please, ensure its [proper installation](https://ritobin-lsp.github.io/book/installation.html).",
+      "Please, ensure its [proper installation](https://ritobin-lsp.github.io/book/installation.html).",
     );
   }
 
@@ -24,10 +24,10 @@ export async function bootstrap(
   if (!isValidExecutable(path, config.serverExtraEnv)) {
     throw new Error(
       `Failed to execute ${path} --version.` +
-        (config.serverPath
-          ? `\`config.server.path\` or \`config.serverPath\` has been set explicitly.\
+      (config.serverPath
+        ? `\`config.server.path\` or \`config.serverPath\` has been set explicitly.\
             Consider removing this config or making a valid server binary available at that path.`
-          : ""),
+        : ""),
     );
   }
 
@@ -86,11 +86,11 @@ async function getServer(
 
   await vscode.window.showErrorMessage(
     "Unfortunately we don't ship binaries for your platform yet. " +
-      "You need to manually clone the ritobin-lsp repository and " +
-      "run `cargo build --release` to build the language server from sources. " +
-      "If you feel that your platform should be supported, please create an issue " +
-      "about that [here](https://github.com/alanpq/ritobin-lsp/issues) and we " +
-      "will consider it.",
+    "You need to manually clone the ritobin-lsp repository and " +
+    "run `cargo build --release` to build the language server from sources. " +
+    "If you feel that your platform should be supported, please create an issue " +
+    "about that [here](https://github.com/alanpq/ritobin-lsp/issues) and we " +
+    "will consider it.",
   );
   return undefined;
 }
@@ -243,18 +243,18 @@ async function patchelf(dest: vscode.Uri): Promise<void> {
     },
     async (progress, _) => {
       const expression = `
-            {srcStr, pkgs ? import <nixpkgs> {}}:
-                pkgs.stdenv.mkDerivation {
-                    name = "ritobin-lsp";
-                    src = /. + srcStr;
-                    phases = [ "installPhase" "fixupPhase" ];
-                    installPhase = "cp $src $out";
-                    fixupPhase = ''
-                    chmod 755 $out
-                    patchelf --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" $out
-                    '';
-                }
-            `;
+{srcStr, pkgs ? import <nixpkgs> {}}:
+    pkgs.stdenv.mkDerivation {
+        name = "ritobin-lsp";
+        src = /. + srcStr;
+        phases = [ "installPhase" "fixupPhase" ];
+        installPhase = "cp $src $out";
+        fixupPhase = ''
+          chmod 755 $out
+          patchelf $out
+        '';
+    }
+`; // --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" when we are not statically linked
       const origFile = vscode.Uri.file(dest.fsPath + "-orig");
       await vscode.workspace.fs.rename(dest, origFile, { overwrite: true });
       try {
