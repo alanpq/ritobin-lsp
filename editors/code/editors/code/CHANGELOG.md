@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.19](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.1.18...ritobin-lsp-vs-v0.1.19) (2026-09-19)
+
+
+### Bug Fixes
+
+* nixos patch ([4ef51ae](https://github.com/alanpq/ritobin-lsp/commit/4ef51ae9fbd1b89c0c24df5c3544329cf1f19eb5))
+
 ## [0.1.18](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.1.17...ritobin-lsp-vs-v0.1.18) (2026-09-03)
 
 
