@@ -36,7 +36,7 @@ ltk_hashdb.workspace = true
 futures.workspace = true
 crossbeam-channel.workspace = true
 dashmap = { workspace = true, features = ["serde"] }
-arc-swap = "1.9.2"
+arc-swap.workspace = true
 
 tokio = { workspace = true, features = ["full"] }
 reqwest = { workspace = true, features = ["json", "stream", "blocking"] }

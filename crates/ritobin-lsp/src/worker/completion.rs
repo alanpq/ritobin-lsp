@@ -1,6 +1,7 @@
 pub mod context;
 pub mod items;
 
+use arc_swap::access::Access as _;
 use lsp_types::{CompletionItem, CompletionResponse};
 use ltk_mimir_cache::Table;
 
@@ -28,8 +29,8 @@ impl Worker {
             return Ok(None);
         };
 
-        let guard = self.server.meta.classes.read().unwrap();
-        let classes = &*guard;
+        let classes = self.server.meta.classes().load();
+        let classes = &classes;
 
         let table = |table| self.server.hashes.as_ref().and_then(|h| h.table(table));
         let (fields, types) = (table(Table::BinFields), table(Table::BinTypes));

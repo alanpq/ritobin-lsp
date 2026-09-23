@@ -78,7 +78,7 @@ pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result
                 }
                 None => {
                     let dir = files.cache_dir();
-                    if let Err(e) = server.meta.load(dir).await {
+                    if let Err(e) = server.meta.load_path(dir).await {
                         tracing::error!("Failed to load existing meta - {e:?}");
                     }
 
@@ -100,7 +100,7 @@ pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result
                 }
             }
 
-            let outcome = match server.meta.loaded.load(Ordering::Relaxed) {
+            let outcome = match server.meta.loaded() {
                 true => TaskStatus::Ready,
                 false => TaskStatus::Failed("No meta dump available".to_owned()),
             };
