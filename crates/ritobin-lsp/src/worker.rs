@@ -31,6 +31,7 @@ pub mod code_actions;
 pub mod completion;
 pub mod diagnostics;
 pub mod semantic_tokens;
+pub mod symbols;
 pub mod unhash;
 
 mod format;
@@ -57,6 +58,11 @@ pub enum Message {
         work_done_progress_params: WorkDoneProgressParams,
     },
     CompletionRequest(CompletionRequest),
+    SymbolsRequest {
+        id: RequestId,
+        work_done_progress_params: WorkDoneProgressParams,
+        partial_result_params: PartialResultParams,
+    },
     CodeActionRequest {
         id: RequestId,
         range: Range,
@@ -296,6 +302,40 @@ impl Worker {
                         )
                     })
                     .await;
+            }
+            Message::SymbolsRequest {
+                id,
+                work_done_progress_params,
+                partial_result_params,
+            } => {
+                let _ = self.send_result(id, |w| {
+                    let Symbols {
+                        symbols,
+                        total_limit_reached,
+                        depth_limit_reached,
+                    } = w.symbols(work_done_progress_params, partial_result_params)?;
+                    if let Some((limit, true)) = total_limit_reached {
+                        let _ = w
+                            .server
+                            .send_notification::<ShowMessage>(ShowMessageParams {
+                                typ: MessageType::WARNING,
+                                message: format!(
+                                    "Document symbols have been truncated to {limit} total symbols."
+                                ),
+                            });
+                    }
+                    if let Some((limit, true)) = depth_limit_reached {
+                        let _ = w
+                            .server
+                            .send_notification::<ShowMessage>(ShowMessageParams {
+                                typ: MessageType::WARNING,
+                                message: format!(
+                                    "Document symbol tree has been limited to {limit} symbols deep."
+                                ),
+                            });
+                    }
+                    Ok::<_, Unparsed>(DocumentSymbolResponse::Nested(symbols))
+                });
             }
             Message::CompletionRequest(req) => {
                 let _ = self.send_result(req.id.clone(), |w| {
