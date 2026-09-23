@@ -33,9 +33,9 @@ serde_with = "3.18.0"
 
 camino = "1.1.10"
 
-ltk_ritobin = { git = "https://github.com/LeagueToolkit/league-toolkit.git", branch = "ritobin/ast", features = ["serde"] }
-ltk_meta = { git = "https://github.com/LeagueToolkit/league-toolkit.git", branch = "ritobin/ast", features = ["serde"] }
-ltk_hash = { git = "https://github.com/LeagueToolkit/league-toolkit.git", branch = "ritobin/ast" }
+ltk_ritobin = { version = "0.8", features = ["serde"] }
+ltk_meta = { version = "*",  features = ["serde"] }
+ltk_hash = { version = "*" }
 ltk_mimir_cache = { git = "https://github.com/LeagueToolkit/Mimir.git" }
 ltk_hashdb = { git = "https://github.com/LeagueToolkit/Mimir.git" }
 
