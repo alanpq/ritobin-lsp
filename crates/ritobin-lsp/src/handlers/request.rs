@@ -5,11 +5,11 @@ use std::{fmt::Write as _, sync::Arc};
 use anyhow::Result;
 use lsp_server::Request as ServerRequest;
 use lsp_types::{
-    CodeActionParams, DocumentFormattingParams, SemanticTokensDeltaParams, SemanticTokensParams,
-    SemanticTokensRangeParams,
+    CodeActionParams, DocumentFormattingParams, DocumentSymbolParams, SemanticTokensDeltaParams,
+    SemanticTokensParams, SemanticTokensRangeParams,
     request::{
-        CodeActionRequest, Completion, Formatting, HoverRequest, SemanticTokensFullDeltaRequest,
-        SemanticTokensFullRequest, SemanticTokensRangeRequest,
+        CodeActionRequest, Completion, DocumentSymbolRequest, Formatting, HoverRequest,
+        SemanticTokensFullDeltaRequest, SemanticTokensFullRequest, SemanticTokensRangeRequest,
     },
 };
 use lsp_types::{
@@ -151,6 +151,17 @@ pub async fn request(server: &Arc<Server>, req: ServerRequest) -> Result<()> {
                         id,
                         position: p.position,
                         work_done_progress_params: p.work_done_progress_params,
+                    },
+                )
+            }
+            DocumentSymbolRequest::METHOD => {
+                let p: DocumentSymbolParams = serde_json::from_value(req.params.clone())?;
+                (
+                    p.text_document.uri.clone(),
+                    worker::Message::SymbolsRequest {
+                        id,
+                        work_done_progress_params: p.work_done_progress_params,
+                        partial_result_params: p.partial_result_params,
                     },
                 )
             }
