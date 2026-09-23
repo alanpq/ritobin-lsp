@@ -5,12 +5,17 @@ use std::{
     fs::File,
     io::{BufReader, Write as _},
     num::ParseIntError,
+    ops::Deref,
     path::{Path, PathBuf},
     str::FromStr,
-    sync::{Arc, RwLock, atomic::AtomicBool},
+    sync::Arc,
 };
 
 use anyhow::Context;
+use arc_swap::{
+    ArcSwap,
+    access::{Access, Map},
+};
 use futures::StreamExt as _;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
@@ -23,6 +28,7 @@ pub struct Classes {
     classes: HashMap<U32Hash, Class>,
     children: FxHashMap<U32Hash, Vec<U32Hash>>,
 }
+
 impl Classes {
     pub fn new(classes: HashMap<U32Hash, Class>) -> Self {
         let mut children: FxHashMap<U32Hash, Vec<U32Hash>> = FxHashMap::default();
@@ -85,15 +91,40 @@ impl Classes {
 static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
 #[derive(Debug, Clone, Default)]
-pub struct MetaService {
-    pub loaded: Arc<AtomicBool>,
-    pub version: Arc<RwLock<Option<VersionTriple>>>,
-    pub classes: Arc<RwLock<Classes>>,
+pub struct MetaService(Arc<ArcSwap<Meta>>);
+
+impl AsRef<Arc<ArcSwap<Meta>>> for MetaService {
+    fn as_ref(&self) -> &Arc<ArcSwap<Meta>> {
+        &self.0
+    }
+}
+
+impl Deref for MetaService {
+    type Target = Arc<ArcSwap<Meta>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct Meta {
+    pub loaded: bool,
+    pub version: Option<VersionTriple>,
+    pub classes: Classes,
 }
 
 impl MetaService {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn loaded(&self) -> bool {
+        ArcSwap::load(&self.0).loaded
+    }
+
+    pub fn classes(&self) -> impl Access<Classes> + 'static + Send {
+        Map::new(self.0.clone(), |meta: &Meta| &meta.classes)
     }
 
     fn load_file_inner(
@@ -105,10 +136,11 @@ impl MetaService {
         let dump: DumpFile = serde_json::from_reader(&mut file)?;
         let count = dump.classes.len();
         let version = version.or_else(|| dump.version.parse().ok());
-        *self.version.write().unwrap() = version;
-        *self.classes.write().unwrap() = Classes::new(dump.classes);
-        self.loaded
-            .store(true, std::sync::atomic::Ordering::Relaxed);
+        self.0.store(Arc::new(Meta {
+            version,
+            loaded: true,
+            classes: Classes::new(dump.classes),
+        }));
 
         match version {
             Some(version) => tracing::info!("Loaded {count} meta classes (v{version})"),
@@ -117,7 +149,7 @@ impl MetaService {
         Ok(())
     }
 
-    pub async fn load(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
+    pub async fn load_path(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
         let s = self.clone();
         let dir = dir.as_ref();
         let version: Option<VersionTriple> = tokio::fs::read_to_string(dir.join("version"))
@@ -162,7 +194,8 @@ impl MetaService {
             .parse()
             .context("Could not determine release version!")?;
 
-        if let Some(existing) = self.version.read().unwrap().as_ref() {
+        let existing = ArcSwap::load(&self.0);
+        if let Some(existing) = existing.version {
             match existing.cmp(&version) {
                 Ordering::Equal => {
                     tracing::info!("Meta up to date.");

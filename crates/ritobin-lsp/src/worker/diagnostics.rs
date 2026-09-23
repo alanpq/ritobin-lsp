@@ -1,5 +1,6 @@
 use std::num::IntErrorKind;
 
+use arc_swap::access::Access;
 use itertools::Itertools as _;
 use lsp_types::{
     Diagnostic as LspDiag, DiagnosticRelatedInformation, DiagnosticSeverity, Location, Range,
@@ -195,8 +196,7 @@ impl Worker {
         }
 
         if let Some(ast) = self.ast.as_ref() {
-            let classes = self.server.meta.classes.clone();
-            let classes = classes.read().unwrap();
+            let classes = self.server.meta.classes().load();
             let hashes = self.server.hashes.as_ref().map(|h| h.snapshot());
             let lints = Linter::new(&classes, hashes.as_ref()).run(ast);
 

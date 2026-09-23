@@ -16,6 +16,7 @@ rustc-hash.workspace = true
 futures.workspace = true
 dashmap.workspace = true
 tokio.workspace = true
+arc-swap.workspace = true
 reqwest = { workspace = true, features = ["json", "stream", "blocking"] }
 progenitor = { git = "https://github.com/oxidecomputer/progenitor" }
 

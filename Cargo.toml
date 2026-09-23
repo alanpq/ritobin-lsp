@@ -22,6 +22,7 @@ rustc-hash = "2.1.1"
 futures = "0.3.32"
 crossbeam-channel = "0.5.15"
 dashmap = { version = "6.1.0", features = ["serde"] }
+arc-swap = "1.9.2"
 
 tokio = { version = "1.50.0" }
 reqwest = { version = "0.13.2" }
