@@ -1242,7 +1242,8 @@ dependencies = [
 [[package]]
 name = "ltk_hash"
 version = "0.4.0"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=ritobin%2Fast#7a24d23e52eb3bdadd7a368005ba407023463755"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ada44666d233f89786fdfd6784346a140ddfc7c31d31ac23dfa7b066f9fbe41b"
 dependencies = [
  "byteorder",
  "serde",
@@ -1263,8 +1264,9 @@ dependencies = [
 
 [[package]]
 name = "ltk_io_ext"
-version = "0.4.4"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=ritobin%2Fast#7a24d23e52eb3bdadd7a368005ba407023463755"
+version = "0.4.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c32624bb75dffedecaa426fc96999ec51f5a68868e0e8ba065a096906b7ef9fd"
 dependencies = [
  "byteorder",
  "glam",
@@ -1274,8 +1276,9 @@ dependencies = [
 
 [[package]]
 name = "ltk_meta"
-version = "0.7.0"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=ritobin%2Fast#7a24d23e52eb3bdadd7a368005ba407023463755"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a25eb8ecd8ce79a18144e316af8be673a2be4ef91a46d7e8b9e78e9dda35480"
 dependencies = [
  "byteorder",
  "enum_dispatch",
@@ -1308,8 +1311,9 @@ dependencies = [
 
 [[package]]
 name = "ltk_primitives"
-version = "0.3.5"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=ritobin%2Fast#7a24d23e52eb3bdadd7a368005ba407023463755"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db5421839880b81f09ece49f767b380c3b2912ee5ea905b865ba6a185c200412"
 dependencies = [
  "byteorder",
  "glam",
@@ -1319,11 +1323,13 @@ dependencies = [
 
 [[package]]
 name = "ltk_ritobin"
-version = "0.6.0"
-source = "git+https://github.com/LeagueToolkit/league-toolkit.git?branch=ritobin%2Fast#7a24d23e52eb3bdadd7a368005ba407023463755"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "962fcb270006ed8cb2b7c512a370c8d39747d5d510b557e058081dc05ce55842"
 dependencies = [
  "glam",
  "indexmap 2.14.0",
+ "itertools",
  "ltk_hash",
  "ltk_meta",
  "ltk_primitives",

@@ -312,8 +312,8 @@ pub trait EqExt<Other> {
     fn eq(&self, other: &Other) -> bool;
 }
 
-impl<M: Clone> EqExt<PropertyValueEnum<M>> for serde_json::Value {
-    fn eq(&self, other: &PropertyValueEnum<M>) -> bool {
+impl EqExt<PropertyValueEnum> for serde_json::Value {
+    fn eq(&self, other: &PropertyValueEnum) -> bool {
         match &self {
             serde_json::Value::Null => other.kind() == PropertyKind::None,
             serde_json::Value::Bool(a)
