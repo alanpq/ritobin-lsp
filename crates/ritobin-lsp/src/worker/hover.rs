@@ -20,6 +20,8 @@ use arc_swap::access::Access;
 enum HoverError {
     #[error(transparent)]
     Fmt(#[from] fmt::Error),
+    #[error("failed to resolve class name/hash: {0}")]
+    Meta(#[from] meta_wiki::client::types::error::ConversionError),
 }
 
 impl Worker {
@@ -49,7 +51,7 @@ impl Worker {
                 };
                 match prop_meta {
                     Some(prop_meta) => {
-                        let name = GetDocsNameOrHash::try_from(class_name).unwrap();
+                        let name = GetDocsNameOrHash::try_from(class_name)?;
                         let rito_type = prop_meta.rito_type();
 
                         let mut str = format!(
@@ -65,8 +67,8 @@ impl Worker {
                             Ok(docs) => wiki::describe(docs.properties.get(txt)).to_owned(),
                             Err(msg) => msg,
                         };
-                        writeln!(str, "{body}").unwrap();
-                        writeln!(str, "\n`0x{hash:>08x}`").unwrap();
+                        writeln!(str, "{body}")?;
+                        writeln!(str, "\n`0x{hash:>08x}`")?;
                         str
                     }
                     None => format!("{txt}: ??"),
@@ -95,7 +97,6 @@ impl Worker {
                             .and_then(|hashes| hashes.table(Table::BinTypes));
 
                         {
-                            // let classes = self.server.meta.classes.read().unwrap();
                             while let Some((hash, class)) = base {
                                 if d > 0 {
                                     let base_name = bin_types
@@ -114,12 +115,12 @@ impl Worker {
                             }
                         }
 
-                        let name = GetDocsNameOrHash::try_from(class_name).unwrap();
+                        let name = GetDocsNameOrHash::try_from(class_name)?;
                         let body = match wiki::fetch_class_docs(&self.server.wiki, &name).await {
                             Ok(docs) => wiki::describe(docs.class.as_ref()).to_owned(),
                             Err(msg) => msg,
                         };
-                        writeln!(txt, "{body}").unwrap();
+                        writeln!(txt, "{body}")?;
 
                         txt
                     }
