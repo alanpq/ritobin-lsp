@@ -1,16 +1,19 @@
 use std::{
+    fmt::Display,
     panic::{AssertUnwindSafe, catch_unwind},
     sync::Arc,
     time::Duration,
 };
 
-use lsp_server::RequestId;
+use lsp_server::{Notification, RequestId};
 use lsp_types::{
-    CompletionContext, CompletionResponse, Diagnostic, FormattingOptions, Hover, MarkedString,
-    PartialResultParams, Position, Range, TextDocumentContentChangeEvent, Url,
-    WorkDoneProgressParams,
+    CompletionContext, CompletionResponse, Diagnostic, DocumentSymbolResponse, FormattingOptions,
+    Hover, MarkedString, MessageType, PartialResultParams, Position, Range, ShowMessageParams,
+    TextDocumentContentChangeEvent, Url, WorkDoneProgressParams, notification::ShowMessage,
+    request::DocumentSymbolRequest,
 };
 use ltk_ritobin::{Cst, ast::Ast};
+use serde::Serialize;
 use tokio::{
     sync::mpsc,
     task::JoinHandle,
@@ -21,7 +24,7 @@ use crate::{
     document::Document,
     lsp::{ext::PositionOrRange, semantic_tokens::TokenCache},
     server::Server,
-    worker::code_actions::CodeActionData,
+    worker::{code_actions::CodeActionData, symbols::Symbols},
 };
 
 pub mod code_actions;
@@ -98,14 +101,23 @@ impl WorkerHandle {
 /// How long the document has to go quiet before we typecheck and lint it.
 const DIAGNOSTICS_DEBOUNCE: Duration = Duration::from_millis(250);
 
-/// `None` when the parser itself panicked.
-fn parse_cst(text: &str) -> Option<Cst> {
-    catch_unwind(AssertUnwindSafe(|| Cst::parse(text))).ok()
+pub struct Parse {
+    pub cst: Cst,
+    pub ast: Ast,
 }
 
-/// `None` when the typechecker panicked on this revision.
-fn build_ast(cst: &Cst, text: &str) -> Option<Ast> {
-    catch_unwind(AssertUnwindSafe(|| cst.build_ast(text))).ok()
+pub enum ParsePanic {
+    Cst(Box<dyn std::any::Any + Send>),
+    Ast(Box<dyn std::any::Any + Send>),
+}
+
+impl Parse {
+    pub fn new(text: &str) -> Result<Self, ParsePanic> {
+        let cst = catch_unwind(AssertUnwindSafe(|| Cst::parse(text))).map_err(ParsePanic::Cst)?;
+        let ast =
+            catch_unwind(AssertUnwindSafe(|| cst.build_ast(text))).map_err(ParsePanic::Ast)?;
+        Ok(Self { cst, ast })
+    }
 }
 
 pub struct Worker {
@@ -113,14 +125,23 @@ pub struct Worker {
     server: Arc<Server>,
 
     document: Document,
-    cst: Option<Cst>,
-    ast: Option<Ast>,
+    parse: Option<Parse>,
     tokens: TokenCache,
     code_action_data: Vec<CodeActionData>,
 
     /// Deadline for the next diagnostics pass. `None` when diagnostics are up to date.
     diagnostics_due: Option<Instant>,
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum WorkerError {
+    #[error(transparent)]
+    Unparsed(#[from] Unparsed),
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Document has not been parsed.")]
+pub struct Unparsed;
 
 impl Worker {
     pub fn spawn(server: Arc<Server>, uri: Url, version: i32, text: String) -> WorkerHandle {
@@ -132,50 +153,60 @@ impl Worker {
                 let mut worker = Self {
                     rx,
                     document: Document::new(uri, version, text),
-                    cst: None,
-                    ast: None,
+                    parse: None,
                     server,
                     tokens: TokenCache::default(),
                     code_action_data: Vec::new(),
                     diagnostics_due: None,
                 };
-                worker.refresh_cst();
-
-                if let Err(e) = worker.service().await {
+                if worker.reparse().is_some()
+                    && let Err(e) = worker.service().await
+                {
                     tracing::error!("document worker error: {e:?}");
-                }
+                };
             }),
         }
     }
 
-    /// Reparses the tree.
-    fn refresh_cst(&mut self) {
-        tracing::debug!("[worker] '{}' reparse", self.document.uri);
-
-        self.diagnostics_due = Some(Instant::now() + DIAGNOSTICS_DEBOUNCE);
-
-        self.cst = parse_cst(&self.document.text);
-        if self.cst.is_none() {
-            tracing::error!("[worker] '{}' parser panicked", self.document.uri);
-        }
+    pub fn parsed(&self) -> Result<&Parse, Unparsed> {
+        self.parse.as_ref().ok_or(Unparsed)
+    }
+    pub fn parsed_mut(&mut self) -> Result<&mut Parse, Unparsed> {
+        self.parse.as_mut().ok_or(Unparsed)
     }
 
-    /// Typechecks and lints the current tree
-    fn refresh_diagnostics(&mut self) {
-        self.diagnostics_due = None;
+    pub fn cst(&self) -> Result<&Cst, Unparsed> {
+        self.parse.as_ref().map(|p| &p.cst).ok_or(Unparsed)
+    }
+    pub fn ast(&self) -> Result<&Ast, Unparsed> {
+        self.parse.as_ref().map(|p| &p.ast).ok_or(Unparsed)
+    }
 
-        let Some(cst) = self.cst.as_ref() else {
-            return;
-        };
+    fn reparse(&mut self) -> Option<&Parse> {
+        tracing::debug!("[worker] '{}' reparse", self.document.uri);
+        // self.diagnostics_due = Some(Instant::now() + DIAGNOSTICS_DEBOUNCE);
+        self.diagnostics_due.take();
+        self.parse = Parse::new(&self.document.text)
+            .inspect_err(|e| match e {
+                ParsePanic::Cst(any) => {
+                    tracing::error!(
+                        "[worker] '{}' cst parse panicked - {any:?}",
+                        self.document.uri
+                    );
+                }
 
-        tracing::debug!("[worker] '{}' diagnostics", self.document.uri);
-        let ast = build_ast(cst, &self.document.text);
+                ParsePanic::Ast(any) => {
+                    tracing::error!(
+                        "[worker] '{}' ast build panicked - {any:?}",
+                        self.document.uri
+                    );
+                }
+            })
+            .ok();
 
-        let errors = ast.as_ref().map(|ast| ast.diagnostics.clone());
-        self.ast = ast;
-        if let Err(e) = self.publish_parse_errors(errors) {
-            tracing::error!("[worker] '{}' publish failed: {e:?}", self.document.uri);
-        }
+        let _ = self.lint_and_publish_parse_errors();
+
+        self.parse.as_ref()
     }
 
     pub async fn service(mut self) -> anyhow::Result<()> {
@@ -189,7 +220,7 @@ impl Worker {
                 None => match wake(&mut self.rx, self.diagnostics_due).await {
                     Wake::Message(req) => req,
                     Wake::Quiet => {
-                        self.refresh_diagnostics();
+                        self.reparse();
                         continue;
                     }
                     Wake::Closed => break,
@@ -206,38 +237,73 @@ impl Worker {
         Ok(())
     }
 
+    fn send_result<T, E>(
+        &mut self,
+        id: RequestId,
+        f: impl FnOnce(&mut Self) -> Result<T, E>,
+    ) -> Result<(), anyhow::Error>
+    where
+        T: Serialize,
+        E: Display,
+    {
+        match f(&mut *self) {
+            Ok(v) => self.server.send_ok(id, &v),
+            Err(e) => {
+                self.server
+                    .send_err(id, lsp_server::ErrorCode::RequestFailed, &e.to_string())
+            }
+        }
+    }
+    async fn send_fut_result<T, E, Fut>(&self, id: RequestId, f: Fut) -> Result<(), anyhow::Error>
+    where
+        Fut: Future<Output = Result<T, E>>,
+        T: Serialize,
+        E: Display,
+    {
+        match f.await {
+            Ok(v) => self.server.send_ok(id, &v),
+            Err(e) => {
+                self.server
+                    .send_err(id, lsp_server::ErrorCode::RequestFailed, &e.to_string())
+            }
+        }
+    }
     /// Handles one message, returning the request that interrupted a run of document changes.
     async fn respond(&mut self, req: Message) -> anyhow::Result<Option<Message>> {
         // TODO: propagate err to lsp client instead of swallowing it
         match req {
             Message::UnhashRequest { id, range } => {
-                let _ = self
-                    .server
-                    .send_ok(id, &self.unhash(range)?.unwrap_or_default());
+                let _ = self.send_result(id, |w| {
+                    Ok::<_, anyhow::Error>(w.unhash(range)?.unwrap_or_default())
+                });
             }
             Message::HoverRequest {
                 id,
                 position,
                 work_done_progress_params,
             } => {
-                let res = self
-                    .hover(position, work_done_progress_params)
-                    .await?
-                    .unwrap_or_else(|| Hover {
-                        contents: lsp_types::HoverContents::Scalar(MarkedString::String(
-                            String::new(),
-                        )),
-                        range: None,
-                    });
-                let _ = self.server.send_ok(id, &res);
+                let _ = self
+                    .send_fut_result(id, async {
+                        Ok::<_, anyhow::Error>(
+                            self.hover(position, work_done_progress_params)
+                                .await?
+                                .unwrap_or_else(|| Hover {
+                                    contents: lsp_types::HoverContents::Scalar(
+                                        MarkedString::String(String::new()),
+                                    ),
+                                    range: None,
+                                }),
+                        )
+                    })
+                    .await;
             }
             Message::CompletionRequest(req) => {
-                let _ = self.server.send_ok(
-                    req.id.clone(),
-                    &self
-                        .complete(req)?
-                        .unwrap_or_else(|| CompletionResponse::Array(vec![])),
-                );
+                let _ = self.send_result(req.id.clone(), |w| {
+                    Ok::<_, anyhow::Error>(
+                        w.complete(req)?
+                            .unwrap_or_else(|| CompletionResponse::Array(vec![])),
+                    )
+                });
             }
             Message::CodeActionRequest {
                 id,
@@ -245,17 +311,16 @@ impl Worker {
                 diagnostics,
                 ..
             } => {
-                let res = self.code_actions(range, diagnostics)?.unwrap_or_default();
-                let _ = self.server.send_ok(id, &res);
+                let _ = self.send_result(id, |w| {
+                    Ok::<_, anyhow::Error>(w.code_actions(range, diagnostics)?.unwrap_or_default())
+                });
             }
             Message::FormatRequest {
                 id,
                 options,
                 work_done_progress_params,
             } => {
-                if let Some(res) = self.format(options, work_done_progress_params)? {
-                    let _ = self.server.send_ok(id, &res);
-                }
+                let _ = self.send_result(id, |w| w.format(options, work_done_progress_params));
             }
             Message::SemanticTokens {
                 id,
@@ -263,13 +328,12 @@ impl Worker {
                 previous_result_id,
                 ..
             } => {
-                let res = self.semantic_tokens(range, previous_result_id);
-                let _ = self.server.send_ok(id, &res);
+                let _ = self.send_result(id, |w| w.semantic_tokens(range, previous_result_id));
             }
             Message::DocumentChange { version, changes } => {
                 self.document.update(version, changes);
                 let pending = drain_changes(&mut self.rx, &mut self.document);
-                self.refresh_cst();
+                self.diagnostics_due = Some(Instant::now() + DIAGNOSTICS_DEBOUNCE);
                 return Ok(pending);
             }
         }

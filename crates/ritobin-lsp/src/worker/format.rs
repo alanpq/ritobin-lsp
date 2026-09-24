@@ -44,9 +44,7 @@ impl Worker {
             tracing::error!("file too big to format!");
             return Ok(None);
         }
-        let Some(cst) = self.cst.as_ref() else {
-            return Ok(None);
-        };
+        let cst = self.cst()?;
         let mut formatted = String::new();
         ltk_ritobin::print::CstPrinter::new(&doc.text, &mut formatted, PrintConfig::default())
             .print(cst)

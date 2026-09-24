@@ -11,7 +11,11 @@ use ltk_ritobin::{
     parse::ErrorKind,
 };
 
-use crate::{config::LintsConfig, linter::Linter, worker::Worker};
+use crate::{
+    config::LintsConfig,
+    linter::Linter,
+    worker::{Parse, Worker},
+};
 
 impl Worker {
     fn convert_diagnostic(&self, d: DiagnosticWithSpan) -> LspDiag {
@@ -137,15 +141,8 @@ impl Worker {
         }
     }
 
-    /// `typecheck` is `None` when the typechecker panicked on this tree.
-    pub fn publish_parse_errors(
-        &mut self,
-        // cst: &Cst,
-        typecheck: Option<Vec<DiagnosticWithSpan>>,
-    ) -> anyhow::Result<()> {
-        let Some(cst) = self.cst.as_ref() else {
-            return Ok(());
-        };
+    pub fn lint_and_publish_parse_errors(&mut self) -> anyhow::Result<()> {
+        let Parse { cst, ast } = self.parsed()?;
 
         let mut diagnostics = cst
             .errors
@@ -155,7 +152,7 @@ impl Worker {
                 severity: Some(DiagnosticSeverity::ERROR),
                 code: None,
                 code_description: None,
-                source: Some("ritobin-lsp".into()),
+                source: Some("ritobin-lsp parser".into()),
                 message: match err.kind {
                     ErrorKind::Expected { expected, got } => {
                         format!("Missing {expected} for {} - got {got}", err.tree)
@@ -169,33 +166,17 @@ impl Worker {
                 tags: None,
                 data: None,
             })
+            .chain(
+                ast.diagnostics
+                    .iter()
+                    .map(|d| self.convert_diagnostic(*d))
+                    .update(|d| {
+                        d.source.replace("ritobin-lsp type checker".into());
+                    }),
+            )
             .collect_vec();
 
-        // let mut parse_errors = FlatErrors::new();
-        // cst.walk(&mut parse_errors);
-
-        match typecheck {
-            Some(errors) => diagnostics.extend(
-                errors
-                    .into_iter()
-                    .map(|d| self.convert_diagnostic(d))
-                    .update(|d| {
-                        d.source.replace("ritobin-lsp".into());
-                    }),
-            ),
-            // Say so rather than silently dropping to syntax-only diagnostics.
-            None => diagnostics.push(LspDiag {
-                range: Range::default(),
-                severity: Some(DiagnosticSeverity::WARNING),
-                source: Some("ritobin-lsp".into()),
-                message: "Type checking crashed - only syntax errors are \
-                          reported until the file parses cleanly."
-                    .into(),
-                ..Default::default()
-            }),
-        }
-
-        if let Some(ast) = self.ast.as_ref() {
+        {
             let classes = self.server.meta.classes().load();
             let hashes = self.server.hashes.as_ref().map(|h| h.snapshot());
             let lints = Linter::new(&classes, hashes.as_ref()).run(ast);

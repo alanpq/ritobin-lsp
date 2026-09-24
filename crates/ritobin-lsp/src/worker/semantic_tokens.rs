@@ -10,7 +10,7 @@ use ritobin_lsp::line_ends::LineNumbers;
 
 use crate::{
     lsp::semantic_tokens::{self, TokenRequest, builder::SemanticTokensBuilder, types::idx},
-    worker::Worker,
+    worker::{Unparsed, Worker},
 };
 
 impl Worker {
@@ -18,8 +18,8 @@ impl Worker {
         &mut self,
         range: Option<Range>,
         previous_result_id: Option<String>,
-    ) -> SemanticTokensFullDeltaResult {
-        let tokens = self.collect_tokens(range.as_ref());
+    ) -> Result<SemanticTokensFullDeltaResult, Unparsed> {
+        let tokens = self.collect_tokens(range.as_ref())?;
 
         let request = match (&range, &previous_result_id) {
             (Some(_), _) => TokenRequest::Range,
@@ -27,14 +27,12 @@ impl Worker {
             (None, None) => TokenRequest::Full,
         };
 
-        self.tokens.respond(request, tokens)
+        Ok(self.tokens.respond(request, tokens))
     }
 
-    fn collect_tokens(&self, range: Option<&Range>) -> Vec<SemanticToken> {
+    fn collect_tokens(&self, range: Option<&Range>) -> Result<Vec<SemanticToken>, Unparsed> {
         let doc = &self.document;
-        let Some(cst) = self.cst.as_ref() else {
-            return Vec::new();
-        };
+        let cst = self.cst()?;
 
         let visitor = SemanticVisitor {
             text: &doc.text,
@@ -46,7 +44,7 @@ impl Worker {
         }
         .walk(cst);
 
-        visitor.builder.build()
+        Ok(visitor.builder.build())
     }
 }
 

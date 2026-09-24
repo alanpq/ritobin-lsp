@@ -143,10 +143,7 @@ impl Worker {
     ) -> anyhow::Result<Option<Hover>> {
         let pos = position.start();
         let doc = &self.document;
-        let Some(ast) = self.ast.as_ref() else {
-            return Ok(None);
-        };
-
+        let ast = self.ast()?;
         let offset = doc.line_numbers.from_position(pos);
         let mut path = ast.fine_path_to(offset).collect_vec();
 

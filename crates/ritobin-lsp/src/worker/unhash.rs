@@ -20,9 +20,7 @@ use crate::{server::HashesSnapshot, worker::Worker};
 
 impl Worker {
     pub fn unhash(&self, _range: Option<Range>) -> anyhow::Result<Option<Vec<TextEdit>>> {
-        let Some(ast) = self.ast.as_ref() else {
-            return Ok(None);
-        };
+        let ast = self.ast()?;
 
         let Some(hashes) = self.server.hashes.as_ref().map(|h| h.snapshot()) else {
             // TODO: propagate this err to client
