@@ -20,10 +20,7 @@ use meta_wiki::schema::U32Hash;
 impl Worker {
     pub fn complete(&self, req: CompletionRequest) -> anyhow::Result<Option<CompletionResponse>> {
         let doc = &self.document;
-        let Some(ast) = self.ast.as_ref() else {
-            return Ok(None);
-        };
-
+        let ast = self.ast()?;
         let offset = doc.line_numbers.from_position(&req.position);
         let Some(resolved) = CompletionContext::resolve(ast, &doc.text, offset) else {
             return Ok(None);
