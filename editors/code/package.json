@@ -191,6 +191,22 @@
                     "ritobin-lsp.metaDumpPath": {
                         "markdownDescription": "Meta dump file override. If left unset, will automatically fetch the latest release from the [lol-meta-classes repo](https://github.com/LeagueToolkit/lol-meta-classes/releases).",
                         "type": "string"
+                    },
+                    "ritobin-lsp.trace.server": {
+                        "markdownDescription": "Traces the communication between VS Code and the language server. When enabled, messages are logged to the `ritobin-lsp LSP Trace` output channel.",
+                        "type": "string",
+                        "enum": [
+                            "off",
+                            "messages",
+                            "verbose"
+                        ],
+                        "enumDescriptions": [
+                            "No traces.",
+                            "Log method names and direction of each message.",
+                            "Log method names, direction, and full JSON params/results of each message."
+                        ],
+                        "default": "off",
+                        "scope": "window"
                     }
                 }
             },
