@@ -65,7 +65,9 @@
         "typescript-eslint": "^8.25.0"
     },
     "activationEvents": [
-        "onStartupFinished",
+        "workspaceContains:**/*.rito",
+        "workspaceContains:**/*.ritobin",
+        "onLanguage:ritobin",
         "onFileSystem:ritobin-bin"
     ],
     "main": "./out/main",

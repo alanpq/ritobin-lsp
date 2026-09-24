@@ -18,7 +18,7 @@ import {
 } from "./explorer_integration";
 import { guard } from "./ide_utils";
 // import { activateTaskProvider } from "./tasks";
-import { isRitobinDocument, log, setContextValue } from "./util";
+import { log, setContextValue } from "./util";
 // import { initializeDebugSessionTrackingAndRebuild } from "./debug";
 
 const RITOBIN_PROJECT_CONTEXT_NAME = "inRitobinProject";
@@ -182,17 +182,8 @@ async function activateServer(ctx: Ctx): Promise<RustAnalyzerExtensionApi> {
     ctx.setServerStatus({
       health: "stopped",
     });
-  } else if (vscode.workspace.textDocuments.some(isRitobinDocument)) {
-    await ctx.start();
   } else {
-    const lazyStart = vscode.workspace.onDidOpenTextDocument(async (doc) => {
-      if (isRitobinDocument(doc)) {
-        lazyStart.dispose();
-        await ctx.start();
-      }
-    });
-
-    ctx.pushExtCleanup(lazyStart);
+    await ctx.start();
   }
 
   void maybePromptExplorerIntegration(ctx);
