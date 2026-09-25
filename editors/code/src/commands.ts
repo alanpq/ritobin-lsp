@@ -68,6 +68,34 @@ export function unhash(ctx: CtxInit): Cmd {
   };
 }
 
+export function editTransitionHash(ctx: CtxInit): Cmd {
+  return async (args: ra.EditTransitionHashArgs) => {
+    const editor = ctx.activeRitobinEditor;
+    if (!editor) return;
+    const client = ctx.client;
+
+    const name = await vscode.window.showInputBox({
+      title: `Edit ${args.half === "from" ? "source" : "destination"} animation`,
+      prompt: "Animation clip name (treated as raw hash if starts with `0x`)",
+      value: args.current ?? "",
+      valueSelection:
+        args.current != null ? [0, args.current.length] : undefined,
+    });
+    if (name === undefined || name.length === 0) return;
+
+    const lcEdits = await client.sendRequest(ra.rehashTransition, {
+      textDocument: { uri: args.uri },
+      range: args.range,
+      half: args.half,
+      name,
+    });
+    if (!lcEdits || lcEdits.length === 0) return;
+
+    const edits = await client.protocol2CodeConverter.asTextEdits(lcEdits);
+    await applySnippetTextEdits(editor, edits);
+  };
+}
+
 export function onEnter(ctx: CtxInit): Cmd {
   async function handleKeypress() {
     const editor = ctx.activeRitobinEditor;
