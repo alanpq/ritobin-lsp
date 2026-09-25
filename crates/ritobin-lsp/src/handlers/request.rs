@@ -5,11 +5,13 @@ use std::{fmt::Write as _, sync::Arc};
 use anyhow::Result;
 use lsp_server::Request as ServerRequest;
 use lsp_types::{
-    CodeActionParams, DocumentFormattingParams, DocumentSymbolParams, SemanticTokensDeltaParams,
-    SemanticTokensParams, SemanticTokensRangeParams,
+    CodeActionParams, ColorPresentationParams, DocumentColorParams, DocumentFormattingParams,
+    DocumentSymbolParams, SemanticTokensDeltaParams, SemanticTokensParams,
+    SemanticTokensRangeParams,
     request::{
-        CodeActionRequest, Completion, DocumentSymbolRequest, Formatting, HoverRequest,
-        SemanticTokensFullDeltaRequest, SemanticTokensFullRequest, SemanticTokensRangeRequest,
+        CodeActionRequest, ColorPresentationRequest, Completion, DocumentColor,
+        DocumentSymbolRequest, Formatting, HoverRequest, SemanticTokensFullDeltaRequest,
+        SemanticTokensFullRequest, SemanticTokensRangeRequest,
     },
 };
 use lsp_types::{
@@ -225,6 +227,30 @@ pub async fn request(server: &Arc<Server>, req: ServerRequest) -> Result<()> {
                         partial_result_params: p.partial_result_params,
                         range: None,
                         previous_result_id: Some(p.previous_result_id),
+                    },
+                )
+            }
+            DocumentColor::METHOD => {
+                let p: DocumentColorParams = serde_json::from_value(req.params.clone())?;
+                (
+                    p.text_document.uri.clone(),
+                    worker::Message::DocumentColorRequest {
+                        id,
+                        work_done_progress_params: p.work_done_progress_params,
+                        partial_result_params: p.partial_result_params,
+                    },
+                )
+            }
+            ColorPresentationRequest::METHOD => {
+                let p: ColorPresentationParams = serde_json::from_value(req.params.clone())?;
+                (
+                    p.text_document.uri.clone(),
+                    worker::Message::ColorPresentationRequest {
+                        id,
+                        color: p.color,
+                        range: p.range,
+                        work_done_progress_params: p.work_done_progress_params,
+                        partial_result_params: p.partial_result_params,
                     },
                 )
             }
