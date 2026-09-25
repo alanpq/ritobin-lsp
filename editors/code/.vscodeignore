@@ -3,6 +3,7 @@
 !language-configuration.json
 !LICENSE
 !out/main.js
+!out/uninstall.js
 !package-lock.json
 !package.json
 !server
