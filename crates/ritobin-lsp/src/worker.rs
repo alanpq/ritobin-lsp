@@ -27,6 +27,7 @@ use crate::{
     worker::{code_actions::CodeActionData, symbols::Symbols},
 };
 
+pub mod anim_blend_inlays;
 pub mod code_actions;
 pub mod color;
 pub mod completion;
@@ -97,6 +98,17 @@ pub enum Message {
         range: Range,
         work_done_progress_params: WorkDoneProgressParams,
         partial_result_params: PartialResultParams,
+    },
+
+    InlayHintRequest {
+        id: RequestId,
+        range: Option<Range>,
+    },
+    RehashTransition {
+        id: RequestId,
+        range: Range,
+        half: anim_blend_inlays::TransitionHalf,
+        name: String,
     },
 
     DocumentChange {
@@ -399,6 +411,17 @@ impl Worker {
                 let _ = self.send_result(id, |w| {
                     Ok::<_, Unparsed>(w.color_presentations(color, range))
                 });
+            }
+            Message::InlayHintRequest { id, range } => {
+                let _ = self.send_result(id, |w| w.inlay_hints(range));
+            }
+            Message::RehashTransition {
+                id,
+                range,
+                half,
+                name,
+            } => {
+                let _ = self.send_result(id, |w| w.rehash_transition(range, half, &name));
             }
             Message::DocumentChange { version, changes } => {
                 self.document.update(version, changes);

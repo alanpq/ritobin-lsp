@@ -102,6 +102,23 @@ pub struct UnhashParams {
     pub range: Option<Range>,
 }
 
+pub enum RehashTransition {}
+
+impl Request for RehashTransition {
+    type Params = RehashTransitionParams;
+    type Result = Vec<lsp_types::TextEdit>;
+    const METHOD: &'static str = "ritobin-lsp/rehashTransition";
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct RehashTransitionParams {
+    pub text_document: TextDocumentIdentifier,
+    pub range: Range,
+    pub half: crate::worker::anim_blend_inlays::TransitionHalf,
+    pub name: String,
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ExpandedMacro {
