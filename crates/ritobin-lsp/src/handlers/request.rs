@@ -6,12 +6,12 @@ use anyhow::Result;
 use lsp_server::Request as ServerRequest;
 use lsp_types::{
     CodeActionParams, ColorPresentationParams, DocumentColorParams, DocumentFormattingParams,
-    DocumentSymbolParams, SemanticTokensDeltaParams, SemanticTokensParams,
+    DocumentSymbolParams, InlayHintParams, SemanticTokensDeltaParams, SemanticTokensParams,
     SemanticTokensRangeParams,
     request::{
         CodeActionRequest, ColorPresentationRequest, Completion, DocumentColor,
-        DocumentSymbolRequest, Formatting, HoverRequest, SemanticTokensFullDeltaRequest,
-        SemanticTokensFullRequest, SemanticTokensRangeRequest,
+        DocumentSymbolRequest, Formatting, HoverRequest, InlayHintRequest,
+        SemanticTokensFullDeltaRequest, SemanticTokensFullRequest, SemanticTokensRangeRequest,
     },
 };
 use lsp_types::{
@@ -21,7 +21,10 @@ use lsp_types::{MarkupContent, request::Request};
 use meta_wiki::client::types::GetDocsNameOrHash;
 
 use crate::{
-    lsp::ext::{DeserializeBin, HoverParams, SerializeBin, Unhash, UnhashParams},
+    lsp::ext::{
+        DeserializeBin, HoverParams, RehashTransition, RehashTransitionParams, SerializeBin,
+        Unhash, UnhashParams,
+    },
     server::Server,
     wiki,
     worker::{self, CompletionRequest},
@@ -251,6 +254,28 @@ pub async fn request(server: &Arc<Server>, req: ServerRequest) -> Result<()> {
                         range: p.range,
                         work_done_progress_params: p.work_done_progress_params,
                         partial_result_params: p.partial_result_params,
+                    },
+                )
+            }
+            InlayHintRequest::METHOD => {
+                let p: InlayHintParams = serde_json::from_value(req.params.clone())?;
+                (
+                    p.text_document.uri.clone(),
+                    worker::Message::InlayHintRequest {
+                        id,
+                        range: Some(p.range),
+                    },
+                )
+            }
+            RehashTransition::METHOD => {
+                let p: RehashTransitionParams = serde_json::from_value(req.params.clone())?;
+                (
+                    p.text_document.uri.clone(),
+                    worker::Message::RehashTransition {
+                        id,
+                        range: p.range,
+                        half: p.half,
+                        name: p.name,
                     },
                 )
             }
