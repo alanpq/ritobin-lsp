@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.22](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.21...ritobin-lsp-v0.1.22) (2026-09-25)
+
+
+### Features
+
+* **lsp:** document symbols ([2e29fbf](https://github.com/alanpq/ritobin-lsp/commit/2e29fbfe6a36a13cf372c0562dc5692f587e5c7f))
+
 ## [0.1.21](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.20...ritobin-lsp-v0.1.21) (2026-09-23)
 
 

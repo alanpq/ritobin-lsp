@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.22](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.1.21...ritobin-lsp-vs-v0.1.22) (2026-09-25)
+
+
+### Features
+
+* **code:** expose LSP trace config ([7e68b2d](https://github.com/alanpq/ritobin-lsp/commit/7e68b2d460fe9292a5ddb3ed328cfacf1b379d20))
+* **code:** replace lazy start gunk with workspaceContains & onLanguage triggers ([2e5a68a](https://github.com/alanpq/ritobin-lsp/commit/2e5a68a8c687d65465007d9348968f10da47f8c9))
+
 ## [0.1.21](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.1.20...ritobin-lsp-vs-v0.1.21) (2026-09-23)
 
 
