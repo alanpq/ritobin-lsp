@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.23](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.1.22...ritobin-lsp-vs-v0.1.23) (2026-09-25)
+
+
+### Features
+
+* **code:** editTransitionHash command for anim-transition inlay hints ([fa590f2](https://github.com/alanpq/ritobin-lsp/commit/fa590f2b9b43e7b986dc9ae2d042d2f40e0a5cbb))
+
 ## [0.1.22](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-vs-v0.1.21...ritobin-lsp-vs-v0.1.22) (2026-09-25)
 
 

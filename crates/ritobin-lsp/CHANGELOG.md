@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.23](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.22...ritobin-lsp-v0.1.23) (2026-09-25)
+
+
+### Features
+
+* basic color support ([#85](https://github.com/alanpq/ritobin-lsp/issues/85)) ([9906916](https://github.com/alanpq/ritobin-lsp/commit/9906916bb68facc93ebcb903a805858d2d9ac58d))
+* **lsp:** anim-transition map keys as inlay hints ([a6d5c7b](https://github.com/alanpq/ritobin-lsp/commit/a6d5c7b11f5bf13fc74cd457ccd9996d1b3eb1b6))
+
+
+### Bug Fixes
+
+* **lsp:** make line_content_end public ([4564776](https://github.com/alanpq/ritobin-lsp/commit/4564776bc67716d6b668681ea3f5fec34f055e54))
+
 ## [0.1.22](https://github.com/alanpq/ritobin-lsp/compare/ritobin-lsp-v0.1.21...ritobin-lsp-v0.1.22) (2026-09-25)
 
 
