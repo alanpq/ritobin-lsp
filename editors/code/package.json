@@ -159,6 +159,11 @@
                 "command": "ritobin-lsp.uninstallExplorerIntegration",
                 "title": "Uninstall Windows Explorer Integration",
                 "category": "ritobin-lsp"
+            },
+            {
+                "command": "ritobin-lsp.editTransitionHash",
+                "title": "Edit Animation Transition Hash",
+                "category": "ritobin-lsp"
             }
         ],
         "keybindings": [],

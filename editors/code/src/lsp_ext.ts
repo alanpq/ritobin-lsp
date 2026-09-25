@@ -130,6 +130,29 @@ export type UnhashParams = {
   range?: lc.Range | null;
 };
 
+export type TransitionHalf = "from" | "to";
+
+export type RehashTransitionParams = {
+  textDocument: lc.TextDocumentIdentifier;
+  range: lc.Range;
+  half: TransitionHalf;
+  name: string;
+};
+
+export const rehashTransition = new lc.RequestType<
+  RehashTransitionParams,
+  lc.TextEdit[],
+  void
+>("ritobin-lsp/rehashTransition");
+
+/** Arguments carried by an anim-transition inlay-hint label part command. */
+export type EditTransitionHashArgs = {
+  uri: string;
+  range: lc.Range;
+  half: TransitionHalf;
+  current: string | null;
+};
+
 export type AnalyzerStatusParams = { textDocument?: lc.TextDocumentIdentifier };
 
 export interface FetchDependencyListParams {}

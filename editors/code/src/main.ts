@@ -240,6 +240,7 @@ function createCommands(): Record<string, CommandFactory> {
     },
     lspStatus: { enabled: commands.lspStatus },
     unhash: { enabled: commands.unhash },
+    editTransitionHash: { enabled: commands.editTransitionHash },
     installExplorerIntegration: {
       enabled: installExplorerIntegrationCommand,
       disabled: installExplorerIntegrationCommand,
