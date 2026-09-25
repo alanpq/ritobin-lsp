@@ -139,7 +139,7 @@ impl LineNumbers {
     }
 
     /// Byte index of the end of `line`'s content.
-    fn line_content_end(&self, line: u32) -> u32 {
+    pub fn line_content_end(&self, line: u32) -> u32 {
         match self.line_starts.get(line as usize + 1) {
             Some(next_start) => next_start - 1,
             None => self.length,
