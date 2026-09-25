@@ -7,10 +7,10 @@ use std::{
 
 use lsp_server::{Notification, RequestId};
 use lsp_types::{
-    CompletionContext, CompletionResponse, Diagnostic, DocumentSymbolResponse, FormattingOptions,
-    Hover, MarkedString, MessageType, PartialResultParams, Position, Range, ShowMessageParams,
-    TextDocumentContentChangeEvent, Url, WorkDoneProgressParams, notification::ShowMessage,
-    request::DocumentSymbolRequest,
+    Color, CompletionContext, CompletionResponse, Diagnostic, DocumentSymbolResponse,
+    FormattingOptions, Hover, MarkedString, MessageType, PartialResultParams, Position, Range,
+    ShowMessageParams, TextDocumentContentChangeEvent, Url, WorkDoneProgressParams,
+    notification::ShowMessage, request::DocumentSymbolRequest,
 };
 use ltk_ritobin::{Cst, ast::Ast};
 use serde::Serialize;
@@ -28,6 +28,7 @@ use crate::{
 };
 
 pub mod code_actions;
+pub mod color;
 pub mod completion;
 pub mod diagnostics;
 pub mod semantic_tokens;
@@ -83,6 +84,19 @@ pub enum Message {
         range: Option<Range>,
         /// The `result_id` of the last response the client holds, if it is asking for a delta.
         previous_result_id: Option<String>,
+    },
+
+    DocumentColorRequest {
+        id: RequestId,
+        work_done_progress_params: WorkDoneProgressParams,
+        partial_result_params: PartialResultParams,
+    },
+    ColorPresentationRequest {
+        id: RequestId,
+        color: Color,
+        range: Range,
+        work_done_progress_params: WorkDoneProgressParams,
+        partial_result_params: PartialResultParams,
     },
 
     DocumentChange {
@@ -369,6 +383,22 @@ impl Worker {
                 ..
             } => {
                 let _ = self.send_result(id, |w| w.semantic_tokens(range, previous_result_id));
+            }
+            Message::DocumentColorRequest {
+                id,
+                work_done_progress_params,
+                partial_result_params,
+            } => {
+                let _ = self.send_result(id, |w| {
+                    w.document_colors(work_done_progress_params, partial_result_params)
+                });
+            }
+            Message::ColorPresentationRequest {
+                id, color, range, ..
+            } => {
+                let _ = self.send_result(id, |w| {
+                    Ok::<_, Unparsed>(w.color_presentations(color, range))
+                });
             }
             Message::DocumentChange { version, changes } => {
                 self.document.update(version, changes);
