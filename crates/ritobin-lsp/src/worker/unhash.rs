@@ -2,10 +2,10 @@ use std::{
     borrow::Cow,
     fmt::{self, Display},
     marker::PhantomData,
-    ops::Deref,
 };
 
 use lsp_types::{Range, TextEdit};
+use ltk_hash::{BinHash, HashValue, WadHash};
 use ltk_mimir_cache::Table;
 use ltk_ritobin::{
     Spanned,
@@ -85,6 +85,29 @@ impl<T, U, F: Fn(T) -> U> Map<T, U> for F {
     }
 }
 
+/// The raw bits of a hash literal, whatever its width.
+pub trait HashBits: Copy {
+    fn bits(self) -> u64;
+}
+
+impl HashBits for BinHash {
+    fn bits(self) -> u64 {
+        u64::from(self.0)
+    }
+}
+
+impl HashBits for WadHash {
+    fn bits(self) -> u64 {
+        self.0
+    }
+}
+
+impl HashBits for HashValue {
+    fn bits(self) -> u64 {
+        self.as_u64()
+    }
+}
+
 /// Looks up hashed AST literals against the given hash tables.
 ///
 /// Provides [`Self::unhash_struct`],[`Self::unhash_property`],[`Self::unhash_object`],[`Self::unhash_value`]
@@ -108,16 +131,17 @@ impl<'a, M: Map<Report<'a>, O>, O> Unhasher<'a, M, O> {
         Walker::new(self).run(ast)
     }
 
-    fn unhash<H, T>(&self, hash: &HashedLiteral<H>, table: Table, format: OutputFormat) -> Option<O>
-    where
-        H: ltk_hash::Hash + Deref<Target = T>,
-        T: Into<u64> + Copy,
-    {
+    fn unhash<H: HashBits>(
+        &self,
+        hash: &HashedLiteral<H>,
+        table: Table,
+        format: OutputFormat,
+    ) -> Option<O> {
         if !hash.was_hash() {
             return None;
         }
 
-        let hash_val = (*hash.value).into();
+        let hash_val = hash.value.bits();
         let unhash = self.hashes.lookup(table, hash_val)?;
         Some(self.mapper.map(Report {
             table,

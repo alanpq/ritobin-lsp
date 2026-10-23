@@ -24,12 +24,13 @@ impl TaskStatus {
 pub struct ServerStatus {
     pub hashes: TaskStatus,
     pub meta: TaskStatus,
+    pub game_index: TaskStatus,
 }
 
 impl ServerStatus {
     /// Ordered so the message reads meta-first, which is what users wait on longest.
-    fn tasks(&self) -> [&TaskStatus; 2] {
-        [&self.meta, &self.hashes]
+    fn tasks(&self) -> [&TaskStatus; 3] {
+        [&self.meta, &self.hashes, &self.game_index]
     }
 
     pub fn params(&self) -> ServerStatusParams {

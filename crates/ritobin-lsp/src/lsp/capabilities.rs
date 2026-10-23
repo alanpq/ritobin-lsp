@@ -64,7 +64,10 @@ pub fn server_capabilities(config: &Config) -> ServerCapabilities {
         // references_provider: Some(OneOf::Left(true)),
         // document_highlight_provider: Some(OneOf::Left(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
-        // workspace_symbol_provider: Some(OneOf::Left(true)),
+        workspace_symbol_provider: Some(OneOf::Right(lsp_types::WorkspaceSymbolOptions {
+            work_done_progress_options: Default::default(),
+            resolve_provider: Some(true),
+        })),
         code_action_provider: Some(config.caps().code_action_capabilities()),
         // code_lens_provider: Some(CodeLensOptions {
         //     resolve_provider: Some(true),

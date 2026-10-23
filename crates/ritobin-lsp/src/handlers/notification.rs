@@ -96,7 +96,15 @@ mod tests {
         let root = AbsPathBuf::assert_utf8(std::env::current_dir().unwrap());
         let config = Config::new(root, ClientCapabilities::default(), vec![], None, None);
 
-        (Arc::new(Server::new(ours, config, None)), theirs)
+        let game = Arc::new(crate::game::GameService::new(
+            std::env::temp_dir(),
+            crate::game::GameConfig {
+                game_dir: None,
+                enabled: false,
+                workers: None,
+            },
+        ));
+        (Arc::new(Server::new(ours, config, None, game)), theirs)
     }
 
     fn note<N: lsp_types::notification::Notification>(

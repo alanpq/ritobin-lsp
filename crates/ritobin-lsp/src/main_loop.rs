@@ -1,13 +1,46 @@
 use lsp_server::{Connection, Message};
 use ltk_mimir_cache::UpdateOutcome;
-use std::sync::{Arc, atomic::Ordering};
+use paths::Utf8PathBuf;
+use std::{num::NonZeroUsize, path::PathBuf, sync::Arc};
 
 use crate::{
     config::Config,
+    game::{GameConfig, GameService, IndexState, Stage, service::default_game_dir},
     handlers,
+    lsp::ext::GameIndexStateNotification,
     server::{Hashes, Server},
     status::TaskStatus,
 };
+
+/// The game-search configuration: `RB_GAME_DIR`, then the setting, then the platform default.
+fn game_config(config: &Config) -> GameConfig {
+    let opts = config.initialization_options.as_ref();
+    let env_dir = std::env::var_os("RB_GAME_DIR")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from);
+    let game_dir = env_dir
+        .or_else(|| opts.and_then(|o| o.game_directory.clone()))
+        .and_then(|p| Utf8PathBuf::from_path_buf(p).ok())
+        .or_else(default_game_dir);
+    let search = opts.map(|o| o.game_search).unwrap_or_default();
+    GameConfig {
+        game_dir,
+        enabled: search.enabled.unwrap_or(true),
+        workers: search.workers.and_then(NonZeroUsize::new),
+    }
+}
+
+/// The status-bar task a game index state maps to.
+fn game_task(state: &IndexState) -> TaskStatus {
+    match state {
+        IndexState::Unconfigured | IndexState::Ready(_) => TaskStatus::Ready,
+        IndexState::Building { stage, done, total } => TaskStatus::Loading(match stage {
+            Stage::Walk => format!("Indexing game ({done}/{total})"),
+            _ => "Indexing game".to_owned(),
+        }),
+        IndexState::Failed { message } => TaskStatus::Failed(format!("Game index: {message}")),
+    }
+}
 
 pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result<()> {
     let files = directories_next::ProjectDirs::from("com", "alanpq", "ritobin-lsp")
@@ -20,7 +53,14 @@ pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result
         })
         .ok();
 
-    let server = Arc::new(Server::new(connection, config.clone(), hashes.clone()));
+    let game = Arc::new(GameService::new(files.cache_dir(), game_config(&config)));
+    tracing::info!("game search: {:?}", game.config());
+    let server = Arc::new(Server::new(
+        connection,
+        config.clone(),
+        hashes.clone(),
+        game.clone(),
+    ));
 
     server.update_status(|status| {
         status.hashes = match hashes.is_some() {
@@ -28,11 +68,33 @@ pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result
             false => TaskStatus::Failed("No hashtable directory".to_owned()),
         };
         status.meta = TaskStatus::Loading("Loading meta dump".to_owned());
+        status.game_index = game_task(&game.state());
     });
+
+    game.on_change({
+        let server = server.clone();
+        move |state| {
+            if let Err(e) = server.send_notification::<GameIndexStateNotification>(state.clone()) {
+                tracing::error!("failed to send game index state: {e}");
+            }
+            let task = game_task(state);
+            server.update_status(|status| status.game_index = task);
+        }
+    });
+
+    match &hashes {
+        // The build waits for the tables: the name layer is cut from them.
+        Some(_) => {}
+        None => {
+            let game = game.clone();
+            tokio::task::spawn_blocking(move || game.build(None));
+        }
+    }
 
     if let Some(hashes) = hashes {
         tokio::spawn({
             let server = server.clone();
+            let game = game.clone();
             async move {
                 tracing::info!("Checking for new hashes...");
                 let outcome = match hashes.update().await {
@@ -51,6 +113,7 @@ pub async fn main_loop(config: Config, connection: Connection) -> anyhow::Result
                 };
                 hashes.load();
                 server.update_status(|status| status.hashes = outcome);
+                tokio::task::spawn_blocking(move || game.build(Some(&hashes)));
             }
         });
     }

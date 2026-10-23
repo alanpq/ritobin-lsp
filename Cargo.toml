@@ -33,9 +33,12 @@ serde_with = "3.18.0"
 
 camino = "1.1.10"
 
-ltk_ritobin = { version = "0.8", features = ["serde"] }
-ltk_meta = { version = "*",  features = ["serde"] }
-ltk_hash = { version = "*" }
+ltk_ritobin = { version = "0.12", features = ["serde"] }
+ltk_meta = { version = "0.9",  features = ["serde"] }
+ltk_hash = { version = "0.5" }
+ltk_wad = { version = "0.5.9" }
+ltk_file = { version = "0.2.12" }
+ltk_game_index = { version = "0.2", features = ["search"] }
 ltk_mimir_cache = { git = "https://github.com/LeagueToolkit/Mimir.git" }
 ltk_hashdb = { git = "https://github.com/LeagueToolkit/Mimir.git" }
 

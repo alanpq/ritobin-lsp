@@ -57,6 +57,11 @@ Configure it as you would for any other language server :)
 - [x] Diagnostics
 - [x] File unhash command
 - [x] Automatic hashtable updates (with [Mimir](https://github.com/LeagueToolkit/Mimir))
+- [x] Whole-game search: every bin of the install indexed by object, class, field, string, hash
+      and link (`ritobin-lsp.gameDirectory` setting)
+    - [x] Game Search panel in the activity bar: live results, kind filters, previews, opens the
+          game's own chunks read-only
+    - [x] `Go to Symbol in Workspace` (Ctrl+T) over every object of the game
 - [ ] [lol-meta-classes](https://github.com/LeagueToolkit/lol-meta-classes) integration
     - [x] Class property auto-complete
     - [x] Property value auto-complete

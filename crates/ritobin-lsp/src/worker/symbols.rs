@@ -326,9 +326,11 @@ impl Visitor for SymbolVisitor<'_> {
                 }
                 Descend::Children.into()
             }
-            Value::Map { entries, .. } => {
-                let entries: Vec<Symbol> =
-                    entries.iter().map(|(k, v)| self.map_entry(k, v)).collect();
+            Value::Map(map) => {
+                let entries: Vec<Symbol> = map
+                    .iter()
+                    .map(|entry| self.map_entry(&entry.key, &entry.value))
+                    .collect();
                 self.action_stack.push(Action::NoOp);
                 self.extend(entries)
             }

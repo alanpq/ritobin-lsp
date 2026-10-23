@@ -11,6 +11,7 @@ import { registerBinReadonlyFlow } from "./bin_readonly";
 import * as commands from "./commands";
 import { type CommandFactory, Ctx, fetchWorkspace } from "./ctx";
 import * as diagnostics from "./diagnostics";
+import * as gameSearch from "./game_search";
 import {
   installExplorerIntegration,
   maybePromptExplorerIntegration,
@@ -19,6 +20,11 @@ import {
 import { guard } from "./ide_utils";
 // import { activateTaskProvider } from "./tasks";
 import { log, setContextValue } from "./util";
+import {
+  RitobinWadDecorationProvider,
+  RitobinWadFs,
+  WAD_SCHEME,
+} from "./wad_fs";
 // import { initializeDebugSessionTrackingAndRebuild } from "./debug";
 
 const RITOBIN_PROJECT_CONTEXT_NAME = "inRitobinProject";
@@ -105,6 +111,27 @@ async function activateServer(ctx: Ctx): Promise<RustAnalyzerExtensionApi> {
   ctx.pushExtCleanup(binStatus);
 
   registerBinReadonlyFlow(ctx, binFs);
+
+  // Chunks of the game open read-only through the ritobin-wad scheme; the
+  // Game Search view is what hands out their uris.
+  const wadFs = new RitobinWadFs(ctx);
+  ctx.pushExtCleanup(
+    vscode.workspace.registerFileSystemProvider(WAD_SCHEME, wadFs, {
+      isCaseSensitive: false,
+      isReadonly: true,
+    }),
+  );
+  vscode.workspace.onDidCloseTextDocument(
+    (doc) => wadFs.handleDidCloseTextDocument(doc),
+    null,
+    ctx.subscriptions,
+  );
+  ctx.pushExtCleanup(
+    vscode.window.registerFileDecorationProvider(
+      new RitobinWadDecorationProvider(),
+    ),
+  );
+  gameSearch.registerGameSearch(ctx, wadFs);
 
   const diagnosticProvider = new diagnostics.TextDocumentProvider(ctx);
   ctx.pushExtCleanup(
@@ -240,6 +267,12 @@ function createCommands(): Record<string, CommandFactory> {
     },
     lspStatus: { enabled: commands.lspStatus },
     unhash: { enabled: commands.unhash },
+    gameSearch: {
+      enabled: gameSearch.gameSearch,
+      disabled: gameSearch.gameSearch,
+    },
+    rebuildGameIndex: { enabled: gameSearch.rebuildGameIndex },
+    openGameChunk: { enabled: gameSearch.openGameChunk },
     editTransitionHash: { enabled: commands.editTransitionHash },
     installExplorerIntegration: {
       enabled: installExplorerIntegrationCommand,

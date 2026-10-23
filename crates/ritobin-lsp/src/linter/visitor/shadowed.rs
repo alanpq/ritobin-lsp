@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use ltk_hash::{BinHash, WadHash};
+use ltk_hash::{BinHash, HashValue, WadHash};
 use ltk_ritobin::ast::{Ast, Object, Value};
 
 use crate::linter::Lint;
@@ -17,7 +17,7 @@ enum MapKey {
     I64(i64),
     U64(u64),
     String(String),
-    Hash(BinHash),
+    Hash(HashValue),
     WadChunkLink(WadHash),
     ObjectLink(BinHash),
 }

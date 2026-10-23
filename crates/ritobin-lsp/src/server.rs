@@ -12,13 +12,14 @@ use lsp_types::{
 };
 use ltk_hash::BinHash;
 use ltk_hashdb::HashDb;
-use ltk_mimir_cache::{HashStore, Table, UpdateOptions, UpdateOutcome};
+use ltk_mimir_cache::{HashStore, Manifest, ManifestError, Table, UpdateOptions, UpdateOutcome};
 use ltk_ritobin::HashProvider;
 use rustc_hash::FxHashMap;
 use tokio::sync::RwLock;
 
 use crate::{
-    config::Config, lsp::ext::ServerStatusNotification, status::ServerStatus, worker::WorkerHandle,
+    config::Config, game::GameService, lsp::ext::ServerStatusNotification, status::ServerStatus,
+    worker::WorkerHandle,
 };
 use meta_wiki::{docs_cache::WikiDocs, service::MetaService};
 
@@ -111,6 +112,11 @@ impl Hashes {
         self.tables.load().get(&table).cloned()
     }
 
+    /// The store's manifest: which file and checksum each table is at.
+    pub fn manifest(&self) -> Result<Manifest, ManifestError> {
+        self.store.manifest()
+    }
+
     /// A consistent, owned view of every table as of now. Tables are only ever swapped out as a
     /// whole (see [`Hashes::load`]), and only on startup or an explicit user-triggered update, so
     /// a snapshot held for e.g. the lifetime of one lint pass won't tear or go stale in any way
@@ -162,11 +168,17 @@ pub struct Server {
     pub meta: MetaService,
     pub wiki: WikiDocs,
     pub hashes: Option<Hashes>,
+    pub game: Arc<GameService>,
     status: Mutex<ServerStatus>,
 }
 
 impl Server {
-    pub fn new(conn: Connection, config: Config, hashes: Option<Hashes>) -> Self {
+    pub fn new(
+        conn: Connection,
+        config: Config,
+        hashes: Option<Hashes>,
+        game: Arc<GameService>,
+    ) -> Self {
         Self {
             conn,
             config,
@@ -174,6 +186,7 @@ impl Server {
             meta: MetaService::default(),
             wiki: WikiDocs::new("https://meta-api.leaguetoolkit.dev"),
             hashes,
+            game,
             status: Default::default(),
         }
     }

@@ -363,3 +363,120 @@ export type RecursiveMemoryLayoutNode = {
 export type RecursiveMemoryLayout = {
   nodes: RecursiveMemoryLayoutNode[];
 };
+
+// game search (docs/design/game-search.md, section 7)
+
+export type TermKind =
+  | "object"
+  | "class"
+  | "embedded"
+  | "field"
+  | "hash"
+  | "link"
+  | "wad"
+  | "string";
+export type GameSearchParams = {
+  query: string;
+  kinds?: TermKind[];
+  limit?: number;
+  offset?: number;
+};
+export type Named = { hash: string; name?: string | null };
+export type GameSearchMatch = { kind: TermKind; text: string };
+export type GameSearchHit = {
+  declaration: number;
+  object: Named;
+  class: Named;
+  chunk: Named;
+  archive: string;
+  isOverride: boolean;
+  matches: GameSearchMatch[];
+};
+export type KindCount = { kind: TermKind; count: number };
+export type GameSearchResult = {
+  kinds: KindCount[];
+  total: number;
+  offset: number;
+  truncated: boolean;
+  hits: GameSearchHit[];
+};
+export const gameSearch = new lc.RequestType<
+  GameSearchParams,
+  GameSearchResult,
+  void
+>("ritobin-lsp/gameSearch");
+
+export type DeserializeWadChunkParams = { chunk: string };
+export type EntryLine = { object: string; line: number };
+export type ChunkDocument = {
+  text: string;
+  isOverride: boolean;
+  entries: EntryLine[];
+};
+export const deserializeWadChunk = new lc.RequestType<
+  DeserializeWadChunkParams,
+  ChunkDocument,
+  void
+>("ritobin-lsp/deserializeWadChunk");
+
+export const rebuildGameIndex = new lc.RequestType0<null, void>(
+  "ritobin-lsp/rebuildGameIndex",
+);
+
+export type GameObjectPreviewParams = {
+  chunk: string;
+  object: string;
+  maxLines?: number;
+};
+export type ObjectPreview = { line: number; text: string; truncated: boolean };
+
+export type GameBrowseParams = { dir?: string };
+export type ObjectRef = {
+  object: Named;
+  class: Named;
+  chunk: Named;
+  archive: string;
+  isOverride: boolean;
+};
+export type TreeEntry =
+  | { kind: "dir"; name: string; objects: number; object: ObjectRef | null }
+  | ({ kind: "object"; name: string } & ObjectRef);
+export type GameListing = {
+  entries: TreeEntry[];
+  total: number;
+  truncated: boolean;
+};
+export const gameBrowse = new lc.RequestType<
+  GameBrowseParams,
+  GameListing,
+  void
+>("ritobin-lsp/gameBrowse");
+export const gameObjectPreview = new lc.RequestType<
+  GameObjectPreviewParams,
+  ObjectPreview | null,
+  void
+>("ritobin-lsp/gameObjectPreview");
+
+export type IndexStats = {
+  archives: number;
+  chunks: number;
+  bins: number;
+  declarations: number;
+  hashTerms: number;
+  stringTerms: number;
+  failedChunks: number;
+  elapsed: number;
+};
+export type GameIndexState =
+  | { state: "unconfigured" }
+  | {
+      state: "building";
+      stage: "chunks" | "names" | "walk" | "save";
+      done: number;
+      total: number;
+    }
+  | ({ state: "ready" } & IndexStats)
+  | { state: "failed"; message: string };
+export const gameIndexState = new lc.NotificationType<GameIndexState>(
+  "ritobin-lsp/gameIndexState",
+);

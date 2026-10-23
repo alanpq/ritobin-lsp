@@ -85,11 +85,13 @@ export function isRitobinDocument(
   // by allowing only `file` schemes
   // unfortunately extensions that use diff views not always set this
   // to something different than 'file' (see ongoing bug: #4608)
-  // "ritobin-bin" is our own virtual scheme for deserialized .bin files
-  // (literal here to avoid a util <-> bin_fs import cycle).
+  // "ritobin-bin" and "ritobin-wad" are our own virtual schemes for deserialized
+  // .bin files and game chunks (literal here to avoid a util <-> bin_fs import cycle).
   return (
     document.languageId === "ritobin" &&
-    (document.uri.scheme === "file" || document.uri.scheme === "ritobin-bin")
+    (document.uri.scheme === "file" ||
+      document.uri.scheme === "ritobin-bin" ||
+      document.uri.scheme === "ritobin-wad")
   );
 }
 

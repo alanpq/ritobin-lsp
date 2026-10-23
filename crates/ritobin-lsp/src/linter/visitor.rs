@@ -91,8 +91,8 @@ impl Visitor for LintVisitor<'_> {
         if let Some(lint) = self.unhasher.as_ref().and_then(|u| u.unhash_value(value)) {
             self.lints.push(lint);
         }
-        if let Value::Map { entries, .. } = value {
-            shadowed::check_map_entries(&mut self.lints, entries.iter().map(|e| &e.0));
+        if let Value::Map(map) = value {
+            shadowed::check_map_entries(&mut self.lints, map.keys());
         }
         EnterFlow::Continue(Descend::Children)
     }

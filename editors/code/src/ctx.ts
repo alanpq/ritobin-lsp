@@ -83,6 +83,16 @@ export class Ctx implements RustAnalyzerExtensionApi {
   private lastStatus: ServerStatusParams | { health: "stopped" } = {
     health: "stopped",
   };
+  private _gameIndexState: ra.GameIndexState = { state: "unconfigured" };
+  private readonly gameIndexStateEmitter =
+    new vscode.EventEmitter<ra.GameIndexState>();
+  /** Fires on every `ritobin-lsp/gameIndexState` notification. */
+  readonly onDidChangeGameIndexState = this.gameIndexStateEmitter.event;
+
+  /** The last game index state the server reported. */
+  get gameIndexState(): ra.GameIndexState {
+    return this._gameIndexState;
+  }
   private _serverVersion: string;
   private statusBarActiveEditorListener: Disposable;
 
@@ -266,6 +276,12 @@ export class Ctx implements RustAnalyzerExtensionApi {
       this.pushClientCleanup(
         this._client.onNotification(ra.openServerLogs, () => {
           this.outputChannel!.show();
+        }),
+      );
+      this.pushClientCleanup(
+        this._client.onNotification(ra.gameIndexState, (state) => {
+          this._gameIndexState = state;
+          this.gameIndexStateEmitter.fire(state);
         }),
       );
     }

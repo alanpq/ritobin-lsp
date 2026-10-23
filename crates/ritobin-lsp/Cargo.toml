@@ -30,6 +30,9 @@ serde_with.workspace = true
 ltk_ritobin = { workspace = true, features = ["serde"] }
 ltk_meta = { workspace = true, features = ["serde"] }
 ltk_hash.workspace = true
+ltk_wad.workspace = true
+ltk_file.workspace = true
+ltk_game_index.workspace = true
 ltk_mimir_cache.workspace = true
 ltk_hashdb.workspace = true
 
@@ -37,6 +40,7 @@ futures.workspace = true
 crossbeam-channel.workspace = true
 dashmap = { workspace = true, features = ["serde"] }
 arc-swap.workspace = true
+camino.workspace = true
 
 tokio = { workspace = true, features = ["full"] }
 reqwest = { workspace = true, features = ["json", "stream", "blocking"] }

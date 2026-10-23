@@ -45,4 +45,13 @@ export class PersistentState {
   async updateBinReadonlyPrompt(value: "dismissed" | undefined) {
     await this.globalState.update("binReadonlyPrompt", value);
   }
+
+  /** The last game search, so the input box can offer it again. */
+  get lastGameSearch(): { query: string; kinds: string[] } | undefined {
+    return this.globalState.get("lastGameSearch");
+  }
+
+  async updateLastGameSearch(value: { query: string; kinds: string[] } | undefined) {
+    await this.globalState.update("lastGameSearch", value);
+  }
 }

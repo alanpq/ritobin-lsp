@@ -1,13 +1,13 @@
-use std::num::IntErrorKind;
-
 use arc_swap::access::Access;
 use itertools::Itertools as _;
 use lsp_types::{
     Diagnostic as LspDiag, DiagnosticRelatedInformation, DiagnosticSeverity, Location, Range,
 };
 use ltk_ritobin::{
-    RitoType,
-    ast::diagnostics::{Diagnostic, DiagnosticWithSpan},
+    ast::{
+        diagnostics::{Diagnostic, DiagnosticWithSpan, TypeMismatch},
+        resolve::literals::ValueEvalError,
+    },
     parse::ErrorKind,
 };
 
@@ -41,12 +41,18 @@ impl Worker {
 
                 ..Default::default()
             },
-            Diagnostic::TypeMismatch {
+            Diagnostic::TypeMismatch(TypeMismatch {
                 span,
                 expected,
                 expected_span,
                 got,
-            } => LspDiag {
+            })
+            | Diagnostic::ValueEvalError(ValueEvalError::TypeMismatch(TypeMismatch {
+                span,
+                expected,
+                expected_span,
+                got,
+            })) => LspDiag {
                 range: self.document.line_numbers.from_span(span),
                 severity: Some(DiagnosticSeverity::ERROR),
                 related_information: expected_span.map(|span| {
@@ -61,27 +67,12 @@ impl Worker {
                 message: format!("Type mismatch - expected {expected}, got {got}"),
                 ..Default::default()
             },
-            Diagnostic::ParseNumericError {
-                expected,
-                error,
-                span,
-            } => {
-                let expected = RitoType::simple(expected);
-                let error = match error {
-                    Some(IntErrorKind::Empty) => "cannot parse integer from empty literal",
-                    Some(IntErrorKind::InvalidDigit) => "invalid digit found in literal",
-                    Some(IntErrorKind::PosOverflow) => "number too large to fit in target type",
-                    Some(IntErrorKind::NegOverflow) => "number too small to fit in target type",
-                    Some(IntErrorKind::Zero) => "number would be zero",
-                    _ => "invalid literal",
-                };
-                LspDiag {
-                    range: self.document.line_numbers.from_span(span),
-                    severity: Some(DiagnosticSeverity::ERROR),
-                    message: format!("Could not parse {expected} - {error}"),
-                    ..Default::default()
-                }
-            }
+            Diagnostic::ValueEvalError(error) => LspDiag {
+                range: self.document.line_numbers.from_span(error.span()),
+                severity: Some(DiagnosticSeverity::ERROR),
+                message: error.to_string(),
+                ..Default::default()
+            },
             Diagnostic::ShadowedEntry { shadowee, shadower } => LspDiag {
                 range: self.document.line_numbers.from_span(d.span),
                 severity: Some(DiagnosticSeverity::WARNING),

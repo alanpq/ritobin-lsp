@@ -741,3 +741,94 @@ impl Request for GetFailedObligations {
     type Result = String;
     const METHOD: &'static str = "ritobin-lsp/getFailedObligations";
 }
+
+// --- game search (docs/design/game-search.md, section 7)
+
+pub enum GameSearch {}
+
+impl Request for GameSearch {
+    type Params = GameSearchParams;
+    type Result = crate::game::results::SearchResult;
+    const METHOD: &'static str = "ritobin-lsp/gameSearch";
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GameSearchParams {
+    pub query: String,
+    /// Empty is every kind.
+    #[serde(default)]
+    pub kinds: Vec<crate::game::TermKind>,
+    /// `None` is the spec's default.
+    #[serde(default)]
+    pub limit: Option<u32>,
+    /// The first hit to return, in the full ordering. Default 0.
+    #[serde(default)]
+    pub offset: u32,
+}
+
+pub enum DeserializeWadChunk {}
+
+impl Request for DeserializeWadChunk {
+    type Params = DeserializeWadChunkParams;
+    type Result = crate::game::chunk::ChunkDocument;
+    const METHOD: &'static str = "ritobin-lsp/deserializeWadChunk";
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct DeserializeWadChunkParams {
+    /// `0x`-prefixed hex of the chunk hash.
+    pub chunk: String,
+}
+
+pub enum RebuildGameIndex {}
+
+impl Request for RebuildGameIndex {
+    type Params = ();
+    type Result = ();
+    const METHOD: &'static str = "ritobin-lsp/rebuildGameIndex";
+}
+
+pub enum GameIndexStateNotification {}
+
+impl Notification for GameIndexStateNotification {
+    type Params = crate::game::IndexState;
+    const METHOD: &'static str = "ritobin-lsp/gameIndexState";
+}
+
+pub enum GameObjectPreview {}
+
+impl Request for GameObjectPreview {
+    type Params = GameObjectPreviewParams;
+    type Result = Option<crate::game::chunk::Preview>;
+    const METHOD: &'static str = "ritobin-lsp/gameObjectPreview";
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GameObjectPreviewParams {
+    /// `0x`-prefixed hex of the chunk hash.
+    pub chunk: String,
+    /// `0x`-prefixed hex of the object's path hash.
+    pub object: String,
+    /// Lines of the object to return. Default 12.
+    #[serde(default)]
+    pub max_lines: Option<u32>,
+}
+
+pub enum GameBrowse {}
+
+impl Request for GameBrowse {
+    type Params = GameBrowseParams;
+    type Result = crate::game::results::Listing;
+    const METHOD: &'static str = "ritobin-lsp/gameBrowse";
+}
+
+/// One level of the object tree: `dir` is an object path prefix, `""` or absent for the root.
+#[derive(Deserialize, Serialize, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct GameBrowseParams {
+    #[serde(default)]
+    pub dir: Option<String>,
+}

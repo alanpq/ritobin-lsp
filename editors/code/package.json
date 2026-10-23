@@ -68,7 +68,9 @@
         "workspaceContains:**/*.rito",
         "workspaceContains:**/*.ritobin",
         "onLanguage:ritobin",
-        "onFileSystem:ritobin-bin"
+        "onFileSystem:ritobin-bin",
+        "onFileSystem:ritobin-wad",
+        "onView:ritobin-lsp.gameSearch"
     ],
     "main": "./out/main",
     "contributes": {
@@ -164,9 +166,32 @@
                 "command": "ritobin-lsp.editTransitionHash",
                 "title": "Edit Animation Transition Hash",
                 "category": "ritobin-lsp"
+            },
+            {
+                "command": "ritobin-lsp.gameSearch",
+                "title": "Search Game",
+                "category": "ritobin-lsp",
+                "icon": "$(search)"
+            },
+            {
+                "command": "ritobin-lsp.rebuildGameIndex",
+                "title": "Rebuild Game Index",
+                "category": "ritobin-lsp",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "ritobin-lsp.openGameChunk",
+                "title": "Open Game Chunk",
+                "category": "ritobin-lsp"
             }
         ],
-        "keybindings": [],
+        "keybindings": [
+            {
+                "command": "ritobin-lsp.gameSearch",
+                "key": "ctrl+shift+alt+f",
+                "mac": "cmd+shift+alt+f"
+            }
+        ],
         "configuration": [
             {
                 "title": "ritobin-lsp",
@@ -214,6 +239,23 @@
                         ],
                         "default": "off",
                         "scope": "window"
+                    },
+                    "ritobin-lsp.gameDirectory": {
+                        "markdownDescription": "The `Game` directory of a League of Legends installation, e.g. `C:\\Riot Games\\League of Legends\\Game`. Empty probes the platform's default install path. The server indexes every bin under its `DATA/FINAL` for the **Search Game** command.",
+                        "type": "string",
+                        "default": "",
+                        "scope": "machine-overridable"
+                    },
+                    "ritobin-lsp.gameSearch.enabled": {
+                        "markdownDescription": "Whether the server builds the game search index at all.",
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "ritobin-lsp.gameSearch.workers": {
+                        "markdownDescription": "Threads used to walk the game's bins while indexing. `0` uses every CPU.",
+                        "type": "number",
+                        "default": 0,
+                        "minimum": 0
                     }
                 }
             },
@@ -496,6 +538,10 @@
         "menus": {
             "commandPalette": [
                 {
+                    "command": "ritobin-lsp.openGameChunk",
+                    "when": "false"
+                },
+                {
                     "command": "ritobin-lsp.matchingBrace",
                     "when": "inRitobinProject"
                 },
@@ -529,11 +575,34 @@
                 }
             ],
             "editor/context": [],
-            "view/title": [],
+            "view/title": [
+                {
+                    "command": "ritobin-lsp.rebuildGameIndex",
+                    "when": "view == ritobin-lsp.gameSearch",
+                    "group": "navigation@1"
+                }
+            ],
             "view/item/context": []
         },
-        "views": {},
-        "viewsContainers": {},
+        "views": {
+            "ritobin-game": [
+                {
+                    "type": "webview",
+                    "id": "ritobin-lsp.gameSearch",
+                    "name": "Game Search",
+                    "contextualTitle": "Ritobin Game Search"
+                }
+            ]
+        },
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "ritobin-game",
+                    "title": "Game",
+                    "icon": "media/game-search.svg"
+                }
+            ]
+        },
         "jsonValidation": [],
         "walkthroughs": []
     }

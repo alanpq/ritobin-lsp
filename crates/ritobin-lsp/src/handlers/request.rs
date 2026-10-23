@@ -1,4 +1,5 @@
 mod bin;
+mod game;
 
 use std::{fmt::Write as _, sync::Arc};
 
@@ -12,6 +13,7 @@ use lsp_types::{
         CodeActionRequest, ColorPresentationRequest, Completion, DocumentColor,
         DocumentSymbolRequest, Formatting, HoverRequest, InlayHintRequest,
         SemanticTokensFullDeltaRequest, SemanticTokensFullRequest, SemanticTokensRangeRequest,
+        WorkspaceSymbolRequest, WorkspaceSymbolResolve,
     },
 };
 use lsp_types::{
@@ -22,7 +24,8 @@ use meta_wiki::client::types::GetDocsNameOrHash;
 
 use crate::{
     lsp::ext::{
-        DeserializeBin, HoverParams, RehashTransition, RehashTransitionParams, SerializeBin,
+        DeserializeBin, DeserializeWadChunk, GameBrowse, GameObjectPreview, GameSearch,
+        HoverParams, RebuildGameIndex, RehashTransition, RehashTransitionParams, SerializeBin,
         Unhash, UnhashParams,
     },
     server::Server,
@@ -47,6 +50,38 @@ pub async fn request(server: &Arc<Server>, req: ServerRequest) -> Result<()> {
             }
             SerializeBin::METHOD => {
                 bin::handle_serialize_bin(server, id, serde_json::from_value(req.params)?);
+                return Ok(());
+            }
+            GameSearch::METHOD => {
+                game::handle_search(server, id, serde_json::from_value(req.params)?);
+                return Ok(());
+            }
+            DeserializeWadChunk::METHOD => {
+                game::handle_deserialize_wad_chunk(server, id, serde_json::from_value(req.params)?);
+                return Ok(());
+            }
+            RebuildGameIndex::METHOD => {
+                game::handle_rebuild(server, id);
+                return Ok(());
+            }
+            GameObjectPreview::METHOD => {
+                game::handle_preview(server, id, serde_json::from_value(req.params)?);
+                return Ok(());
+            }
+            GameBrowse::METHOD => {
+                game::handle_browse(server, id, serde_json::from_value(req.params)?);
+                return Ok(());
+            }
+            WorkspaceSymbolRequest::METHOD => {
+                game::handle_workspace_symbol(server, id, serde_json::from_value(req.params)?);
+                return Ok(());
+            }
+            WorkspaceSymbolResolve::METHOD => {
+                game::handle_workspace_symbol_resolve(
+                    server,
+                    id,
+                    serde_json::from_value(req.params)?,
+                );
                 return Ok(());
             }
             Unhash::METHOD => {

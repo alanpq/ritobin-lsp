@@ -143,19 +143,13 @@ pub struct Property {
 impl Property {
     pub fn rito_type(&self) -> RitoType {
         let base = self.value_type.into();
-        match (&self.container, &self.map) {
-            (Some(container), None) => RitoType {
-                base,
-                subtypes: [Some(container.value_type.into()), None],
-            },
-            (None, Some(map)) => RitoType {
-                base,
-                subtypes: [Some(map.key_type.into()), Some(map.value_type.into())],
-            },
-
+        let subtypes = match (&self.container, &self.map) {
+            (Some(container), None) => [Some(container.value_type.into()), None],
+            (None, Some(map)) => [Some(map.key_type.into()), Some(map.value_type.into())],
             (Some(_container), Some(_map)) => unreachable!("property is both container and map?"),
-            (None, None) => RitoType::simple(base),
-        }
+            (None, None) => [None, None],
+        };
+        RitoType::from_parts(base, subtypes)
     }
 }
 

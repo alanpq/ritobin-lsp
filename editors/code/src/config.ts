@@ -43,7 +43,9 @@ export class Config {
     "server",
     "files",
     "showSyntaxTree",
-    "lints"
+    "lints",
+    "gameDirectory",
+    "gameSearch",
   ].map((opt) => `${this.rootSection}.${opt}`);
 
   private readonly requiresWindowReloadOpts = ["testExplorer"].map(

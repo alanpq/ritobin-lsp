@@ -6,8 +6,8 @@ use lsp_types::{
     InlayHintTooltip, Position, Range, TextEdit, Url,
 };
 use ltk_hash::{BinHash, Hash as _};
-use ltk_meta::PropertyKind;
 use ltk_mimir_cache::Table;
+use ltk_ritobin::ScalarType;
 use ltk_ritobin::{
     Spanned, SpannedExt,
     ast::{
@@ -160,15 +160,13 @@ impl Visitor for InlayVisitor<'_> {
         if property.name.value.0 != self.blend_field {
             return Descend::Children.into();
         }
-        let Some(Value::Map {
-            key_kind: PropertyKind::U64,
-            entries,
-            ..
-        }) = &property.value
-        else {
+        let Some(Value::Map(map)) = &property.value else {
             return Descend::Children.into();
         };
-        for (key, _) in entries {
+        if map.key_kind != ScalarType::U64 {
+            return Descend::Children.into();
+        }
+        for key in map.keys() {
             let Value::U64(key) = key else { continue };
             let key_range = self.lines.from_span(key.span);
 
@@ -223,8 +221,8 @@ struct KeyFinder<'a> {
 
 impl Visitor for KeyFinder<'_> {
     fn enter_value(&mut self, value: &Value) -> EnterFlow {
-        if let Value::Map { entries, .. } = value {
-            for (key, _) in entries {
+        if let Value::Map(map) = value {
+            for key in map.keys() {
                 if let Value::U64(key) = key
                     && self.lines.from_span(key.span) == self.range
                 {

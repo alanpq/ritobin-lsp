@@ -184,8 +184,8 @@ fn classify_value(path: &[SubNodeRef], text: &str, offset: u32) -> Option<Comple
 
     let context = match *path.get(vi.checked_sub(1)?)? {
         // Descended into a map entry: keys aren't completable, only values.
-        SubNodeRef::Value(Value::Map { entries, .. }) => {
-            if entries.iter().any(|(key, _)| std::ptr::eq(key, value)) {
+        SubNodeRef::Value(Value::Map(map)) => {
+            if map.keys().any(|key| std::ptr::eq(key, value)) {
                 return None;
             }
             CursorContext::ContainerItem { class, property }

@@ -1,0 +1,777 @@
+:root {
+  --gs-fg: var(--vscode-foreground);
+  --gs-dim: var(--vscode-descriptionForeground);
+  /* Icons take the theme's symbol palette. */
+  --gs-class: var(--vscode-symbolIcon-classForeground);
+  --gs-field: var(--vscode-symbolIcon-fieldForeground);
+  --gs-string: var(--vscode-symbolIcon-stringForeground);
+  --gs-hash: var(--vscode-symbolIcon-keyForeground);
+  --gs-link: var(--vscode-symbolIcon-referenceForeground);
+  --gs-wad: var(--vscode-symbolIcon-fileForeground);
+  --gs-event: var(--vscode-symbolIcon-eventForeground);
+  /* Text takes the editor's token colours, the Dark+ and Light+ values that ritobin files are
+     highlighted with: class names teal, strings orange, hashes green, links and fields light blue.
+     Overridden per theme kind below. */
+  --gs-text-class: #4ec9b0;
+  --gs-text-string: #ce9178;
+  --gs-text-hash: #b5cea8;
+  --gs-text-link: #9cdcfe;
+  --gs-text-field: #9cdcfe;
+  --gs-text-wad: #dcdcaa;
+  /* The classic filled folder, as file icon themes draw it. */
+  --gs-folder: #dcb67a;
+  --gs-hover: var(--vscode-list-hoverBackground);
+  --gs-active: var(--vscode-list-activeSelectionBackground);
+  --gs-active-fg: var(--vscode-list-activeSelectionForeground);
+  /* The query inside a label: the colour native trees give a filter match, no background. */
+  --gs-match: var(--vscode-list-highlightForeground);
+  --gs-border: var(--vscode-sideBarSectionHeader-border, transparent);
+  --gs-badge-bg: var(--vscode-badge-background);
+  --gs-badge-fg: var(--vscode-badge-foreground);
+}
+
+body.vscode-light {
+  --gs-folder: #c09553;
+  --gs-text-class: #267f99;
+  --gs-text-string: #a31515;
+  --gs-text-hash: #098658;
+  --gs-text-link: #001080;
+  --gs-text-field: #001080;
+  --gs-text-wad: #795e26;
+}
+
+body.vscode-high-contrast {
+  --gs-text-class: #4ec9b0;
+  --gs-text-string: #ce9178;
+  --gs-text-hash: #b5cea8;
+  --gs-text-link: #9cdcfe;
+  --gs-text-field: #9cdcfe;
+  --gs-text-wad: #dcdcaa;
+}
+
+body.vscode-high-contrast-light {
+  --gs-text-class: #185e73;
+  --gs-text-string: #a31515;
+  --gs-text-hash: #096d48;
+  --gs-text-link: #001080;
+  --gs-text-field: #001080;
+  --gs-text-wad: #5e2cbc;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+mark {
+  color: var(--gs-match);
+  background: transparent;
+  font-weight: 600;
+}
+
+.row.selected mark {
+  color: inherit;
+  text-decoration: underline;
+}
+
+svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  color: var(--gs-fg);
+  background: transparent;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+a {
+  color: var(--vscode-textLink-foreground);
+}
+
+/* ---- header: input, chips, status ---- */
+
+.head {
+  flex: none;
+  padding: 6px 12px 4px;
+}
+
+.search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search input {
+  width: 100%;
+  padding: 4px 72px 4px 6px;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  font-family: inherit;
+  font-size: inherit;
+  outline: none;
+}
+
+.search input:focus {
+  border-color: var(--vscode-focusBorder);
+}
+
+.search input::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+.search .tools {
+  position: absolute;
+  right: 2px;
+  display: flex;
+  gap: 2px;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--vscode-icon-foreground);
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+}
+
+.icon-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  color: var(--gs-dim);
+  background: transparent;
+  border: 1px solid
+    var(
+      --vscode-widget-border,
+      var(--vscode-contrastBorder, rgba(128, 128, 128, 0.35))
+    );
+  border-radius: 10px;
+  font-size: 0.92em;
+  line-height: 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.chip svg {
+  width: 13px;
+  height: 13px;
+}
+
+.chip:hover {
+  color: var(--gs-fg);
+}
+
+.chip.on {
+  color: var(--gs-fg);
+  background: var(--vscode-toolbar-activeBackground, var(--gs-hover));
+  border-color: var(--vscode-focusBorder);
+}
+
+.chip.empty {
+  opacity: 0.45;
+}
+
+.chip .n {
+  color: var(--gs-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  margin-top: 6px;
+  color: var(--gs-dim);
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status.error {
+  color: var(--vscode-errorForeground);
+}
+
+.status progress {
+  width: 100%;
+  height: 3px;
+  margin: 2px 0 0;
+  appearance: none;
+}
+
+/* ---- results ---- */
+
+.results {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  outline: none;
+}
+
+.welcome {
+  padding: 8px 20px;
+  color: var(--gs-dim);
+  line-height: 1.5;
+}
+
+.group {
+  border-top: 1px solid var(--gs-border);
+}
+
+.group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px 0 4px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.group-head:hover {
+  background: var(--gs-hover);
+}
+
+.group-head .twist {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  transition: transform 0.08s;
+}
+
+.group.closed .group-head .twist {
+  transform: rotate(-90deg);
+}
+
+.path {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+
+/* The parent path gives way first and truncates from its start: rtl flow puts the ellipsis
+   on the left while the lrm marks keep the Latin text reading left to right. */
+.path .pre {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--gs-dim);
+  direction: rtl;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.path .sep {
+  flex: none;
+  color: var(--gs-dim);
+}
+
+.path .last {
+  flex: 0 1 auto;
+  min-width: 6ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-head .chunk {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.group-head .chunk .last {
+  color: var(--gs-dim);
+}
+
+.group-head .archive {
+  flex: 0 4 auto;
+  min-width: 0;
+  color: var(--gs-dim);
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-head .count {
+  flex: none;
+  margin-left: auto;
+  padding: 0 6px;
+  color: var(--gs-badge-fg);
+  background: var(--gs-badge-bg);
+  border-radius: 9px;
+  font-size: 0.85em;
+  line-height: 16px;
+}
+
+.group.closed .rows {
+  display: none;
+}
+
+/* ---- a row's matched terms: a chevron toggle, and the list under the object ---- */
+
+.fold-terms {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px 0 0;
+  margin-left: 4px;
+  color: var(--gs-dim);
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.fold-terms:hover {
+  color: var(--gs-fg);
+}
+
+.fold-terms .twist {
+  width: 12px;
+  height: 12px;
+  transform: rotate(-90deg);
+}
+
+.fold-terms .twist.open {
+  transform: none;
+}
+
+.terms {
+  padding: 0 8px 4px 60px;
+}
+
+.terms .term {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  height: 20px;
+  font-size: 0.92em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.terms .term .t {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.terms .term .tk {
+  flex: none;
+  margin-left: auto;
+  color: var(--gs-dim);
+  font-size: 0.85em;
+}
+
+.terms .t.string {
+  color: var(--gs-text-string);
+}
+.terms .t.hash {
+  color: var(--gs-text-hash);
+}
+.terms .t.link {
+  color: var(--gs-text-link);
+}
+.terms .t.wad {
+  color: var(--gs-text-wad);
+}
+.terms .t.field {
+  color: var(--gs-text-field);
+}
+.terms .t.embedded {
+  color: var(--gs-text-class);
+}
+
+.terms .fold-terms {
+  margin: 2px 0 0 -14px;
+  font-size: 0.92em;
+}
+
+/* ---- the browse tree ---- */
+
+.tree {
+  padding: 2px 0;
+}
+
+.tnode .children {
+  padding-left: 16px;
+}
+
+.tnode.closed .children {
+  display: none;
+}
+
+.trow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px 0 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.trow:hover {
+  background: var(--gs-hover);
+}
+
+.trow .twist {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.08s;
+}
+
+.tnode.closed > .trow .twist {
+  transform: rotate(-90deg);
+}
+
+.trow .kind.dim {
+  color: var(--gs-dim);
+}
+
+.trow .name {
+  flex: 0 1 auto;
+  min-width: 6ch;
+  margin-left: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trow .name.dim {
+  color: var(--gs-dim);
+}
+
+.trow .class {
+  flex: 0 3 auto;
+  min-width: 6ch;
+  margin-left: 4px;
+  color: var(--gs-text-class);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trow .meta {
+  flex: 0 4 auto;
+  min-width: 0;
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--gs-dim);
+  font-size: 0.85em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trow .actions {
+  display: none;
+  flex: none;
+  margin-left: 4px;
+}
+
+.trow:hover .actions {
+  display: inline-flex;
+}
+
+.trow .actions .icon-button {
+  width: 20px;
+  height: 20px;
+}
+
+.tnote {
+  height: 22px;
+  padding-left: 28px;
+  color: var(--gs-dim);
+  line-height: 22px;
+}
+
+/* ---- parent-path folders ---- */
+
+.folder-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px 0 22px;
+  color: var(--gs-dim);
+  cursor: pointer;
+  user-select: none;
+  overflow: hidden;
+}
+
+.folder-head:hover {
+  background: var(--gs-hover);
+}
+
+.folder-head .kind {
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+}
+
+.folder-head .twist {
+  width: 14px;
+  height: 14px;
+  transition: transform 0.08s;
+}
+
+.folder.closed .folder-head .kind {
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+}
+
+.folder-head .twist {
+  transform: rotate(-90deg);
+}
+
+/* Truncates from the start so the nearest parent stays readable. */
+.folder-head .parent {
+  flex: 0 1 auto;
+  min-width: 0;
+  direction: rtl;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-head .n {
+  flex: none;
+  margin-left: auto;
+  padding-left: 8px;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85em;
+}
+
+.folder.closed .rows {
+  display: none;
+}
+
+/* ---- rows ---- */
+
+.row {
+  position: relative;
+  padding: 0 8px 0 40px;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--gs-hover);
+}
+
+.row.selected {
+  color: var(--gs-active-fg);
+  background: var(--gs-active);
+}
+
+.row .line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.row .kind {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.kind.object,
+.kind.class,
+.kind.embedded {
+  color: var(--gs-class);
+}
+.kind.folder {
+  color: var(--gs-folder);
+}
+.kind.field {
+  color: var(--gs-field);
+}
+.kind.string {
+  color: var(--gs-string);
+}
+.kind.hash {
+  color: var(--gs-hash);
+}
+.kind.link {
+  color: var(--gs-link);
+}
+.kind.wad {
+  color: var(--gs-wad);
+}
+.kind.override {
+  color: var(--gs-event);
+}
+
+/* Name, then class in the editor's type colour; the class gives way first. */
+.row .last {
+  flex: 0 1 auto;
+  min-width: 10ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row .class {
+  flex: 0 3 auto;
+  min-width: 6ch;
+  margin-left: 2px;
+  color: var(--gs-text-class);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row.selected .class,
+.row.selected .sub {
+  color: inherit;
+  opacity: 0.85;
+}
+
+/* Matched terms on their own line: plain coloured text, one line unless opened. */
+.row .sub {
+  display: block;
+  padding: 0 0 4px 20px;
+  margin-top: -3px;
+  color: var(--gs-dim);
+  font-size: 0.92em;
+  line-height: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.row .sub .t {
+  margin-right: 12px;
+}
+
+.row .sub .t.string {
+  color: var(--gs-text-string);
+}
+.row .sub .t.hash {
+  color: var(--gs-text-hash);
+}
+.row .sub .t.link {
+  color: var(--gs-text-link);
+}
+.row .sub .t.wad {
+  color: var(--gs-text-wad);
+}
+.row .sub .t.field {
+  color: var(--gs-text-field);
+}
+.row .sub .t.embedded {
+  color: var(--gs-text-class);
+}
+
+.row.selected .sub .t {
+  color: inherit;
+}
+
+.row .actions {
+  display: none;
+  flex: none;
+  margin-left: auto;
+  gap: 1px;
+}
+
+/* Hovering reveals the actions without pushing the text around. */
+.row:hover .actions,
+.row.selected .actions {
+  display: inline-flex;
+}
+
+.row .actions .icon-button {
+  width: 20px;
+  height: 20px;
+}
+
+.row.selected .actions .icon-button {
+  color: inherit;
+}
+
+.preview {
+  margin: 0 8px 6px 60px;
+  padding: 4px 8px;
+  color: var(--vscode-editor-foreground);
+  background: var(--vscode-editor-background);
+  border: 1px solid var(--gs-border);
+  border-radius: 3px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+  line-height: 1.4;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.preview .more {
+  color: var(--gs-dim);
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+}
+
+.more-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 28px;
+  color: var(--gs-dim);
+}
+
+.more-row button {
+  padding: 2px 10px;
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+  border: none;
+  border-radius: 2px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.more-row button:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.hidden {
+  display: none !important;
+}

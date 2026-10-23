@@ -295,6 +295,7 @@ export async function createClient(
     documentSelector: [
       { scheme: "file", language: "ritobin" },
       { scheme: "ritobin-bin", language: "ritobin" },
+      { scheme: "ritobin-wad", language: "ritobin" },
     ],
     initializationOptions,
     diagnosticCollectionName: "rustc",

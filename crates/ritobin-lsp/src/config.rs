@@ -74,8 +74,23 @@ pub struct InitOptions {
     pub meta_dump_path: Option<PathBuf>,
     pub diagnostic_limit: Option<usize>,
     pub lints: Option<LintsConfig>,
+    /// The `Game` directory of a League installation. Empty probes the platform default.
+    #[serde(default, deserialize_with = "empty_string_as_none")]
+    pub game_directory: Option<PathBuf>,
+    #[serde(default)]
+    pub game_search: GameSearchOptions,
     #[serde(flatten)]
     pub other: HashMap<String, serde_json::Value>,
+}
+
+/// The `ritobin-lsp.gameSearch.*` settings.
+#[derive(Deserialize, Debug, Clone, Copy, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct GameSearchOptions {
+    /// Whether the server builds the game index at all. Default `true`.
+    pub enabled: Option<bool>,
+    /// Walk threads. `0` or unset is the number of CPUs.
+    pub workers: Option<usize>,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
